@@ -81,7 +81,7 @@ export default function AdminDashboard() {
     getRoleHolder,
     setReports,
     news, submitSiteEdit,
-    galleryAlbums, setGalleryAlbums, galleryCategories,
+    galleryAlbums, galleryCategories,
     authInitializing, identityRefreshing,
   } = useApp();
 
@@ -189,7 +189,7 @@ export default function AdminDashboard() {
           {tab === 'branding' && currentUser?.role === 'PRESIDENT' && <SiteBrandingPanel />}
           {tab === 'history' && currentUser && isLeadershipRole(currentUser.role) && <EditsHistoryPanel />}
           {tab === 'events' && currentUser && isLeadershipRole(currentUser.role) && <EventsTab events={events} currentUser={currentUser} />}
-          {tab === 'gallery' && currentUser && isLeadershipRole(currentUser.role) && <GalleryTab galleryAlbums={galleryAlbums} setGalleryAlbums={setGalleryAlbums} galleryCategories={galleryCategories} currentUser={currentUser} />}
+          {tab === 'gallery' && currentUser && isLeadershipRole(currentUser.role) && <GalleryTab galleryAlbums={galleryAlbums} galleryCategories={galleryCategories} currentUser={currentUser} />}
           {tab === 'news' && canEditSection('news') && <NewsTab news={news} currentUser={currentUser} submitSiteEdit={submitSiteEdit} />}
           {tab === 'members' && currentUser?.role === 'PRESIDENT' && <MembersTab members={members} currentUser={currentUser} transferMemberRole={transferMemberRole} revokeExecutiveAssignment={revokeExecutiveAssignment} getRoleHolder={getRoleHolder} removeMember={removeMember} />}
           {tab === 'applications' && (
@@ -1548,23 +1548,34 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
 }
 
 /* ---------------- Gallery Tab ---------------- */
-function GalleryTab({ galleryAlbums, setGalleryAlbums, galleryCategories, currentUser }: {
+function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
   galleryAlbums: GalleryAlbum[];
-  setGalleryAlbums: React.Dispatch<React.SetStateAction<GalleryAlbum[]>>;
   galleryCategories: GalleryCategory[];
   currentUser: ReturnType<typeof useApp>['currentUser'];
 }) {
   const { t, i18n } = useTranslation();
-  const { uploadManagedFile, savePublishedSiteTarget, refreshPublishedLocalizations } = useApp();
+  const { uploadManagedFile, savePublishedSiteTarget, refreshPublishedLocalizations, createGalleryAlbum, updateOwnedGalleryAlbum, appendOwnedGalleryMedia, listOwnAlbumIds } = useApp();
   const repository = useCmsLocalizationRepository();
   // Scoped access: the president manages all albums; every other executive
   // member sees, adds, edits and deletes only the albums their role created
   // (`createdByRole == currentUser.role`).
   const isPresident = currentUser?.role === 'PRESIDENT';
+  const [ownedAlbumIds, setOwnedAlbumIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!isPresident) {
+      listOwnAlbumIds().then(res => {
+        if (res.ok && res.data) {
+          setOwnedAlbumIds(new Set(res.data));
+        }
+      });
+    }
+  }, [isPresident, listOwnAlbumIds]);
+
   const visibleAlbums =
     isPresident || !currentUser
       ? galleryAlbums
-      : galleryAlbums.filter((a) => a.createdByRole === currentUser.role);
+      : galleryAlbums.filter((a) => ownedAlbumIds.has(a.id));
 
   const [albumModalOpen, setAlbumModalOpen] = useState(false);
   const [editingAlbum, setEditingAlbum] = useState<GalleryAlbum | null>(null);
@@ -1643,10 +1654,16 @@ function GalleryTab({ galleryAlbums, setGalleryAlbums, galleryCategories, curren
     if (!validateRequired(albumForm, ['title', 'categoryId', 'date', 'location', 'coverImage', 'description'], setInvalid)) return;
     if (editingAlbum) {
       const next = galleryAlbums.map((a) => a.id === editingAlbum.id ? { ...a, ...albumForm } : a);
+      let saved;
       if (isPresident) {
-        const saved = await savePublishedSiteTarget('galleryAlbums', next);
-        if (!saved.ok) return;
-      } else setGalleryAlbums(next);
+        saved = await savePublishedSiteTarget('galleryAlbums', next);
+      } else {
+        saved = await updateOwnedGalleryAlbum(editingAlbum.id, albumForm);
+      }
+      if (!saved.ok) {
+        if (!isPresident) alert(saved.error ?? t('admin.gallery.editFailed', 'تعذر تعديل الألبوم.'));
+        return;
+      }
     } else {
       const newAlbumId = 'album' + Date.now();
       const newAlbum: GalleryAlbum = {
@@ -1654,10 +1671,16 @@ function GalleryTab({ galleryAlbums, setGalleryAlbums, galleryCategories, curren
         createdByRole: currentUser?.role, media: [],
       };
       const next = [newAlbum, ...galleryAlbums];
+      let saved;
       if (isPresident) {
-        const saved = await savePublishedSiteTarget('galleryAlbums', next);
-        if (!saved.ok) return;
-      } else setGalleryAlbums(next);
+        saved = await savePublishedSiteTarget('galleryAlbums', next);
+      } else {
+        saved = await createGalleryAlbum(newAlbum);
+      }
+      if (!saved.ok) {
+        if (!isPresident) alert(saved.error ?? t('admin.gallery.createFailed', 'تعذر إنشاء الألبوم.'));
+        return;
+      }
 
       if (isPresident) {
         try {
@@ -1703,12 +1726,11 @@ function GalleryTab({ galleryAlbums, setGalleryAlbums, galleryCategories, curren
   };
 
   const deleteAlbum = async (id: string) => {
+    if (!isPresident) return;
     if (!confirm(t('admin.gallery.confirmDeleteAlbum', 'هل أنت متأكد من حذف هذا الألبوم بكامل محتوياته؟'))) return;
     const next = galleryAlbums.filter((a) => a.id !== id);
-    if (isPresident) {
-      const saved = await savePublishedSiteTarget('galleryAlbums', next);
-      if (!saved.ok) return;
-    } else setGalleryAlbums(next);
+    const saved = await savePublishedSiteTarget('galleryAlbums', next);
+    if (!saved.ok) return;
     if (mediaAlbum?.id === id) setMediaAlbum(null);
   };
 
@@ -1757,29 +1779,48 @@ function GalleryTab({ galleryAlbums, setGalleryAlbums, galleryCategories, curren
       };
     };
     const nextAlbums = galleryAlbums.map((a) => a.id === mediaAlbum.id ? applyMedia(a) : a);
+    let saved;
     if (isPresident) {
-      const saved = await savePublishedSiteTarget('galleryAlbums', nextAlbums);
-      if (!saved.ok) return;
-    } else setGalleryAlbums(nextAlbums);
+      saved = await savePublishedSiteTarget('galleryAlbums', nextAlbums);
+    } else {
+      if (editingMedia) {
+        const targetAlbum = applyMedia(mediaAlbum);
+        saved = await updateOwnedGalleryAlbum(targetAlbum.id, targetAlbum);
+      } else {
+        const newMedia: GalleryMedia = {
+          id: 'media' + Date.now(), type: mediaForm.type, url: mediaForm.url,
+          thumbnail: mediaForm.thumbnail || undefined, caption: mediaForm.caption || undefined,
+          photoUrl: mediaForm.photoUrl.trim() || undefined, createdByRole: currentUser?.role,
+        };
+        saved = await appendOwnedGalleryMedia(mediaAlbum.id, newMedia);
+      }
+    }
+    if (!saved.ok) {
+      if (!isPresident) alert(saved.error ?? t('admin.gallery.mediaFailed', 'تعذر حفظ الوسائط.'));
+      return;
+    }
     setMediaAlbum((prev) => (prev ? { ...prev, ...applyMedia(prev) } : prev));
     setMediaModalOpen(false);
   };
 
   const deleteMedia = async (album: GalleryAlbum, mediaId: string) => {
     if (!confirm(t('admin.gallery.confirmDeleteMedia', 'هل أنت متأكد من حذف هذه الوسائط؟'))) return;
-    const nextAlbums = galleryAlbums.map((a) => {
-      if (a.id !== album.id) return a;
-      const media = a.media.filter((m) => m.id !== mediaId);
-      return {
-        ...a, media,
-        photoCount: media.filter((m) => m.type === 'photo').length,
-        videoCount: media.filter((m) => m.type === 'video').length,
-      };
-    });
+    const updatedAlbum = {
+      ...album, media: album.media.filter((m) => m.id !== mediaId),
+      photoCount: album.media.filter((m) => m.id !== mediaId && m.type === 'photo').length,
+      videoCount: album.media.filter((m) => m.id !== mediaId && m.type === 'video').length,
+    };
+    const nextAlbums = galleryAlbums.map((a) => a.id === album.id ? updatedAlbum : a);
+    let saved;
     if (isPresident) {
-      const saved = await savePublishedSiteTarget('galleryAlbums', nextAlbums);
-      if (!saved.ok) return;
-    } else setGalleryAlbums(nextAlbums);
+      saved = await savePublishedSiteTarget('galleryAlbums', nextAlbums);
+    } else {
+      saved = await updateOwnedGalleryAlbum(album.id, updatedAlbum);
+    }
+    if (!saved.ok) {
+      if (!isPresident) alert(saved.error ?? t('admin.gallery.mediaDeleteFailed', 'تعذر حذف الوسائط.'));
+      return;
+    }
     setMediaAlbum((prev) => {
       if (!prev || prev.id !== album.id) return prev;
       const media = prev.media.filter((m) => m.id !== mediaId);
@@ -1835,7 +1876,7 @@ function GalleryTab({ galleryAlbums, setGalleryAlbums, galleryCategories, curren
               <div className="mt-3 flex gap-1.5">
                 <button onClick={() => openEditAlbum(album)} className="flex h-8 w-8 items-center justify-center rounded-lg text-navy-600 transition-colors hover:bg-navy-50" title={t('admin.gallery.editAlbumTitle', 'تعديل الألبوم')}><Edit3 className="h-4 w-4" /></button>
                 <button onClick={() => openAddMedia(album)} className="flex items-center gap-1 rounded-lg bg-navy-700 px-2.5 text-xs font-bold text-white hover:bg-navy-800" title={t('admin.gallery.manageMedia', 'الوسائط')}><Plus className="h-3.5 w-3.5" /> {t('admin.gallery.manageMedia', 'الوسائط')}</button>
-                <button onClick={() => deleteAlbum(album.id)} className="flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition-colors hover:bg-rose-50" title={t('admin.gallery.deleteAlbumTitle', 'حذف الألبوم')}><Trash2 className="h-4 w-4" /></button>
+                {isPresident && <button onClick={() => deleteAlbum(album.id)} className="flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition-colors hover:bg-rose-50" title={t('admin.gallery.deleteAlbumTitle', 'حذف الألبوم')}><Trash2 className="h-4 w-4" /></button>}
               </div>
             </div>
           </div>
@@ -2061,9 +2102,10 @@ function EventsTab({ events, currentUser }: {
   currentUser: ReturnType<typeof useApp>['currentUser'];
 }) {
   const { t } = useTranslation();
-  const { uploadManagedFile, savePublishedSiteTarget, createPublishedEvent, refreshPublishedLocalizations } = useApp();
+  const { uploadManagedFile, savePublishedSiteTarget, createPublishedEvent, updateOwnedEvent, listOwnEventIds, refreshPublishedLocalizations } = useApp();
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [ownedEventIds, setOwnedEventIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [invalid, setInvalid] = useState<string[]>([]);
   const [toast, setToast] = useState<ToastMessage | null>(null);
@@ -2086,10 +2128,21 @@ function EventsTab({ events, currentUser }: {
   // invisible inside the member's personal dashboard.
   const isPresident = currentUser?.role === 'PRESIDENT';
   const canCreate = canCreateExecutiveContent(currentUser?.role);
+
+  useEffect(() => {
+    if (canCreate && !isPresident) {
+      listOwnEventIds().then(res => {
+        if (res.ok && res.data) {
+          setOwnedEventIds(new Set(res.data));
+        }
+      });
+    }
+  }, [canCreate, isPresident, listOwnEventIds]);
+
   const visibleEvents =
     isPresident || !currentUser
       ? events
-      : events.filter((e) => e.createdByRole === currentUser.role);
+      : events.filter((e) => ownedEventIds.has(e.id));
 
   const openAdd = () => {
     setEditId(null);
@@ -2120,8 +2173,12 @@ function EventsTab({ events, currentUser }: {
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canCreate || (editId && !isPresident)) {
-      setToast({ id: Date.now(), type: 'error', text: editId ? t('admin.events.editRestrictedPresident', 'تعديل الفعاليات المنشورة متاح لرئيس الاتحاد فقط.') : t('admin.events.createRestrictedExecutive', 'إنشاء الفعاليات متاح لأعضاء الهيئة التنفيذية فقط.') });
+    if (!canCreate) {
+      setToast({ id: Date.now(), type: 'error', text: t('admin.events.createRestrictedExecutive', 'إنشاء الفعاليات متاح لأعضاء الهيئة التنفيذية فقط.') });
+      return;
+    }
+    if (editId && !isPresident && !ownedEventIds.has(editId)) {
+      setToast({ id: Date.now(), type: 'error', text: t('admin.events.editRestrictedPresident', 'غير مصرح لك بتعديل هذه الفعالية.') });
       return;
     }
     const ok = validateRequired(form, ['title', 'category', 'date', 'time', 'location', 'description', 'image', 'status', 'activityType', 'registrationDeadline'], setInvalid);
@@ -2137,8 +2194,17 @@ function EventsTab({ events, currentUser }: {
     const publicEventId = editId ?? crypto.randomUUID();
     if (editId) {
       const next = events.map((ev) => ev.id === editId ? { ...ev, title: form.title, category: form.category, date: iso, location: form.location, description: form.description, capacity: form.capacity, status: form.status, image, eventUrl, activityType: form.activityType, pointsValue: Number(form.pointsValue), registrationDeadline } : ev);
-      const saved = await savePublishedSiteTarget('events', next);
-      if (!saved.ok) return;
+      let saved;
+      if (isPresident) {
+        saved = await savePublishedSiteTarget('events', next);
+      } else {
+        const singleNext = next.find(ev => ev.id === editId)!;
+        saved = await updateOwnedEvent(editId, singleNext);
+      }
+      if (!saved.ok) {
+        if (!isPresident) setToast({ id: Date.now(), type: 'error', text: saved.error ?? t('admin.events.editFailed', 'تعذر تعديل الفعالية.') });
+        return;
+      }
     } else {
       const newEvent: UEvent = { id: publicEventId, title: form.title, category: form.category, date: iso, location: form.location, description: form.description, status: form.status, capacity: Number(form.capacity), registered: 0, image, eventUrl, createdBy: currentUser?.email, createdByRole: currentUser?.role, activityType: form.activityType, pointsValue: Number(form.pointsValue), registrationDeadline };
       const saved = await createPublishedEvent(newEvent);
@@ -2229,10 +2295,10 @@ function EventsTab({ events, currentUser }: {
                       : <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-bold text-gray-600">{t('admin.events.status.past', 'منتهية')}</span>}
                   </td>
                   <td className="px-4 py-3">
-                    {isPresident ? (
+                    {(isPresident || ownedEventIds.has(e.id)) ? (
                       <div className="flex gap-1">
                         <button onClick={() => openEdit(e)} className="flex h-8 w-8 items-center justify-center rounded-lg text-navy-600 transition-colors hover:bg-navy-50" title={t('common.edit', 'تعديل')}><Edit3 className="h-4 w-4" /></button>
-                        <button onClick={() => remove(e.id)} className="flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition-colors hover:bg-rose-50" title={t('common.delete', 'حذف')}><Trash2 className="h-4 w-4" /></button>
+                        {isPresident && <button onClick={() => remove(e.id)} className="flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition-colors hover:bg-rose-50" title={t('common.delete', 'حذف')}><Trash2 className="h-4 w-4" /></button>}
                       </div>
                     ) : <span className="text-xs text-gray-400">{t('admin.events.viewOnly', 'عرض فقط')}</span>}
                   </td>

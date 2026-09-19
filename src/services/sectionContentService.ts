@@ -32,3 +32,17 @@ export const publishOwnCommitteeFields = (
 ) => (
   repository.publishOwnCommitteeFields(committeeId, fields, expectedVersion)
 );
+export const updateOwnedEvent = (eventId: string, eventPatch: unknown, expectedVersion: number) => (
+  repository.updateOwnedEvent(eventId, eventPatch, expectedVersion)
+);
+export const createGalleryAlbum = (album: unknown, expectedVersion: number) => (
+  repository.createGalleryAlbum(album, expectedVersion)
+);
+export const updateOwnedGalleryAlbum = (albumId: string, albumPatch: unknown, expectedVersion: number) => (
+  repository.updateOwnedGalleryAlbum(albumId, albumPatch, expectedVersion)
+);
+export const appendOwnedGalleryMedia = (albumId: string, media: unknown, expectedVersion: number) => (
+  repository.appendOwnedGalleryMedia(albumId, media, expectedVersion)
+);
+export const listOwnEventIds = () => repository.listOwnEventIds();
+export const listOwnAlbumIds = () => repository.listOwnAlbumIds();

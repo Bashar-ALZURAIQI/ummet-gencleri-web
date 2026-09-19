@@ -16,6 +16,7 @@ import { useCmsLocalizationRepository } from '../context/CmsLocalizationContext'
 import { type LocalizedCmsLocale } from '../domain/cmsLocalization';
 import { publishCmsEntityLocales, resolveCanonicalEntityById } from '../domain/cmsLocalizationEditor';
 import { formatPublicDate } from '../domain/datePresentation';
+import { canCreateExecutiveContent } from '../domain/phaseThreeEconomy.ts';
 
 export default function MediaGallery() {
   const {
@@ -28,11 +29,16 @@ export default function MediaGallery() {
     uploadManagedFile,
     savePublishedSiteTarget,
     refreshPublishedLocalizations,
+    listOwnAlbumIds,
+    updateOwnedGalleryAlbum,
+    appendOwnedGalleryMedia,
+    createGalleryAlbum,
   } = useApp();
   const { t, i18n } = useTranslation();
   const [filter, setFilter] = useState<string>('all');
   const [selectedAlbumId, setSelectedAlbumId] = useState<string | null>(null);
   const [lightboxMedia, setLightboxMedia] = useState<GalleryMedia | null>(null);
+  const [ownedAlbumIds, setOwnedAlbumIds] = useState<Set<string>>(new Set());
 
   // Album modal
   const localizationRepo = useCmsLocalizationRepository();
@@ -101,6 +107,17 @@ export default function MediaGallery() {
   const isPresidentOrMedia =
     currentUser &&
     (currentUser.role === 'PRESIDENT' || currentUser.role === 'MEDIA_HEAD');
+  const canManageAlbum = currentUser && canCreateExecutiveContent(currentUser.role);
+
+  useEffect(() => {
+    if (canManageAlbum && !isPresident) {
+      listOwnAlbumIds().then(res => {
+        if (res.ok && res.data) {
+          setOwnedAlbumIds(new Set(res.data));
+        }
+      });
+    }
+  }, [canManageAlbum, isPresident, listOwnAlbumIds]);
 
   const mediaNotice = () => undefined;
 
@@ -180,7 +197,19 @@ export default function MediaGallery() {
     if (!albumForm.title.trim() || !albumForm.categoryId) return;
     if (editingAlbum) {
       const next: GalleryAlbum = { ...editingAlbum, ...albumForm };
-      if (currentUser?.role === 'MEDIA_HEAD') {
+      if (isPresident) {
+        const saved = await savePublishedSiteTarget(
+          'galleryAlbums',
+          (canonicalGalleryAlbums ?? galleryAlbums).map((album) => album.id === editingAlbum.id ? next : album),
+        );
+        if (!saved.ok) return;
+      } else if (ownedAlbumIds.has(editingAlbum.id)) {
+        const saved = await updateOwnedGalleryAlbum(editingAlbum.id, next);
+        if (!saved.ok) {
+          alert(saved.error ?? t('admin.gallery.editFailed', 'تعذر تعديل الألبوم.'));
+          return;
+        }
+      } else if (currentUser?.role === 'MEDIA_HEAD') {
         const diffs = albumDiffs('update', editingAlbum, next);
         if (diffs.length) {
           const submitted = await submitSiteEdit({
@@ -193,17 +222,34 @@ export default function MediaGallery() {
         setAlbumModalOpen(false);
         return;
       }
-      const saved = await savePublishedSiteTarget(
-        'galleryAlbums',
-        (canonicalGalleryAlbums ?? galleryAlbums).map((album) => album.id === editingAlbum.id ? next : album),
-      );
-      if (!saved.ok) return;
     } else {
       const newAlbumId = 'album' + Date.now();
       const newAlbum: GalleryAlbum = {
         id: newAlbumId, ...albumForm, media: [], createdByRole: currentUser?.role,
       };
-      if (currentUser?.role === 'MEDIA_HEAD') {
+      if (isPresident) {
+        const saved = await savePublishedSiteTarget('galleryAlbums', [newAlbum, ...(canonicalGalleryAlbums ?? galleryAlbums)]);
+        if (!saved.ok) return;
+        try {
+          await publishCmsEntityLocales({
+            repository: localizationRepo, target: 'galleryAlbums',
+            canonicalPayload: [newAlbum, ...(canonicalGalleryAlbums ?? galleryAlbums)],
+            recordId: newAlbumId, translations: albumTranslations,
+          });
+          await refreshPublishedLocalizations();
+        } catch {
+          alert(t('cmsLocalization.publishFailed', 'تعذر نشر الترجمة.'));
+          return;
+        }
+      } else if (canManageAlbum) {
+        const saved = await createGalleryAlbum(newAlbum);
+        if (!saved.ok) {
+          alert(saved.error ?? t('admin.gallery.createFailed', 'تعذر إنشاء الألبوم.'));
+          return;
+        }
+        // NOTE: Translation publishing for non-presidents might need a draft or is skipped here for simplicity.
+        // If they want to translate, they can do it via draft if they are MEDIA_HEAD, or wait for President.
+      } else if (currentUser?.role === 'MEDIA_HEAD') {
         const diffs = albumDiffs('add', null, newAlbum);
         if (diffs.length) {
           const submitted = await submitSiteEdit({
@@ -216,20 +262,6 @@ export default function MediaGallery() {
         setAlbumModalOpen(false);
         return;
       }
-      const saved = await savePublishedSiteTarget('galleryAlbums', [newAlbum, ...(canonicalGalleryAlbums ?? galleryAlbums)]);
-      if (!saved.ok) return;
-
-      try {
-        await publishCmsEntityLocales({
-          repository: localizationRepo, target: 'galleryAlbums',
-          canonicalPayload: [newAlbum, ...(canonicalGalleryAlbums ?? galleryAlbums)],
-          recordId: newAlbumId, translations: albumTranslations,
-        });
-        await refreshPublishedLocalizations();
-      } catch {
-        alert(t('cmsLocalization.publishFailed', 'تعذر نشر الترجمة.'));
-        return;
-      }
     }
     setAlbumModalOpen(false);
   };
@@ -238,7 +270,10 @@ export default function MediaGallery() {
     if (!confirm('هل أنت متأكد من حذف هذا الألبوم بكامل محتوياته؟')) return;
     const current = (canonicalGalleryAlbums ?? galleryAlbums).find((a) => a.id === id);
     if (!current) return;
-    if (currentUser?.role === 'MEDIA_HEAD') {
+    if (isPresident) {
+      const saved = await savePublishedSiteTarget('galleryAlbums', (canonicalGalleryAlbums ?? galleryAlbums).filter((album) => album.id !== id));
+      if (!saved.ok) return;
+    } else if (currentUser?.role === 'MEDIA_HEAD') {
       await submitSiteEdit({
         pageId: 'gallery', pageLabel: 'معرض الصور', sectionLabel: current.title,
         target: 'galleryAlbums', op: 'delete', recordId: id, recordValue: current,
@@ -246,9 +281,10 @@ export default function MediaGallery() {
       });
       mediaNotice();
       return;
+    } else {
+      alert("ليس لديك صلاحية لحذف الألبوم بالكامل.");
+      return;
     }
-    const saved = await savePublishedSiteTarget('galleryAlbums', (canonicalGalleryAlbums ?? galleryAlbums).filter((album) => album.id !== id));
-    if (!saved.ok) return;
     if (selectedAlbumId === id) setSelectedAlbumId(null);
   };
 
@@ -387,7 +423,28 @@ export default function MediaGallery() {
         videoCount: newMedia.type === 'video' ? a.videoCount + 1 : a.videoCount,
       };
     };
-    if (currentUser?.role === 'MEDIA_HEAD') {
+    if (isPresident) {
+      const nextAlbums = (canonicalGalleryAlbums ?? galleryAlbums)
+        .map((album) => album.id === selectedAlbumId ? buildNext(album) : album);
+      const saved = await savePublishedSiteTarget('galleryAlbums', nextAlbums);
+      if (!saved.ok) return;
+      try {
+        await publishCmsEntityLocales({
+          repository: localizationRepo, target: 'galleryAlbums', canonicalPayload: nextAlbums,
+          recordId: newMedia.id, translations: mediaTranslations,
+        });
+        await refreshPublishedLocalizations();
+      } catch {
+        alert(t('cmsLocalization.publishFailed', 'تعذر نشر الترجمة.'));
+        return;
+      }
+    } else if (ownedAlbumIds.has(selectedAlbumId)) {
+      const saved = await appendOwnedGalleryMedia(selectedAlbumId, newMedia);
+      if (!saved.ok) {
+        alert(saved.error ?? t('admin.gallery.mediaFailed', 'تعذر حفظ الوسائط.'));
+        return;
+      }
+    } else if (currentUser?.role === 'MEDIA_HEAD') {
       const current = (canonicalGalleryAlbums ?? galleryAlbums).find((a) => a.id === selectedAlbumId);
       if (!current) return;
       const next = buildNext(current);
@@ -405,22 +462,6 @@ export default function MediaGallery() {
       });
       if (!submitted) return;
       mediaNotice();
-      setMediaModalOpen(false);
-      return;
-    }
-    const nextAlbums = (canonicalGalleryAlbums ?? galleryAlbums)
-      .map((album) => album.id === selectedAlbumId ? buildNext(album) : album);
-    const saved = await savePublishedSiteTarget('galleryAlbums', nextAlbums);
-    if (!saved.ok) return;
-    try {
-      await publishCmsEntityLocales({
-        repository: localizationRepo, target: 'galleryAlbums', canonicalPayload: nextAlbums,
-        recordId: newMedia.id, translations: mediaTranslations,
-      });
-      await refreshPublishedLocalizations();
-    } catch {
-      alert(t('cmsLocalization.publishFailed', 'تعذر نشر الترجمة.'));
-      return;
     }
     setMediaModalOpen(false);
   };
@@ -437,7 +478,17 @@ export default function MediaGallery() {
       photoCount: media.type === 'photo' ? a.photoCount - 1 : a.photoCount,
       videoCount: media.type === 'video' ? a.videoCount - 1 : a.videoCount,
     });
-    if (currentUser?.role === 'MEDIA_HEAD') {
+    if (isPresident) {
+      await savePublishedSiteTarget(
+        'galleryAlbums',
+        (canonicalGalleryAlbums ?? galleryAlbums).map((album) => album.id === canonicalAlbum.id ? buildNext(album) : album),
+      );
+    } else if (ownedAlbumIds.has(canonicalAlbum.id)) {
+      const saved = await updateOwnedGalleryAlbum(canonicalAlbum.id, buildNext(canonicalAlbum));
+      if (!saved.ok) {
+        alert(saved.error ?? t('admin.gallery.mediaDeleteFailed', 'تعذر حذف الوسائط.'));
+      }
+    } else if (currentUser?.role === 'MEDIA_HEAD') {
       const next = buildNext(canonicalAlbum);
       const diffs: SiteEditDiff[] = [
         { label: 'حذف وسائط', oldValue: media.url, newValue: 'سيتم حذف هذه الوسائط', editable: false },
@@ -448,12 +499,7 @@ export default function MediaGallery() {
         nested: { parentField: 'media', itemId: mediaId, remove: true },
       });
       mediaNotice();
-      return;
     }
-    await savePublishedSiteTarget(
-      'galleryAlbums',
-      (canonicalGalleryAlbums ?? galleryAlbums).map((album) => album.id === canonicalAlbum.id ? buildNext(album) : album),
-    );
   };
 
   return (
@@ -543,8 +589,8 @@ export default function MediaGallery() {
               onClick={() => setSelectedAlbumId(album.id)}
               className="group relative cursor-pointer overflow-hidden rounded-2xl bg-white shadow-md ring-1 ring-gray-100 transition-all hover:-translate-y-1 hover:shadow-xl"
             >
-              {isPresidentOrMedia && (
-                <div className="absolute left-3 top-3 z-20 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="absolute left-3 top-3 z-20 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                {(isPresidentOrMedia || ownedAlbumIds.has(album.id)) && (
                   <button
                     onClick={(e) => { e.stopPropagation(); openEditAlbum(album); }}
                     className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-navy-700 shadow backdrop-blur-sm hover:bg-white"
@@ -552,6 +598,8 @@ export default function MediaGallery() {
                   >
                     <Edit3 className="h-4 w-4" />
                   </button>
+                )}
+                {isPresidentOrMedia && (
                   <button
                     onClick={(e) => { e.stopPropagation(); deleteAlbum(album.id); }}
                     className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-rose-600 shadow backdrop-blur-sm hover:bg-white"
@@ -559,8 +607,8 @@ export default function MediaGallery() {
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
-                </div>
-              )}
+                )}
+              </div>
               <div className="relative aspect-[4/3] overflow-hidden">
                 <img
                   src={album.coverImage}
@@ -599,7 +647,7 @@ export default function MediaGallery() {
           ))}
         </div>
 
-        {isPresidentOrMedia && (
+        {canManageAlbum && (
           <button
             onClick={openAddAlbum}
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-navy-200 px-4 py-4 text-sm font-bold text-navy-600 transition-colors hover:border-navy-300 hover:bg-navy-50"
@@ -659,7 +707,7 @@ export default function MediaGallery() {
                     {t('gallery.videoCount', { count: selectedAlbum.videoCount })}
                   </div>
                 )}
-                {isPresidentOrMedia && (
+                {(isPresidentOrMedia || (selectedAlbum && ownedAlbumIds.has(selectedAlbum.id))) && (
                   <button
                     onClick={openAddMedia}
                     className="mr-auto inline-flex items-center gap-1.5 rounded-xl bg-navy-700 px-4 py-2 text-sm font-bold text-white hover:bg-navy-800"
@@ -699,7 +747,7 @@ export default function MediaGallery() {
                           <p className="text-xs text-white">{m.caption}</p>
                         </div>
                       )}
-                      {isPresidentOrMedia && (
+                      {(isPresidentOrMedia || (selectedAlbum && ownedAlbumIds.has(selectedAlbum.id))) && (
                         <button
                           onClick={(e) => { e.stopPropagation(); deleteMedia(m.id); }}
                           className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-rose-600 opacity-0 shadow transition-opacity group-hover:opacity-100 hover:bg-white"

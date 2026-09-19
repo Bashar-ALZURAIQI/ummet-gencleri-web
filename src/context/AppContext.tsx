@@ -48,6 +48,12 @@ import {
   publishOwnCommittee,
   publishOwnCommitteeFields,
   publishCmsTarget,
+  updateOwnedEvent as updateOwnedEventService,
+  createGalleryAlbum as createGalleryAlbumService,
+  updateOwnedGalleryAlbum as updateOwnedGalleryAlbumService,
+  appendOwnedGalleryMedia as appendOwnedGalleryMediaService,
+  listOwnEventIds as listOwnEventIdsService,
+  listOwnAlbumIds as listOwnAlbumIdsService,
 } from '../services/sectionContentService';
 import {
   listVisibleContactMessages,
@@ -227,6 +233,7 @@ import {
   type GuideSectionData,
   initialGuideSections,
   type GalleryAlbum,
+  type GalleryMedia,
   type GalleryCategory,
   initialGalleryAlbums,
   initialGalleryCategories,
@@ -732,6 +739,12 @@ interface AppContextValue {
     goals: string,
   ) => Promise<{ ok: boolean; error?: string }>;
   createPublishedEvent: (event: UEvent) => Promise<{ ok: boolean; error?: string }>;
+  updateOwnedEvent: (eventId: string, eventPatch: Partial<UEvent>) => Promise<{ ok: boolean; error?: string }>;
+  createGalleryAlbum: (album: GalleryAlbum) => Promise<{ ok: boolean; error?: string }>;
+  updateOwnedGalleryAlbum: (albumId: string, albumPatch: Partial<GalleryAlbum>) => Promise<{ ok: boolean; error?: string }>;
+  appendOwnedGalleryMedia: (albumId: string, media: GalleryMedia) => Promise<{ ok: boolean; error?: string }>;
+  listOwnEventIds: () => Promise<{ ok: boolean; data?: string[]; error?: string }>;
+  listOwnAlbumIds: () => Promise<{ ok: boolean; data?: string[]; error?: string }>;
   canonicalSiteContent?: SiteContent;
   canonicalAboutContent?: AboutContent;
   canonicalNews?: NewsItem[];
@@ -3451,6 +3464,126 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   };
 
+  const updateOwnedEvent: AppContextValue['updateOwnedEvent'] = async (eventId, eventPatch) => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'تعديل الفعاليات متاح لأعضاء الهيئة التنفيذية فقط.' };
+    }
+    const expectedVersion = selectCmsExpectedVersion('events', currentCmsVersions());
+    if (expectedVersion < 1) {
+      return { ok: false, error: 'لم تكتمل مزامنة النسخة الرسمية بعد. حدّث الصفحة ثم أعد المحاولة.' };
+    }
+    const result = await updateOwnedEventService(eventId, eventPatch, expectedVersion);
+    const currentOwner = captureConfirmedAuthOwner();
+    if (!currentOwner || currentOwner.userId !== owner.userId || currentOwner.epoch !== owner.epoch || !isLeadershipRole(currentOwner.role)) {
+      return { ok: false, error: 'تغيرت صلاحية الحساب أثناء التعديل؛ لم تُعتمد النتيجة في هذه الجلسة.' };
+    }
+    if (!result.ok) {
+      const error = result.error.message || 'تعذر تعديل الفعالية في قاعدة البيانات.';
+      setContentError(error);
+      return { ok: false, error };
+    }
+    applyCmsPublication('events', result.data.payload, result.data.version);
+    setContentError(null);
+    return { ok: true };
+  };
+
+  const createGalleryAlbum: AppContextValue['createGalleryAlbum'] = async (album) => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'إنشاء الألبومات متاح لأعضاء الهيئة التنفيذية فقط.' };
+    }
+    const expectedVersion = selectCmsExpectedVersion('galleryAlbums', currentCmsVersions());
+    if (expectedVersion < 1) {
+      return { ok: false, error: 'لم تكتمل مزامنة النسخة الرسمية بعد. حدّث الصفحة ثم أعد المحاولة.' };
+    }
+    const result = await createGalleryAlbumService(album, expectedVersion);
+    const currentOwner = captureConfirmedAuthOwner();
+    if (!currentOwner || currentOwner.userId !== owner.userId || currentOwner.epoch !== owner.epoch || !isLeadershipRole(currentOwner.role)) {
+      return { ok: false, error: 'تغيرت صلاحية الحساب أثناء الإنشاء؛ لم تُعتمد النتيجة في هذه الجلسة.' };
+    }
+    if (!result.ok) {
+      const error = result.error.message || 'تعذر إنشاء الألبوم في قاعدة البيانات.';
+      setContentError(error);
+      return { ok: false, error };
+    }
+    applyCmsPublication('galleryAlbums', result.data.payload, result.data.version);
+    setContentError(null);
+    return { ok: true };
+  };
+
+  const updateOwnedGalleryAlbum: AppContextValue['updateOwnedGalleryAlbum'] = async (albumId, albumPatch) => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'تعديل الألبومات متاح لأعضاء الهيئة التنفيذية فقط.' };
+    }
+    const expectedVersion = selectCmsExpectedVersion('galleryAlbums', currentCmsVersions());
+    if (expectedVersion < 1) {
+      return { ok: false, error: 'لم تكتمل مزامنة النسخة الرسمية بعد. حدّث الصفحة ثم أعد المحاولة.' };
+    }
+    const result = await updateOwnedGalleryAlbumService(albumId, albumPatch, expectedVersion);
+    const currentOwner = captureConfirmedAuthOwner();
+    if (!currentOwner || currentOwner.userId !== owner.userId || currentOwner.epoch !== owner.epoch || !isLeadershipRole(currentOwner.role)) {
+      return { ok: false, error: 'تغيرت صلاحية الحساب أثناء التعديل؛ لم تُعتمد النتيجة في هذه الجلسة.' };
+    }
+    if (!result.ok) {
+      const error = result.error.message || 'تعذر تعديل الألبوم في قاعدة البيانات.';
+      setContentError(error);
+      return { ok: false, error };
+    }
+    applyCmsPublication('galleryAlbums', result.data.payload, result.data.version);
+    setContentError(null);
+    return { ok: true };
+  };
+
+  const appendOwnedGalleryMedia: AppContextValue['appendOwnedGalleryMedia'] = async (albumId, media) => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'إضافة الوسائط متاحة لأعضاء الهيئة التنفيذية فقط.' };
+    }
+    const expectedVersion = selectCmsExpectedVersion('galleryAlbums', currentCmsVersions());
+    if (expectedVersion < 1) {
+      return { ok: false, error: 'لم تكتمل مزامنة النسخة الرسمية بعد. حدّث الصفحة ثم أعد المحاولة.' };
+    }
+    const result = await appendOwnedGalleryMediaService(albumId, media, expectedVersion);
+    const currentOwner = captureConfirmedAuthOwner();
+    if (!currentOwner || currentOwner.userId !== owner.userId || currentOwner.epoch !== owner.epoch || !isLeadershipRole(currentOwner.role)) {
+      return { ok: false, error: 'تغيرت صلاحية الحساب أثناء الإضافة؛ لم تُعتمد النتيجة في هذه الجلسة.' };
+    }
+    if (!result.ok) {
+      const error = result.error.message || 'تعذر إضافة الوسائط في قاعدة البيانات.';
+      setContentError(error);
+      return { ok: false, error };
+    }
+    applyCmsPublication('galleryAlbums', result.data.payload, result.data.version);
+    setContentError(null);
+    return { ok: true };
+  };
+
+  const listOwnEventIds: AppContextValue['listOwnEventIds'] = async () => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'غير مصرح.' };
+    }
+    const result = await listOwnEventIdsService();
+    if (!result.ok) {
+      return { ok: false, error: result.error.message };
+    }
+    return { ok: true, data: result.data };
+  };
+
+  const listOwnAlbumIds: AppContextValue['listOwnAlbumIds'] = async () => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'غير مصرح.' };
+    }
+    const result = await listOwnAlbumIdsService();
+    if (!result.ok) {
+      return { ok: false, error: result.error.message };
+    }
+    return { ok: true, data: result.data };
+  };
+
   /** Media-head edits are persisted first; the UI changes only after RPC confirmation. */
   const submitSiteEdit: AppContextValue['submitSiteEdit'] = async (input) => {
     const owner = captureConfirmedAuthOwner();
@@ -3977,6 +4110,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saveOwnCommitteeContent,
       saveOwnCommitteeVision,
       createPublishedEvent,
+      updateOwnedEvent,
+      createGalleryAlbum,
+      updateOwnedGalleryAlbum,
+      appendOwnedGalleryMedia,
+      listOwnEventIds,
+      listOwnAlbumIds,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
