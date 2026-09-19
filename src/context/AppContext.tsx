@@ -17,7 +17,6 @@ import {
   listPresidentAssignableMembers,
   listPublicExecutiveDirectory,
   loadSessionIdentity,
-  subscribeToPublicExecutiveDirectory,
   subscribeToOwnProfileAndAssignment,
   transferExecutiveAssignment,
   revokeExecutiveAssignment as revokeExecutiveAssignmentService,
@@ -1542,28 +1541,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         applyPublishedContentBundle(result.data.content);
       });
 
-    const channel = supabase
-      .channel('published-site-content:main')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'published_site_content', filter: 'id=eq.main' },
-        (payload) => {
-          if (!active) return;
-          const row = payload.new as { content?: unknown; version?: unknown };
-          if (!row || typeof row !== 'object' || !Number.isSafeInteger(row.version)) return;
-          const nextVersion = Number(row.version);
-          if (nextVersion <= contentVersionRef.current || !row.content || typeof row.content !== 'object' || Array.isArray(row.content)) return;
-          contentVersionRef.current = nextVersion;
-          setContentVersion(nextVersion);
-          applyPublishedContentBundle(row.content as SiteContentBundle);
-          setContentError(null);
-        },
-      )
-      .subscribe();
-
     return () => {
       active = false;
-      void supabase.removeChannel(channel);
     };
   }, [applyPublishedContentBundle]);
 
@@ -1590,47 +1569,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       });
 
-    const guideChannel = supabase
-      .channel('student-guide:main')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'student_guide', filter: 'id=eq.main' },
-        (payload) => {
-          if (!active) return;
-          const row = payload.new as { quick_info?: unknown; sections?: unknown; version?: unknown };
-          if (!Number.isSafeInteger(row?.version) || Number(row.version) <= guideVersionRef.current) return;
-          if (typeof row.quick_info !== 'string' || !Array.isArray(row.sections)) return;
-          guideVersionRef.current = Number(row.version);
-          setGuideVersion(Number(row.version));
-          setGuideQuickInfo(row.quick_info);
-          setGuideSections(row.sections as GuideSectionData[]);
-          setContentError(null);
-        },
-      )
-      .subscribe();
-
-    const faqChannel = supabase
-      .channel('faq:main')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'faq', filter: 'id=eq.main' },
-        (payload) => {
-          if (!active) return;
-          const row = payload.new as { categories?: unknown; version?: unknown };
-          if (!Number.isSafeInteger(row?.version) || Number(row.version) <= faqVersionRef.current) return;
-          if (!Array.isArray(row.categories)) return;
-          faqVersionRef.current = Number(row.version);
-          setFaqVersion(Number(row.version));
-          setFaqCategories(row.categories as FAQCategoryData[]);
-          setContentError(null);
-        },
-      )
-      .subscribe();
-
     return () => {
       active = false;
-      void supabase.removeChannel(guideChannel);
-      void supabase.removeChannel(faqChannel);
     };
   }, []);
 
@@ -1704,8 +1644,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addEventListener: (_event, listener) => window.addEventListener('focus', listener),
         removeEventListener: (_event, listener) => window.removeEventListener('focus', listener),
       },
-      scheduleInterval: (callback, milliseconds) => window.setInterval(callback, milliseconds),
-      clearScheduledInterval: (handle) => window.clearInterval(handle as number),
     });
 
     return () => {
@@ -1852,19 +1790,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
     };
     reloadPublicBoard();
-    const unsubscribe = subscribeToPublicExecutiveDirectory(
-      reloadPublicBoard,
-      (error) => {
-        if (!active) return;
-        console.error('Public executive Realtime error.', { code: error.code });
-        reloadPublicBoard();
-      },
-    );
     return () => {
       active = false;
-      void unsubscribe().then((result) => {
-        if (!result.ok) console.error('Public executive Realtime cleanup failed.', { code: result.error.code });
-      });
     };
   }, [refreshPublicExecutiveBoard]);
 
