@@ -14,7 +14,6 @@ import {
   type PublicExecutiveDirectoryRow,
 } from '../domain/supabaseMappers.ts';
 import {
-  createPublicExecutiveSubscription,
   createIdentitySubscription,
   type IdentityRealtimeClient,
   type IdentityRealtimeChangeKind,
@@ -262,19 +261,6 @@ export function subscribeToOwnProfileAndAssignment(
     client: supabase as unknown as IdentityRealtimeClient,
     userId,
     requestConfirmedRefresh,
-    onError,
-    onSubscribed,
-  });
-}
-
-export function subscribeToPublicExecutiveDirectory(
-  requestRefresh: () => void,
-  onError: (error: ServiceError) => void,
-  onSubscribed?: () => void,
-): () => Promise<ServiceResult<void>> {
-  return createPublicExecutiveSubscription({
-    client: supabase as unknown as IdentityRealtimeClient,
-    requestRefresh,
     onError,
     onSubscribed,
   });

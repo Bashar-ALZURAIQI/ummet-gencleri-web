@@ -152,32 +152,3 @@ test('disposed callbacks stay inert when removeChannel throws', async () => {
   assert.deepEqual(state.getRefreshes(), []);
   assert.deepEqual(state.errors, []);
 });
-
-test('public executive subscription reloads from one PII-free public event signal', async () => {
-  assert.equal(typeof realtime.createPublicExecutiveSubscription, 'function');
-  const channel = new FakeChannel();
-  let refreshes = 0;
-  const errors = [];
-  const client = {
-    channel: () => channel,
-    removeChannel: async () => 'ok',
-  };
-
-  const unsubscribe = realtime.createPublicExecutiveSubscription({
-    client,
-    requestRefresh: () => { refreshes += 1; },
-    onError: (error) => errors.push(error),
-  });
-
-  assert.deepEqual(channel.listeners.map(({ type, filter }) => ({ type, filter })), [
-    { type: 'postgres_changes', filter: { event: 'UPDATE', schema: 'public', table: 'public_executive_directory_events', filter: 'id=eq.directory' } },
-  ]);
-  channel.emitChange(0);
-  assert.equal(refreshes, 1);
-
-  await unsubscribe();
-  channel.emitChange(0);
-  channel.emitStatus('CHANNEL_ERROR', { message: 'late' });
-  assert.equal(refreshes, 1);
-  assert.deepEqual(errors, []);
-});

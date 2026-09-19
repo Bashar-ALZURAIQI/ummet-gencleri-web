@@ -32,7 +32,6 @@ test('context loads and subscribes to the public executive projection and syncs 
   ]);
 
   assert.match(context, /refreshPublicExecutiveBoard/);
-  assert.match(context, /subscribeToPublicExecutiveDirectory/);
   assert.match(context, /synchronizeProfileIdentityByUserId/);
   assert.doesNotMatch(context, /photo:\s*[^,\n]*\|\|\s*DEFAULT_PHOTO/);
   assert.doesNotMatch(committee, /const photo = memberForm\.photo \|\| `https?:/);
