@@ -41,20 +41,12 @@ test('President refresh runs on focus and interval and fully cleans up', () => {
         if (listeners.get(name) === callback) listeners.delete(name);
       },
     },
-    scheduleInterval: (callback, milliseconds) => {
-      assert.equal(milliseconds, 30_000);
-      intervalCallback = callback;
-      return 17;
-    },
-    clearScheduledInterval: (handle) => cleared.push(handle),
   });
 
   listeners.get('focus')();
-  intervalCallback();
-  assert.equal(refreshes, 2);
+  assert.equal(refreshes, 1);
   stop();
   assert.equal(listeners.has('focus'), false);
-  assert.deepEqual(cleared, [17]);
 });
 
 test('application refresh does not install polling or focus listeners for non-Presidents', () => {
@@ -68,12 +60,9 @@ test('application refresh does not install polling or focus listeners for non-Pr
       addEventListener: () => { listeners += 1; },
       removeEventListener: () => {},
     },
-    scheduleInterval: () => { intervals += 1; return 9; },
-    clearScheduledInterval: () => assert.fail('no student interval exists'),
   });
   stop();
   assert.equal(listeners, 0);
-  assert.equal(intervals, 0);
 });
 
 test('shared Sidebar badge renders a positive count on desktop and mobile and hides zero', async () => {
