@@ -26,6 +26,7 @@ import MemberPointsAdminPanel from '../components/MemberPointsAdminPanel';
 import TaskManagementDashboard from '../components/TaskManagementDashboard';
 import { SidebarLayout } from '../components/SidebarLayout';
 import SiteBrandingPanel from '../components/SiteBrandingPanel';
+import AdminPushNotificationControl from '../components/AdminPushNotificationControl';
 import TransientToast, { type ToastMessage } from '../components/TransientToast';
 import { validateRequired, clearInvalid, isInvalid, fieldId } from '../utils/formValidation';
 import { buildTransferConfirmation, runTransferWithBusyState } from '../domain/executiveTransfer';
@@ -195,6 +196,7 @@ export default function AdminDashboard() {
           {tab === 'applications' && (
             <ApplicationsTab
               applications={applications}
+              currentUser={currentUser}
               scheduleInterview={scheduleInterview}
               decideApplication={decideApplication}
               applicationEmailNotifications={applicationEmailNotifications}
@@ -3126,12 +3128,14 @@ function MembersTab({ members, currentUser, transferMemberRole, revokeExecutiveA
 /* ---------------- Applications Tab ---------------- */
 function ApplicationsTab({
   applications,
+  currentUser,
   scheduleInterview,
   decideApplication,
   applicationEmailNotifications,
   retryApplicationEmailNotification,
 }: {
   applications: StudentApplication[];
+  currentUser: { role: string | null } | null;
   scheduleInterview: (id: string, interview: InterviewInfo) => Promise<{ ok: boolean; error?: string; emailWarning?: string }>;
   decideApplication: (id: string, status: 'accepted' | 'rejected', rejectionReason?: string) => Promise<{ ok: boolean; error?: string; emailWarning?: string }>;
   applicationEmailNotifications: ApplicationEmailNotification[];
@@ -3268,6 +3272,7 @@ function ApplicationsTab({
 
   return (
     <div>
+      <AdminPushNotificationControl isPresident={currentUser?.role === 'PRESIDENT'} />
       {applicationNotice && (
         <div className={`mb-4 flex items-center gap-2 rounded-xl border p-3 text-sm font-semibold ${applicationNotice.kind === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
           {applicationNotice.kind === 'success' ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <Info className="h-4 w-4 shrink-0" />}

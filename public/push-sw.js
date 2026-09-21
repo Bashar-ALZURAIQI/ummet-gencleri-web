@@ -1,6 +1,6 @@
 const DEFAULT_TITLE = 'اتحاد شباب الأمة';
 const DEFAULT_BODY = 'لديك تحديث جديد من الاتحاد.';
-const ALLOWED_DESTINATIONS = new Set(['news', 'programs', 'gallery', 'student-dashboard']);
+const ALLOWED_DESTINATIONS = new Set(['news', 'programs', 'gallery', 'student-dashboard', 'admin-applications']);
 
 const notificationPayload = (event) => {
   let value = {};

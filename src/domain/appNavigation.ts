@@ -208,7 +208,7 @@ export function urlToView(urlOrPath: string): ParsedAppRoute {
     // 2. Web push destination
     const pushParam = url.searchParams.get('push');
     let pushDestination: PushDestination | undefined;
-    if (pushParam === 'news' || pushParam === 'programs' || pushParam === 'gallery') {
+    if (pushParam === 'news' || pushParam === 'programs' || pushParam === 'gallery' || pushParam === 'admin-applications') {
       pushDestination = pushParam;
     }
 
@@ -217,6 +217,12 @@ export function urlToView(urlOrPath: string): ParsedAppRoute {
 
     // Route matching
     if (pushDestination) {
+      if (pushDestination === 'admin-applications') {
+        return {
+          view: { kind: 'admin', tab: 'applications' },
+          pushDestination,
+        };
+      }
       return {
         view: { kind: pushDestination },
         pushDestination,

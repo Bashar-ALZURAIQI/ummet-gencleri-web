@@ -1659,9 +1659,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
     });
 
+    let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+    if (currentUser?.role === 'PRESIDENT') {
+      realtimeChannel = supabase
+        .channel('president_applications_refresh')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'student_applications' },
+          () => void refreshApplications(),
+        )
+        .subscribe();
+    }
+
     return () => {
       active = false;
       stopPresidentRefresh();
+      if (realtimeChannel) {
+        void supabase.removeChannel(realtimeChannel);
+      }
     };
   }, [currentUser?.userId, currentUser?.role]);
 

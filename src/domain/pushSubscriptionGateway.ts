@@ -110,6 +110,29 @@ export function createPushSubscriptionGateway(client: PushSubscriptionClient) {
       return mapRecord(response.data);
     },
 
+    async registerPresident(
+      subscription: SerializedPushSubscription,
+      userAgent: string,
+    ): Promise<PushSubscriptionResult<PushSubscriptionRecord>> {
+      if (!validSubscription(subscription)) {
+        return failure('PUSH_SUBSCRIPTION_INVALID', 'بيانات اشتراك الإشعارات غير مكتملة.');
+      }
+      const response = await client.rpc('register_current_president_push_subscription', {
+        p_endpoint: subscription.endpoint.trim(),
+        p_p256dh: subscription.keys.p256dh.trim(),
+        p_auth_key: subscription.keys.auth.trim(),
+        p_user_agent: userAgent.trim(),
+      });
+      if (response.error) {
+        return failure(
+          'PUSH_SUBSCRIPTION_SAVE_FAILED',
+          'تعذر حفظ اشتراك إشعارات الإدارة.',
+          response.error,
+        );
+      }
+      return mapRecord(response.data);
+    },
+
     async disable(endpointValue: string): Promise<PushSubscriptionResult<null>> {
       const endpoint = endpointValue.trim();
       if (!endpoint) {
