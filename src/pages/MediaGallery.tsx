@@ -247,6 +247,7 @@ export default function MediaGallery() {
           alert(saved.error ?? t('admin.gallery.createFailed', 'تعذر إنشاء الألبوم.'));
           return;
         }
+        setOwnedAlbumIds(prev => new Set([...prev, newAlbumId]));
         // NOTE: Translation publishing for non-presidents might need a draft or is skipped here for simplicity.
         // If they want to translate, they can do it via draft if they are MEDIA_HEAD, or wait for President.
       } else if (currentUser?.role === 'MEDIA_HEAD') {

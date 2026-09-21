@@ -1682,6 +1682,10 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
         return;
       }
 
+      if (!isPresident) {
+        setOwnedAlbumIds(prev => new Set([...prev, newAlbumId]));
+      }
+
       if (isPresident) {
         try {
           await publishCmsEntityLocales({
