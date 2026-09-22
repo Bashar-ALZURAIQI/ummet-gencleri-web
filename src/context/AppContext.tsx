@@ -741,7 +741,10 @@ interface AppContextValue {
   updateOwnedEvent: (eventId: string, eventPatch: Partial<UEvent>) => Promise<{ ok: boolean; error?: string }>;
   createGalleryAlbum: (album: GalleryAlbum) => Promise<{ ok: boolean; error?: string }>;
   updateOwnedGalleryAlbum: (albumId: string, albumPatch: Partial<GalleryAlbum>) => Promise<{ ok: boolean; error?: string }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  deleteOwnedGalleryAlbum: (albumId: string) => Promise<{ ok: boolean; error?: string; albumData?: any }>;
   appendOwnedGalleryMedia: (albumId: string, media: GalleryMedia) => Promise<{ ok: boolean; error?: string }>;
+  deleteOwnedGalleryMedia: (albumId: string, mediaId: string) => Promise<{ ok: boolean; error?: string; mediaUrl?: string }>;
   listOwnEventIds: () => Promise<{ ok: boolean; data?: string[]; error?: string }>;
   listOwnAlbumIds: () => Promise<{ ok: boolean; data?: string[]; error?: string }>;
   canonicalSiteContent?: SiteContent;
@@ -3502,6 +3505,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   };
 
+  const deleteOwnedGalleryAlbum: AppContextValue['deleteOwnedGalleryAlbum'] = async (albumId) => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'حذف الألبومات متاح لأعضاء الهيئة التنفيذية فقط.' };
+    }
+    const { data, error } = await supabase.rpc('delete_owned_gallery_album', { p_album_id: albumId });
+    if (error || !data || !data.deletedAlbumId) {
+      const errMsg = error?.message || 'تعذر حذف الألبوم في قاعدة البيانات.';
+      setContentError(errMsg);
+      return { ok: false, error: errMsg };
+    }
+
+    const newPayload = galleryAlbums.filter(a => a.id !== albumId);
+    applyCmsPublication('galleryAlbums', newPayload, contentVersionRef.current + 1);
+
+    setContentError(null);
+    return { ok: true, albumData: data.albumData };
+  };
+
+  const deleteOwnedGalleryMedia: AppContextValue['deleteOwnedGalleryMedia'] = async (albumId, mediaId) => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'حذف الوسائط متاح لأعضاء الهيئة التنفيذية فقط.' };
+    }
+    const { data, error } = await supabase.rpc('delete_owned_gallery_media', { p_album_id: albumId, p_media_id: mediaId });
+    if (error || !data || !data.deletedMediaId) {
+      const errMsg = error?.message || 'تعذر حذف الوسائط في قاعدة البيانات.';
+      setContentError(errMsg);
+      return { ok: false, error: errMsg };
+    }
+
+    const newPayload = galleryAlbums.map(album => {
+      if (album.id !== albumId) return album;
+      const targetMedia = album.media.find(m => m.id === mediaId);
+      return {
+        ...album,
+        media: album.media.filter(m => m.id !== mediaId),
+        photoCount: targetMedia?.type === 'photo' ? Math.max(0, album.photoCount - 1) : album.photoCount,
+        videoCount: targetMedia?.type === 'video' ? Math.max(0, album.videoCount - 1) : album.videoCount,
+      };
+    });
+    applyCmsPublication('galleryAlbums', newPayload, contentVersionRef.current + 1);
+
+    setContentError(null);
+    return { ok: true, mediaUrl: data.mediaData?.url };
+  };
+
   const listOwnEventIds: AppContextValue['listOwnEventIds'] = async () => {
     const owner = captureConfirmedAuthOwner();
     if (!owner || !isLeadershipRole(owner.role)) {
@@ -3514,7 +3564,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { ok: true, data: result.data };
   };
 
-  const listOwnAlbumIds: AppContextValue['listOwnAlbumIds'] = async () => {
+  const listOwnAlbumIds: AppContextValue['listOwnAlbumIds'] = useCallback(async () => {
     const owner = captureConfirmedAuthOwner();
     if (!owner || !isLeadershipRole(owner.role)) {
       return { ok: false, error: 'غير مصرح.' };
@@ -3524,7 +3574,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { ok: false, error: result.error.message };
     }
     return { ok: true, data: result.data };
-  };
+  }, [captureConfirmedAuthOwner]);
 
   /** Media-head edits are persisted first; the UI changes only after RPC confirmation. */
   const submitSiteEdit: AppContextValue['submitSiteEdit'] = async (input) => {
@@ -4055,7 +4105,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateOwnedEvent,
       createGalleryAlbum,
       updateOwnedGalleryAlbum,
+      deleteOwnedGalleryAlbum,
       appendOwnedGalleryMedia,
+      deleteOwnedGalleryMedia,
       listOwnEventIds,
       listOwnAlbumIds,
   };

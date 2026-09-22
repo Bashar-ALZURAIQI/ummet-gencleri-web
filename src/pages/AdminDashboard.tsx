@@ -65,6 +65,9 @@ import {
 
 export type AdminTab = 'stats' | 'board' | 'pending-edits' | 'site-pending' | 'branding' | 'history' | 'events' | 'gallery' | 'news' | 'members' | 'applications' | 'inbox' | 'plans' | 'suggestions' | 'guide-suggestions' | 'excuses' | 'oversight' | 'task-management' | 'member-points' | 'translation-monitoring' | 'profile';
 
+import { supabase } from '../lib/supabase';
+import { SupabaseCmsLocalizationRepository } from '../services/localization/SupabaseCmsLocalizationRepository';
+
 export default function AdminDashboard() {
   const { t } = useTranslation();
   const {
@@ -1556,7 +1559,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
   currentUser: ReturnType<typeof useApp>['currentUser'];
 }) {
   const { t, i18n } = useTranslation();
-  const { uploadManagedFile, savePublishedSiteTarget, refreshPublishedLocalizations, createGalleryAlbum, updateOwnedGalleryAlbum, appendOwnedGalleryMedia, listOwnAlbumIds } = useApp();
+  const { uploadManagedFile, savePublishedSiteTarget, refreshPublishedLocalizations, createGalleryAlbum, updateOwnedGalleryAlbum, deleteOwnedGalleryAlbum, appendOwnedGalleryMedia, deleteOwnedGalleryMedia, listOwnAlbumIds } = useApp();
   const repository = useCmsLocalizationRepository();
   // Scoped access: the president manages all albums; every other executive
   // member sees, adds, edits and deletes only the albums their role created
@@ -1589,6 +1592,9 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
     tr: { title: '', location: '', description: '' },
     en: { title: '', location: '', description: '' },
   });
+
+  const ownsEditingGalleryAlbum = Boolean(editingAlbum && ownedAlbumIds.has(editingAlbum.id));
+  const canPublishEditingGalleryAlbum = Boolean(isPresident || ownsEditingGalleryAlbum);
 
   const [mediaAlbum, setMediaAlbum] = useState<GalleryAlbum | null>(null);
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
@@ -1732,12 +1738,43 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
   };
 
   const deleteAlbum = async (id: string) => {
-    if (!isPresident) return;
-    if (!confirm(t('admin.gallery.confirmDeleteAlbum', 'هل أنت متأكد من حذف هذا الألبوم بكامل محتوياته؟'))) return;
-    const next = galleryAlbums.filter((a) => a.id !== id);
-    const saved = await savePublishedSiteTarget('galleryAlbums', next);
-    if (!saved.ok) return;
-    if (mediaAlbum?.id === id) setMediaAlbum(null);
+    if (!confirm(t('admin.gallery.confirmDeleteAlbum', 'هل أنت متأكد من حذف هذا الألبوم؟ لا يمكن التراجع عن هذا الإجراء.'))) return;
+    const current = galleryAlbums.find((a) => a.id === id);
+    if (!current) return;
+
+    if (isPresident || ownedAlbumIds.has(id)) {
+      try {
+        const { ok, error, albumData } = await deleteOwnedGalleryAlbum(id);
+        if (!ok) {
+          console.error('Delete album failed:', error);
+          alert(t('admin.gallery.albumDeleteFailed', 'تعذر حذف الألبوم.'));
+          return;
+        }
+
+        if (mediaAlbum?.id === id) setMediaAlbum(null);
+
+        if (albumData && Array.isArray(albumData.media)) {
+          const filesToDelete = albumData.media
+            .map((m: { url?: string }) => m.url)
+            .filter((url: string | undefined): url is string => typeof url === 'string' && url.includes('supabase.co/storage/v1/object/public/gallery/site/'))
+            .map((url: string) => {
+              try {
+                return url.split('/gallery/')[1];
+              } catch { return null; }
+            })
+            .filter((path: string | null): path is string => path !== null);
+
+          if (filesToDelete.length > 0) {
+            await supabase.storage.from('gallery').remove(filesToDelete);
+          }
+        }
+      } catch (err) {
+        console.error('Unexpected delete error:', err);
+        alert(t('admin.gallery.albumDeleteFailed', 'تعذر حذف الألبوم.'));
+      }
+    } else {
+      alert("ليس لديك صلاحية لحذف الألبوم بالكامل.");
+    }
   };
 
   const openAddMedia = (album: GalleryAlbum) => {
@@ -1811,31 +1848,42 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
 
   const deleteMedia = async (album: GalleryAlbum, mediaId: string) => {
     if (!confirm(t('admin.gallery.confirmDeleteMedia', 'هل أنت متأكد من حذف هذه الوسائط؟'))) return;
-    const updatedAlbum = {
-      ...album, media: album.media.filter((m) => m.id !== mediaId),
-      photoCount: album.media.filter((m) => m.id !== mediaId && m.type === 'photo').length,
-      videoCount: album.media.filter((m) => m.id !== mediaId && m.type === 'video').length,
-    };
-    const nextAlbums = galleryAlbums.map((a) => a.id === album.id ? updatedAlbum : a);
-    let saved;
-    if (isPresident) {
-      saved = await savePublishedSiteTarget('galleryAlbums', nextAlbums);
+
+    if (isPresident || ownedAlbumIds.has(album.id)) {
+      try {
+        const { ok, error, mediaUrl } = await deleteOwnedGalleryMedia(album.id, mediaId);
+        if (!ok) {
+          console.error('Delete media failed:', error);
+          alert(t('admin.gallery.mediaDeleteFailed', 'تعذر حذف الوسائط.'));
+          return;
+        }
+
+        if (mediaUrl) {
+          if (mediaUrl.includes('supabase.co/storage/v1/object/public/gallery/site/')) {
+            const path = mediaUrl.split('/gallery/')[1];
+            if (path) {
+              await supabase.storage.from('gallery').remove([path]);
+            }
+          }
+        }
+
+        setMediaAlbum((prev) => {
+          if (!prev || prev.id !== album.id) return prev;
+          const media = prev.media.filter((m) => m.id !== mediaId);
+          return {
+            ...prev, media,
+            photoCount: media.filter((m) => m.type === 'photo').length,
+            videoCount: media.filter((m) => m.type === 'video').length,
+          };
+        });
+
+      } catch (err) {
+        console.error('Unexpected media delete error:', err);
+        alert(t('admin.gallery.mediaDeleteFailed', 'تعذر حذف الوسائط.'));
+      }
     } else {
-      saved = await updateOwnedGalleryAlbum(album.id, updatedAlbum);
+      alert("ليس لديك صلاحية لحذف الوسائط.");
     }
-    if (!saved.ok) {
-      if (!isPresident) alert(saved.error ?? t('admin.gallery.mediaDeleteFailed', 'تعذر حذف الوسائط.'));
-      return;
-    }
-    setMediaAlbum((prev) => {
-      if (!prev || prev.id !== album.id) return prev;
-      const media = prev.media.filter((m) => m.id !== mediaId);
-      return {
-        ...prev, media,
-        photoCount: media.filter((m) => m.type === 'photo').length,
-        videoCount: media.filter((m) => m.type === 'video').length,
-      };
-    });
   };
 
   return (
@@ -1882,7 +1930,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
               <div className="mt-3 flex gap-1.5">
                 <button onClick={() => openEditAlbum(album)} className="flex h-8 w-8 items-center justify-center rounded-lg text-navy-600 transition-colors hover:bg-navy-50" title={t('admin.gallery.editAlbumTitle', 'تعديل الألبوم')}><Edit3 className="h-4 w-4" /></button>
                 <button onClick={() => openAddMedia(album)} className="flex items-center gap-1 rounded-lg bg-navy-700 px-2.5 text-xs font-bold text-white hover:bg-navy-800" title={t('admin.gallery.manageMedia', 'الوسائط')}><Plus className="h-3.5 w-3.5" /> {t('admin.gallery.manageMedia', 'الوسائط')}</button>
-                {isPresident && <button onClick={() => deleteAlbum(album.id)} className="flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition-colors hover:bg-rose-50" title={t('admin.gallery.deleteAlbumTitle', 'حذف الألبوم')}><Trash2 className="h-4 w-4" /></button>}
+                {(isPresident || ownedAlbumIds.has(album.id)) && <button onClick={() => deleteAlbum(album.id)} className="flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition-colors hover:bg-rose-50" title={t('admin.gallery.deleteAlbumTitle', 'حذف الألبوم')}><Trash2 className="h-4 w-4" /></button>}
               </div>
             </div>
           </div>
@@ -1951,8 +1999,13 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
                 placeholder: t('admin.gallery.albumModal.descriptionLabel', 'الوصف'),
               },
             ]}
-            canEdit={isPresident || !editingAlbum || editingAlbum.createdByRole === currentUser?.role}
-            canPublish={isPresident}
+            canEdit={editingAlbum == null ? true : canPublishEditingGalleryAlbum}
+            canPublish={editingAlbum == null ? false : canPublishEditingGalleryAlbum}
+            onPublishOverride={isPresident ? undefined : async (loc, fields) => {
+              if (!editingAlbum?.id) return;
+              const localizationRepo = new SupabaseCmsLocalizationRepository(supabase);
+              await localizationRepo.publishOwnedGalleryAlbumLocalization(editingAlbum.id, loc, fields);
+            }}
             translations={translations}
             onTranslationChange={(loc, name, val) => {
               setTranslations((prev) => ({

@@ -39,6 +39,7 @@ export interface CmsEntityTranslationTabsProps {
   translations: Record<LocalizedCmsLocale, Record<string, string>>;
   onTranslationChange: (locale: LocalizedCmsLocale, fieldName: string, value: string) => void;
   onDraftSaved?: (locale: LocalizedCmsLocale) => void;
+  onPublishOverride?: (locale: LocalizedCmsLocale, fields: Record<string, string>) => Promise<void>;
   onPublished?: (locale: LocalizedCmsLocale) => void;
   children: ReactNode;
 }
@@ -91,6 +92,7 @@ export function CmsEntityTranslationTabs({
   translations,
   onTranslationChange,
   onDraftSaved,
+  onPublishOverride,
   onPublished,
   children,
 }: CmsEntityTranslationTabsProps) {
@@ -219,15 +221,19 @@ const saved = await saveCmsEntityDraft({
           .filter((field) => localeTranslations[field.name] !== undefined)
           .map((field) => [field.name, localeTranslations[field.name]]),
       );
-await publishCmsEntityFields({
-        repository,
-        target,
-        locale,
-        canonicalPayload,
-        recordId,
-        fields: dirtyFields,
-        committeeId,
-      });
+      if (onPublishOverride) {
+        await onPublishOverride(locale, dirtyFields);
+      } else {
+        await publishCmsEntityFields({
+          repository,
+          target,
+          locale,
+          canonicalPayload,
+          recordId,
+          fields: dirtyFields,
+          committeeId,
+        });
+      }
       const [draftRecord, publishedRecord] = await Promise.all([
         repository.getDraft(target, locale),
         repository.getPublished(target, locale),
@@ -247,12 +253,13 @@ await publishCmsEntityFields({
 
       onDraftSaved?.(locale);
       onPublished?.(locale);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to publish translation', err);
+      const msg = err instanceof Error && err.message ? err.message : t('cmsLocalization.publishFailed', `تم حفظ المحتوى الأساسي، لكن تعذر نشر الترجمة ${locale === 'tr' ? 'التركية' : 'الإنجليزية'}.`);
       updater((prev) => ({
         ...prev,
         publishing: false,
-        publishError: t('cmsLocalization.publishFailed', 'تم حفظ المحتوى العربي، لكن تعذر نشر الترجمة.'),
+        publishError: msg,
       }));
     }
   };
@@ -389,6 +396,7 @@ await publishCmsEntityFields({
               {activeTab === 'tr' ? trStatus.publishError : enStatus.publishError}
             </div>
           )}
+
 
           {(recordId || target === 'contactMap' || target === 'site' || target === 'programsContent' || target === 'about' || target === 'generalInfo') && (
             <div className="flex items-center justify-end gap-2 pt-1">
