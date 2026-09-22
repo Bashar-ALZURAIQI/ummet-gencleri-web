@@ -485,6 +485,82 @@ export class SupabaseCmsLocalizationRepository implements CmsLocalizationReposit
     }
   }
 
+  public async publishOwnedEventLocalization(
+    eventId: string,
+    locale: LocalizedCmsLocale,
+    translation: { title?: string; description?: string; location?: string },
+  ): Promise<void> {
+    this.assertSupportedLocalizedLocale(locale);
+    const trimmedId = eventId.trim();
+    if (!trimmedId) {
+      throw new CmsLocalizationRepositoryError('UNKNOWN', 'Valid eventId is required');
+    }
+
+    try {
+      const client = await this.getClient();
+      // Use the secure server-enforced RPC when available on Supabase client
+      if (typeof client.rpc === 'function') {
+        const expectedVersion = 0; // handled internally
+        const { error } = await client.rpc('publish_owned_event_translation', {
+          p_event_id: trimmedId,
+          p_locale: locale,
+          p_title: translation.title?.trim() || null,
+          p_description: translation.description?.trim() || null,
+          p_location: translation.location?.trim() || null,
+          p_expected_version: expectedVersion,
+        });
+
+        if (error) {
+          const conflict = error.code === '40001' || error.message === 'CONTENT_VERSION_CONFLICT';
+          if (conflict) {
+            throw new CmsLocalizationRepositoryError('CONFLICT', 'The localization target has been updated by someone else.');
+          }
+          throw new CmsLocalizationRepositoryError('UNKNOWN', `Failed to publish owned event localization: ${error.message}`);
+        }
+        return;
+      }
+
+      // Fallback for mock/test query clients lacking .rpc
+      const existing = await this.getPublished<Record<string, unknown>[]>('events', locale);
+      const pubList = Array.isArray(existing?.payload)
+        ? JSON.parse(JSON.stringify(existing.payload))
+        : [];
+      const sanitized: Record<string, unknown> = { id: trimmedId };
+      if (translation.title?.trim()) sanitized.title = translation.title.trim();
+      if (translation.description?.trim()) sanitized.description = translation.description.trim();
+      if (translation.location?.trim()) sanitized.location = translation.location.trim();
+
+      const idx = pubList.findIndex((item: Record<string, unknown>) => item && typeof item === 'object' && item.id === trimmedId);
+      if (idx >= 0) {
+        pubList[idx] = { ...pubList[idx], ...sanitized };
+      } else {
+        pubList.push(sanitized);
+      }
+
+      const manualPaths = existing?.manualPaths ? [...existing.manualPaths] : [];
+      const pathToAdd = `${trimmedId}.title`;
+      if (!manualPaths.includes(pathToAdd)) {
+        manualPaths.push(pathToAdd);
+      }
+
+      await this.savePublished({
+        target: 'events',
+        locale,
+        payload: pubList as unknown as JsonValue,
+        status: 'fresh',
+        manualPaths,
+        stalePaths: existing?.stalePaths ? existing.stalePaths.filter((p) => p !== pathToAdd) : [],
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      if (err instanceof CmsLocalizationRepositoryError) throw err;
+      throw new CmsLocalizationRepositoryError(
+        'UNKNOWN',
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
   public async publishOwnedGalleryAlbumLocalization(
     albumId: string,
     locale: LocalizedCmsLocale,

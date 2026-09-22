@@ -2161,7 +2161,7 @@ function EventsTab({ events, currentUser }: {
   currentUser: ReturnType<typeof useApp>['currentUser'];
 }) {
   const { t } = useTranslation();
-  const { uploadManagedFile, savePublishedSiteTarget, createPublishedEvent, updateOwnedEvent, listOwnEventIds, refreshPublishedLocalizations } = useApp();
+  const { uploadManagedFile, savePublishedSiteTarget, createPublishedEvent, updateOwnedEvent, deleteOwnedEvent, listOwnEventIds, refreshPublishedLocalizations } = useApp();
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [ownedEventIds, setOwnedEventIds] = useState<Set<string>>(new Set());
@@ -2276,7 +2276,7 @@ function EventsTab({ events, currentUser }: {
         const trData = translations[loc];
         if (trData.title?.trim() || trData.description?.trim() || trData.location?.trim()) {
           try {
-            await repository.publishEventLocalization(publicEventId, loc, trData);
+            await repository.publishOwnedEventLocalization(publicEventId, loc, trData);
           } catch {
             setToast({ id: Date.now(), type: 'error', text: t('cmsLocalization.publishFailed', 'تعذر نشر الترجمة.') });
             return;
@@ -2290,14 +2290,18 @@ function EventsTab({ events, currentUser }: {
   };
 
   const remove = async (id: string) => {
-    if (!isPresident) {
-      setToast({ id: Date.now(), type: 'error', text: t('admin.events.deleteRestrictedPresident', 'حذف الفعاليات المنشورة متاح لرئيس الاتحاد فقط.') });
+    if (!isPresident && !ownedEventIds.has(id)) {
+      setToast({ id: Date.now(), type: 'error', text: t('admin.events.deleteRestricted', 'لا يمكنك حذف فعالية لم تقم بإنشائها.') });
       return;
     }
     if (confirm(t('admin.events.confirmDelete', 'هل أنت متأكد من حذف هذه الفعالية؟'))) {
-      const next = events.filter((e) => e.id !== id);
-      const saved = await savePublishedSiteTarget('events', next);
-      if (!saved.ok) return;
+      const { ok, error } = await deleteOwnedEvent(id);
+      if (!ok) {
+        console.error('Delete event failed:', error);
+        setToast({ id: Date.now(), type: 'error', text: error || t('admin.events.deleteFailed', 'حدث خطأ أثناء الحذف.') });
+        return;
+      }
+      setToast({ id: Date.now(), type: 'success', text: t('admin.events.deletedSuccess', 'تم حذف الفعالية بنجاح.') });
     }
   };
 
@@ -2357,7 +2361,7 @@ function EventsTab({ events, currentUser }: {
                     {(isPresident || ownedEventIds.has(e.id)) ? (
                       <div className="flex gap-1">
                         <button onClick={() => openEdit(e)} className="flex h-8 w-8 items-center justify-center rounded-lg text-navy-600 transition-colors hover:bg-navy-50" title={t('common.edit', 'تعديل')}><Edit3 className="h-4 w-4" /></button>
-                        {isPresident && <button onClick={() => remove(e.id)} className="flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition-colors hover:bg-rose-50" title={t('common.delete', 'حذف')}><Trash2 className="h-4 w-4" /></button>}
+                        {(isPresident || ownedEventIds.has(e.id)) && <button onClick={() => remove(e.id)} className="flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 transition-colors hover:bg-rose-50" title={t('common.delete', 'حذف')}><Trash2 className="h-4 w-4" /></button>}
                       </div>
                     ) : <span className="text-xs text-gray-400">{t('admin.events.viewOnly', 'عرض فقط')}</span>}
                   </td>
@@ -2450,6 +2454,11 @@ function EventsTab({ events, currentUser }: {
           <CmsEntityTranslationTabs
             target="events"
             recordId={editId}
+            onPublishOverride={async (loc, fields) => {
+              if (!editId) return;
+              const localizationRepo = new SupabaseCmsLocalizationRepository(supabase);
+              await localizationRepo.publishOwnedEventLocalization(editId, loc, fields);
+            }}
             canonicalPayload={editId ? events.map((ev) => (ev.id === editId ? { ...ev, title: form.title, description: form.description, location: form.location } : ev)) : events}
             fields={[
               {
@@ -2475,8 +2484,8 @@ function EventsTab({ events, currentUser }: {
                 placeholder: t('admin.events.modal.descriptionPlaceholder', 'وصف الفعالية'),
               },
             ]}
-            canEdit={canCreate && (!editId || isPresident)}
-            canPublish={canCreate && (!editId || isPresident)}
+            canEdit={canCreate && (!editId || isPresident || ownedEventIds.has(editId))}
+            canPublish={canCreate && (!editId || isPresident || ownedEventIds.has(editId))}
             translations={translations}
             onTranslationChange={(loc, name, val) => {
               setTranslations((prev) => ({

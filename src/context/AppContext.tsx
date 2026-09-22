@@ -739,6 +739,7 @@ interface AppContextValue {
   ) => Promise<{ ok: boolean; error?: string }>;
   createPublishedEvent: (event: UEvent) => Promise<{ ok: boolean; error?: string }>;
   updateOwnedEvent: (eventId: string, eventPatch: Partial<UEvent>) => Promise<{ ok: boolean; error?: string }>;
+  deleteOwnedEvent: (eventId: string) => Promise<{ ok: boolean; error?: string; eventData?: unknown }>;
   createGalleryAlbum: (album: GalleryAlbum) => Promise<{ ok: boolean; error?: string }>;
   updateOwnedGalleryAlbum: (albumId: string, albumPatch: Partial<GalleryAlbum>) => Promise<{ ok: boolean; error?: string }>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3433,6 +3434,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   };
 
+  const deleteOwnedEvent: AppContextValue['deleteOwnedEvent'] = async (eventId) => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'حذف الفعاليات متاح لأعضاء الهيئة التنفيذية فقط.' };
+    }
+    const expectedVersion = selectCmsExpectedVersion('events', currentCmsVersions());
+    if (expectedVersion < 1) {
+      return { ok: false, error: 'لم تكتمل مزامنة النسخة الرسمية بعد. حدّث الصفحة ثم أعد المحاولة.' };
+    }
+    const { deleteOwnedEvent: serviceDelete } = await import('../services/sectionContentService.ts');
+    const result = await serviceDelete(eventId);
+    const currentOwner = captureConfirmedAuthOwner();
+    if (!currentOwner || currentOwner.userId !== owner.userId || currentOwner.epoch !== owner.epoch || !isLeadershipRole(currentOwner.role)) {
+      return { ok: false, error: 'تغيرت صلاحية الحساب أثناء الحذف؛ لم تُعتمد النتيجة في هذه الجلسة.' };
+    }
+    if (!result.ok) {
+      const error = result.error.message || 'تعذر حذف الفعالية في قاعدة البيانات.';
+      setContentError(error);
+      return { ok: false, error };
+    }
+
+    // UI refresh like gallery
+    const prevEvents = Array.isArray(events) ? events : [];
+    const nextEvents = prevEvents.filter((e: { id: string }) => e.id !== eventId);
+    applyCmsPublication('events', nextEvents, result.data.newVersion ?? expectedVersion);
+    setContentError(null);
+    return { ok: true, eventData: result.data.eventData };
+  };
+
   const createGalleryAlbum: AppContextValue['createGalleryAlbum'] = async (album) => {
     const owner = captureConfirmedAuthOwner();
     if (!owner || !isLeadershipRole(owner.role)) {
@@ -4103,6 +4133,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saveOwnCommitteeVision,
       createPublishedEvent,
       updateOwnedEvent,
+      deleteOwnedEvent,
       createGalleryAlbum,
       updateOwnedGalleryAlbum,
       deleteOwnedGalleryAlbum,

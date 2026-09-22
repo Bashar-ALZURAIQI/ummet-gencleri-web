@@ -50,7 +50,7 @@ interface SingletonQuery {
 export interface SectionContentClient {
   from(table: 'student_guide' | 'faq'): SingletonQuery;
   rpc(
-    name: 'publish_cms_target' | 'create_published_event' | 'publish_own_committee' | 'publish_own_committee_fields' | 'update_owned_published_event' | 'create_gallery_album' | 'update_owned_gallery_album' | 'append_owned_gallery_media' | 'list_own_event_ids' | 'list_own_album_ids',
+    name: 'publish_cms_target' | 'create_published_event' | 'publish_own_committee' | 'publish_own_committee_fields' | 'update_owned_published_event' | 'delete_owned_published_event' | 'create_gallery_album' | 'update_owned_gallery_album' | 'append_owned_gallery_media' | 'list_own_event_ids' | 'list_own_album_ids',
     args?: Record<string, unknown>,
   ): Promise<QueryResponse>;
 }
@@ -195,8 +195,8 @@ export function createSectionContentRepository(client: SectionContentClient) {
               ? response.error.code
               : 'EVENT_CREATION_FAILED',
           conflict
-            ? 'أضيفت فعالية أحدث. حدّث الصفحة ثم أعد المحاولة.'
-            : 'تعذر إنشاء الفعالية على الخادم.',
+            ? 'تحديث متعارض للفعالية. يرجى إعادة تحميل الصفحة والمحاولة مجدداً.'
+            : 'تعذر إنشاء الفعالية على الخادم: ' + response.error.message,
           response.error,
         );
       }
@@ -302,6 +302,30 @@ export function createSectionContentRepository(client: SectionContentClient) {
       return publication?.target === 'events'
         ? { ok: true, data: publication }
         : fail('SECTION_CONTENT_RESPONSE_INVALID', 'أعاد الخادم نتيجة تعديل فعالية غير صالحة.');
+    },
+
+    async deleteOwnedEvent(eventId: string): Promise<RepositoryResult<{ deletedEventId: string; eventData: unknown, newVersion?: number }>> {
+      const response = await client.rpc('delete_owned_published_event', {
+        p_event_id: eventId,
+      });
+      if (response.error) {
+        return fail(
+          typeof response.error.code === 'string' ? response.error.code : 'EVENT_DELETE_FAILED',
+          'تعذر حذف الفعالية. قد لا تملك الصلاحية الكافية.',
+          response.error,
+        );
+      }
+      if (!response.data || typeof response.data !== 'object' || !('deletedEventId' in response.data)) {
+        return fail('SECTION_CONTENT_RESPONSE_INVALID', 'أعاد الخادم نتيجة حذف غير صالحة.');
+      }
+      return {
+        ok: true,
+        data: {
+          deletedEventId: (response.data as Record<string, unknown>).deletedEventId as string,
+          eventData: (response.data as Record<string, unknown>).eventData,
+          newVersion: (response.data as Record<string, unknown>).newVersion as number | undefined
+        }
+      };
     },
 
     async createGalleryAlbum(album: unknown, expectedVersion: number): Promise<RepositoryResult<CmsPublication>> {

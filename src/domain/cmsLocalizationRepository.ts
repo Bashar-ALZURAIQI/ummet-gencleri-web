@@ -165,6 +165,15 @@ export interface CmsLocalizationRepository {
   ): Promise<void>;
 
   /**
+   * Scoped mutation for an executive to safely overwrite localization of a specific event they own.
+   */
+  publishOwnedEventLocalization(
+    eventId: string,
+    locale: LocalizedCmsLocale,
+    translation: { title?: string; description?: string; location?: string },
+  ): Promise<void>;
+
+  /**
    * Scoped mutation for an executive to safely overwrite localization of specific media inside an album they own.
    */
   publishOwnedGalleryMediaLocalization(
@@ -405,6 +414,16 @@ export class InMemoryCmsLocalizationRepository implements CmsLocalizationReposit
     };
 
     this.publishedStore.set(key, updatedRecord);
+  }
+
+  public async publishOwnedEventLocalization(
+    eventId: string,
+    locale: LocalizedCmsLocale,
+    translation: { title?: string; description?: string; location?: string },
+  ): Promise<void> {
+    // In-memory implementation delegates to the standard publish
+    // since there's no real DB owner check anyway.
+    return this.publishEventLocalization(eventId, locale, translation);
   }
 
   public async publishOwnedGalleryAlbumLocalization(
