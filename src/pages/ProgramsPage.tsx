@@ -27,6 +27,8 @@ import { type LocalizedCmsLocale } from '../domain/cmsLocalization';
 import { publishCmsEntityLocales, resolveCanonicalEntityById } from '../domain/cmsLocalizationEditor';
 import { getEventCategoryLabel } from '../domain/eventCategoryPresentation';
 import { interpolateProgramsAchievementsText } from '../domain/programsAchievements.ts';
+import { useTemporalBoundary } from '../hooks/useTemporalBoundary.ts';
+import { getEffectiveEventStatus } from '../domain/eventTemporalStatus.ts';
 
 type Tab = 'upcoming' | 'past';
 
@@ -158,15 +160,22 @@ export default function ProgramsPage() {
     }
   }, [canAddEvent, isPresident, listOwnEventIds]);
 
-  const filtered = events.filter((e) => {
+  const nowTime = useTemporalBoundary(events.map(e => e.date));
+
+  const effectiveEvents = useMemo(() => events.map(e => ({
+    ...e,
+    status: getEffectiveEventStatus(e.status, e.date, nowTime)
+  })), [events, nowTime]);
+
+  const filtered = effectiveEvents.filter((e) => {
     if (tab === 'upcoming' && e.status !== 'upcoming') return false;
     if (tab === 'past' && e.status !== 'past') return false;
     if (cat !== 'all' && e.category !== cat) return false;
     return true;
   });
 
-  const upcomingCount = events.filter((e) => e.status === 'upcoming').length;
-  const pastCount = events.filter((e) => e.status === 'past').length;
+  const upcomingCount = effectiveEvents.filter((e) => e.status === 'upcoming').length;
+  const pastCount = effectiveEvents.filter((e) => e.status === 'past').length;
 
   const openAdd = () => {
     setEditId(null);

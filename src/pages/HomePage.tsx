@@ -4,10 +4,12 @@ import {
   Wallet, Network, ExternalLink, Star, Zap, Globe, Mail, Phone, MapPin,
   CheckCircle2, Clock, FileText, Eye, Heart, Handshake, type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTranslation } from 'react-i18next';
 import { resolvePublicBrandName } from '../domain/publicBrand';
+import { useTemporalBoundary } from '../hooks/useTemporalBoundary.ts';
+import { getEffectiveEventStatus } from '../domain/eventTemporalStatus.ts';
 import StatCounter from '../components/StatCounter';
 import EventCard from '../components/EventCard';
 import Modal from '../components/Modal';
@@ -41,7 +43,14 @@ export default function HomePage() {
   const HeroBadgeOneIcon = iconMap[sc.hero.badge1.icon ?? 'Award'] || Award;
   const HeroBadgeTwoIcon = iconMap[sc.hero.badge2.icon ?? 'TrendingUp'] || TrendingUp;
   const canEdit = !!currentUser && canEditSection('homepage');
-  const upcoming = events.filter((e) => e.showOnHomepage && e.status === 'upcoming').slice(0, 3);
+
+  const nowTime = useTemporalBoundary(events.map(e => e.date));
+  const effectiveEvents = useMemo(() => events.map(e => ({
+    ...e,
+    status: getEffectiveEventStatus(e.status, e.date, nowTime)
+  })), [events, nowTime]);
+
+  const upcoming = effectiveEvents.filter((e) => e.showOnHomepage && e.status === 'upcoming').slice(0, 3);
   const pinnedNews = news.filter((n) => n.pinnedOnHomepage).slice(0, 3);
 
   return (
