@@ -226,6 +226,12 @@ export function createInternalEconomyRepository(client: InternalEconomyClient) {
       return row ? { ok: true, data: row } : fail('TASK_ENROLLMENT_RESPONSE_INVALID', 'لم يؤكد الخادم حجز المهمة.');
     },
 
+    async cancelTaskEnrollment(taskId: string): Promise<InternalEconomyResult<void>> {
+      const response = await safeRpc(client, 'cancel_task_enrollment', { p_task_id: taskId });
+      if (response.error) return serverFailure(response.error);
+      return { ok: true, data: undefined };
+    },
+
     async upsertEventActivity(input: UpsertEventActivityInput): Promise<InternalEconomyResult<{ id: string; publicEventId: string }>> {
       const response = await safeRpc(client, 'upsert_event_activity', {
         p_public_event_id: input.publicEventId,

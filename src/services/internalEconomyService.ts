@@ -10,5 +10,6 @@ export const loadStudentActivityBoard = () => repository.loadStudentActivities()
 export const loadStudentTaskBoard = () => repository.loadStudentTasks();
 export const setOwnActivityDecision = repository.setOwnActivityDecision;
 export const registerForInternalTask = repository.registerForTask;
+export const cancelTaskEnrollment = repository.cancelTaskEnrollment;
 export const upsertEventActivity = repository.upsertEventActivity;
 export const createInternalTask = repository.createTask;

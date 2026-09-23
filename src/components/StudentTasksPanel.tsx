@@ -46,6 +46,23 @@ export default function StudentTasksPanel() {
     setToast({ id: Date.now(), type: 'success', text: t('tasks.reservedSuccess', 'تم حجز المهمة التطوعية في حسابك.') });
   };
 
+  const cancel = async (item: StudentTaskBoardItem) => {
+    if (!confirm(t('tasks.confirmCancel', 'هل أنت متأكد من إلغاء مشاركتك في هذه المهمة؟'))) return;
+    setBusyId(item.taskId);
+    // Assuming cancelTaskEnrollment will be added to the service
+    const { cancelTaskEnrollment } = await import('../services/internalEconomyService');
+    const result = await cancelTaskEnrollment(item.taskId);
+    setBusyId(null);
+    if (!result.ok) {
+      console.error('[internal-economy] task cancellation failed', result.error);
+      setToast({ id: Date.now(), type: 'error', text: result.error.message });
+      await load();
+      return;
+    }
+    await load();
+    setToast({ id: Date.now(), type: 'success', text: t('tasks.cancelSuccess', 'تم إلغاء المشاركة بنجاح.') });
+  };
+
   if (loading) return <div className="flex items-center justify-center gap-2 py-16 text-sm font-semibold text-gray-500"><RefreshCw className="h-4 w-4 animate-spin" /> {t('tasks.loading', 'جارٍ تحميل المهام...')}</div>;
 
   const localeCode = i18n.language === 'tr' ? 'tr-TR' : i18n.language === 'en' ? 'en-US' : 'ar-EG';
@@ -75,17 +92,36 @@ export default function StudentTasksPanel() {
                 <span className="inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-2 font-bold text-violet-700"><Users className="h-4 w-4" /> {t('tasks.remaining', { count: remaining, defaultValue: `متبقٍ ${remaining}` })}</span>
                 <span className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 px-3 py-2 font-bold text-sky-700"><Clock3 className="h-4 w-4" /> {new Date(item.deadline).toLocaleDateString(localeCode)}</span>
               </div>
-              <button
-                type="button"
-                disabled={!state.canRegister || busyId === item.taskId}
-                onClick={() => void register(item)}
-                className={`mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed ${
-                  item.isEnrolled ? 'bg-emerald-50 text-emerald-700' : state.canRegister ? 'bg-navy-800 text-white hover:bg-navy-900' : 'bg-gray-100 text-gray-500'
-                }`}
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                {busyId === item.taskId ? t('tasks.reserving', 'جارٍ الحجز...') : item.isEnrolled ? t('tasks.enrolled', 'تم حجز المهمة') : state.reason === 'DEADLINE' ? t('tasks.deadlineEnded', 'انتهى التسجيل') : state.reason === 'FULL' ? t('tasks.full', 'مكتملة العدد') : t('tasks.willParticipate', 'سأنجز المهمة')}
-              </button>
+              {item.isEnrolled ? (
+                <div className="mt-5 space-y-2">
+                  <div className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+                    <CheckCircle2 className="h-4 w-4" />
+                    {t('tasks.enrolled', 'تم حجز المهمة')}
+                  </div>
+                  {item.completionStatus === 'PENDING' && (
+                    <button
+                      type="button"
+                      disabled={busyId === item.taskId}
+                      onClick={() => void cancel(item)}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {busyId === item.taskId ? t('tasks.canceling', 'جارٍ الإلغاء...') : t('tasks.cancelParticipation', 'إلغاء المشاركة')}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!state.canRegister || busyId === item.taskId}
+                  onClick={() => void register(item)}
+                  className={`mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition-colors disabled:cursor-not-allowed ${
+                    state.canRegister ? 'bg-navy-800 text-white hover:bg-navy-900' : 'bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  {busyId === item.taskId ? t('tasks.reserving', 'جارٍ الحجز...') : state.reason === 'DEADLINE' ? t('tasks.deadlineEnded', 'انتهى التسجيل') : state.reason === 'FULL' ? t('tasks.full', 'مكتملة العدد') : t('tasks.willParticipate', 'سأنجز المهمة')}
+                </button>
+              )}
             </article>
           );
         })}
