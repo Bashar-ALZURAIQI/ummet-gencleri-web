@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const migrationUrl = new URL(
-  '../supabase/migrations/20260923150000_task_withdrawal.sql',
+  '../supabase/migrations/20260923160000_fix_task_withdrawal_schema_bug.sql',
   import.meta.url,
 );
 
@@ -12,7 +12,6 @@ const normalized = sql.replace(/\s+/g, ' ');
 
 test('withdrawal frees capacity and deletes pending enrollment', () => {
   assert.match(normalized, /DELETE FROM public\.task_enrollments/i);
-  assert.match(normalized, /v_enrollment_id uuid;/i);
 });
 
 test('FULL reopens', () => {
@@ -35,7 +34,7 @@ test('student cannot cancel another student\'s enrollment', () => {
 });
 
 test('second cancellation fails safely (enrollment not found)', () => {
-  assert.match(normalized, /SELECT enrollment\.id, enrollment\.completion_status/i);
+  assert.match(normalized, /SELECT enrollment\.completion_status/i);
   assert.match(normalized, /IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'Enrollment not found'/i);
 });
 
