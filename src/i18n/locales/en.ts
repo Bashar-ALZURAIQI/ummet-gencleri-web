@@ -1412,6 +1412,10 @@ const en: TranslationSchema = {
     full: 'Fully booked',
     willParticipate: 'I will do the task',
     reservedSuccess: 'The volunteer task has been reserved in your account.',
+    cancelParticipation: 'Cancel Participation',
+    canceling: 'Canceling...',
+    confirmCancel: 'Are you sure you want to cancel your participation in this task?',
+    cancelSuccess: 'Participation canceled successfully.',
   },
   gamification: {
     loading: 'Loading your rank and points...',

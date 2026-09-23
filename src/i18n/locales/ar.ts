@@ -1414,6 +1414,10 @@ const ar = {
     full: 'مكتملة العدد',
     willParticipate: 'سأنجز المهمة',
     reservedSuccess: 'تم حجز المهمة التطوعية في حسابك.',
+    cancelParticipation: 'إلغاء المشاركة',
+    canceling: 'جارٍ الإلغاء...',
+    confirmCancel: 'هل أنت متأكد من إلغاء مشاركتك في هذه المهمة؟',
+    cancelSuccess: 'تم إلغاء المشاركة بنجاح.',
   },
   gamification: {
     loading: 'جارٍ تحميل رتبتك ونقاطك...',

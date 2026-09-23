@@ -1412,6 +1412,10 @@ const tr: TranslationSchema = {
     full: 'Kontenjan dolu',
     willParticipate: 'Görevi Üstleniyorum',
     reservedSuccess: 'Gönüllü görevi hesabınıza başarıyla ayrıldı.',
+    cancelParticipation: 'Katılımı İptal Et',
+    canceling: 'İptal ediliyor...',
+    confirmCancel: 'Bu göreve katılımınızı iptal etmek istediğinizden emin misiniz?',
+    cancelSuccess: 'Katılımınız başarıyla iptal edildi.',
   },
   gamification: {
     loading: 'Sıralamanız ve puanlarınız yükleniyor...',
