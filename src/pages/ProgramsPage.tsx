@@ -104,7 +104,7 @@ export default function ProgramsPage() {
 
   const saveStudentDecision = useCallback(async (
     activity: StudentActivityBoardItem,
-    decision: 'JOINING' | 'DECLINING',
+    decision: 'JOINING' | 'DECLINING' | 'IGNORED',
     excuse?: string | null,
   ) => {
     const request = buildActivityDecisionRequest({
@@ -131,6 +131,10 @@ export default function ProgramsPage() {
   }, [notify, refreshActivityBoard]);
 
   const declineActivity = (activity: StudentActivityBoardItem) => {
+    if (activity.decision === 'DECLINING') {
+      void saveStudentDecision(activity, 'IGNORED', null);
+      return;
+    }
     if (activity.type === 'MANDATORY') {
       setExcuseActivity(activity);
       setExcuseText(activity.excuseText ?? '');
@@ -633,7 +637,13 @@ const saveHeader = async (e: React.FormEvent) => {
                   activity={activityByEventId.get(e.id) ?? null}
                   activityLoading={activityLoading}
                   activityBusy={activityBusyId === activityByEventId.get(e.id)?.activityId}
-                  onJoin={(activity) => void saveStudentDecision(activity, 'JOINING', null)}
+                  onJoin={(activity) => {
+                    if (activity.decision === 'JOINING') {
+                      void saveStudentDecision(activity, 'IGNORED', null);
+                    } else {
+                      void saveStudentDecision(activity, 'JOINING', null);
+                    }
+                  }}
                   onDecline={declineActivity}
                 />
                 {(isPresident || ownedEventIds.has(e.id)) && (

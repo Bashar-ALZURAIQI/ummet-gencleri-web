@@ -133,7 +133,9 @@ export default function OversightEvaluationPanel() {
                       <span className="min-w-36 flex-1 font-semibold">{row.studentName}</span>
                       {row.decision === 'IGNORED' ? (
                         <span className="inline-flex items-center rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 border border-rose-200">
-                          {t('admin.oversight.ignoredPenalty', 'لم يرد (-20)')}
+                          {rows[0].activityType === 'MANDATORY'
+                            ? t('admin.oversight.ignoredPenalty', 'لم يرد (-20)')
+                            : t('admin.oversight.ignoredNoPenalty', 'لم يرد')}
                         </span>
                       ) : (
                         <select

@@ -73,3 +73,18 @@ test('11-13: list_activity_evaluations special cases preserved', () => {
   // 13: attendance_status nullable for unevaluated JOINING students
   assert.match(sql, /e\.attendance_status/i);
 });
+
+test('14-25: set_own_activity_enrollment toggle and reset behaviors', () => {
+  const root = new URL('..', import.meta.url).pathname.replace(/^\/([a-zA-Z]:)/, '$1');
+  const sql = readFileSync(`${root}/supabase/migrations/20260923020000_activity_participation_toggle.sql`, 'utf8');
+
+  // 14 & 15: clears excuse when decision is IGNORED or JOINING
+  assert.match(sql, /IF p_decision = 'JOINING' THEN[\s\S]*v_clean_excuse := NULL;/i);
+  assert.match(sql, /IF p_decision = 'IGNORED' THEN\s*v_clean_excuse := NULL;\s*END IF;/i);
+
+  // 13-16: final excuse lock preserves participation and ledger history
+  assert.match(sql, /IF v_existing\.excuse_status IN \('ACCEPTED', 'PARTIAL', 'REJECTED'\) THEN\s*RAISE EXCEPTION USING\s*ERRCODE = '55000',\s*MESSAGE = 'Final excuse review locks activity participation';\s*END IF;/i);
+
+  // 16 & 17: clears attendance_status on decision change
+  assert.match(sql, /attendance_status = CASE\s*WHEN EXCLUDED\.decision <> public\.activity_enrollments\.decision THEN NULL\s*ELSE public\.activity_enrollments\.attendance_status/i);
+});
