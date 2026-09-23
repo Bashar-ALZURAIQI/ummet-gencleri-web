@@ -29,6 +29,7 @@ import SiteBrandingPanel from '../components/SiteBrandingPanel';
 import AdminPushNotificationControl from '../components/AdminPushNotificationControl';
 import TransientToast, { type ToastMessage } from '../components/TransientToast';
 import { validateRequired, clearInvalid, isInvalid, fieldId } from '../utils/formValidation';
+import { normalizeMeetingUrl } from '../utils/meetingUrlNormalizer';
 import { buildTransferConfirmation, runTransferWithBusyState } from '../domain/executiveTransfer';
 import { resolveEffectiveAdminTab } from '../domain/appNavigation';
 import { buildRevocationConfirmation, getOfficeName, type ExecutiveRole } from '../domain/executiveRevocation';
@@ -3274,11 +3275,16 @@ function ApplicationsTab({
       setInterviewError(t('admin.applications.interviewModal.pastDateError', 'لا يمكن اختيار تاريخ في الماضي — يجب أن يكون تاريخ المقابلة اليوم أو في المستقبل'));
       return;
     }
+    const normalizedUrl = normalizeMeetingUrl(interviewForm.meetingUrl);
+    if (!normalizedUrl) {
+      setInterviewError(t('admin.applications.interviewModal.invalidUrlError', 'يرجى إدخال رابط Google Meet أو Zoom صحيح.'));
+      return;
+    }
     setApplicationActionBusy(true);
     const result = await scheduleInterview(interviewModal.id, {
       date,
       time: interviewForm.time,
-      meetingUrl: interviewForm.meetingUrl,
+      meetingUrl: normalizedUrl,
     });
     setApplicationActionBusy(false);
     if (!result.ok) {
@@ -3481,7 +3487,7 @@ function ApplicationsTab({
               <label className="label-field">{t('admin.applications.interviewModal.urlLabel', 'رابط المقابلة (Zoom / Meet)')} <RequiredMark /></label>
               <div className="relative">
                 <Link2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-                <input id={fieldId('meetingUrl')} type="url" value={interviewForm.meetingUrl} onChange={(e) => { setInterviewForm({ ...interviewForm, meetingUrl: e.target.value }); clearInvalid(setInvalid, 'meetingUrl'); }} className={`${isInvalid(invalid, 'meetingUrl') ? 'input-field-error' : 'input-field'} pr-10`} placeholder={t('admin.applications.interviewModal.urlPlaceholder', 'https://meet.google.com/...')} dir="ltr" />
+                <input id={fieldId('meetingUrl')} type="text" value={interviewForm.meetingUrl} onChange={(e) => { setInterviewForm({ ...interviewForm, meetingUrl: e.target.value }); clearInvalid(setInvalid, 'meetingUrl'); }} className={`${isInvalid(invalid, 'meetingUrl') ? 'input-field-error' : 'input-field'} pr-10`} placeholder={t('admin.applications.interviewModal.urlPlaceholder', 'https://meet.google.com/...')} dir="ltr" />
               </div>
               <p className="mt-1 text-xs text-gray-400">{t('admin.applications.interviewModal.urlHint', 'أدخل رابط الجلسة الافتراضية للمقابلة.')}</p>
             </div>
