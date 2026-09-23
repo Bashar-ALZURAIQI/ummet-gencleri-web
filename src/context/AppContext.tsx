@@ -47,6 +47,12 @@ import {
   publishOwnCommittee,
   publishOwnCommitteeFields,
   publishCmsTarget,
+  updateOwnedEvent as updateOwnedEventService,
+  createGalleryAlbum as createGalleryAlbumService,
+  updateOwnedGalleryAlbum as updateOwnedGalleryAlbumService,
+  appendOwnedGalleryMedia as appendOwnedGalleryMediaService,
+  listOwnEventIds as listOwnEventIdsService,
+  listOwnAlbumIds as listOwnAlbumIdsService,
 } from '../services/sectionContentService';
 import {
   listVisibleContactMessages,
@@ -226,6 +232,7 @@ import {
   type GuideSectionData,
   initialGuideSections,
   type GalleryAlbum,
+  type GalleryMedia,
   type GalleryCategory,
   initialGalleryAlbums,
   initialGalleryCategories,
@@ -731,6 +738,16 @@ interface AppContextValue {
     goals: string,
   ) => Promise<{ ok: boolean; error?: string }>;
   createPublishedEvent: (event: UEvent) => Promise<{ ok: boolean; error?: string }>;
+  updateOwnedEvent: (eventId: string, eventPatch: Partial<UEvent>) => Promise<{ ok: boolean; error?: string }>;
+  deleteOwnedEvent: (eventId: string) => Promise<{ ok: boolean; error?: string; eventData?: unknown }>;
+  createGalleryAlbum: (album: GalleryAlbum) => Promise<{ ok: boolean; error?: string }>;
+  updateOwnedGalleryAlbum: (albumId: string, albumPatch: Partial<GalleryAlbum>) => Promise<{ ok: boolean; error?: string }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  deleteOwnedGalleryAlbum: (albumId: string) => Promise<{ ok: boolean; error?: string; albumData?: any }>;
+  appendOwnedGalleryMedia: (albumId: string, media: GalleryMedia) => Promise<{ ok: boolean; error?: string }>;
+  deleteOwnedGalleryMedia: (albumId: string, mediaId: string) => Promise<{ ok: boolean; error?: string; mediaUrl?: string }>;
+  listOwnEventIds: () => Promise<{ ok: boolean; data?: string[]; error?: string }>;
+  listOwnAlbumIds: () => Promise<{ ok: boolean; data?: string[]; error?: string }>;
   canonicalSiteContent?: SiteContent;
   canonicalAboutContent?: AboutContent;
   canonicalNews?: NewsItem[];
@@ -1646,9 +1663,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
     });
 
+    let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+    if (currentUser?.role === 'PRESIDENT') {
+      realtimeChannel = supabase
+        .channel('president_applications_refresh')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'student_applications' },
+          () => void refreshApplications(),
+        )
+        .subscribe();
+    }
+
     return () => {
       active = false;
       stopPresidentRefresh();
+      if (realtimeChannel) {
+        void supabase.removeChannel(realtimeChannel);
+      }
     };
   }, [currentUser?.userId, currentUser?.role]);
 
@@ -3378,6 +3410,202 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   };
 
+  const updateOwnedEvent: AppContextValue['updateOwnedEvent'] = async (eventId, eventPatch) => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'تعديل الفعاليات متاح لأعضاء الهيئة التنفيذية فقط.' };
+    }
+    const expectedVersion = selectCmsExpectedVersion('events', currentCmsVersions());
+    if (expectedVersion < 1) {
+      return { ok: false, error: 'لم تكتمل مزامنة النسخة الرسمية بعد. حدّث الصفحة ثم أعد المحاولة.' };
+    }
+    const result = await updateOwnedEventService(eventId, eventPatch, expectedVersion);
+    const currentOwner = captureConfirmedAuthOwner();
+    if (!currentOwner || currentOwner.userId !== owner.userId || currentOwner.epoch !== owner.epoch || !isLeadershipRole(currentOwner.role)) {
+      return { ok: false, error: 'تغيرت صلاحية الحساب أثناء التعديل؛ لم تُعتمد النتيجة في هذه الجلسة.' };
+    }
+    if (!result.ok) {
+      const error = result.error.message || 'تعذر تعديل الفعالية في قاعدة البيانات.';
+      setContentError(error);
+      return { ok: false, error };
+    }
+    applyCmsPublication('events', result.data.payload, result.data.version);
+    setContentError(null);
+    return { ok: true };
+  };
+
+  const deleteOwnedEvent: AppContextValue['deleteOwnedEvent'] = async (eventId) => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'حذف الفعاليات متاح لأعضاء الهيئة التنفيذية فقط.' };
+    }
+    const expectedVersion = selectCmsExpectedVersion('events', currentCmsVersions());
+    if (expectedVersion < 1) {
+      return { ok: false, error: 'لم تكتمل مزامنة النسخة الرسمية بعد. حدّث الصفحة ثم أعد المحاولة.' };
+    }
+    const { deleteOwnedEvent: serviceDelete } = await import('../services/sectionContentService.ts');
+    const result = await serviceDelete(eventId);
+    const currentOwner = captureConfirmedAuthOwner();
+    if (!currentOwner || currentOwner.userId !== owner.userId || currentOwner.epoch !== owner.epoch || !isLeadershipRole(currentOwner.role)) {
+      return { ok: false, error: 'تغيرت صلاحية الحساب أثناء الحذف؛ لم تُعتمد النتيجة في هذه الجلسة.' };
+    }
+    if (!result.ok) {
+      const error = result.error.message || 'تعذر حذف الفعالية في قاعدة البيانات.';
+      setContentError(error);
+      return { ok: false, error };
+    }
+
+    // UI refresh like gallery
+    const prevEvents = Array.isArray(events) ? events : [];
+    const nextEvents = prevEvents.filter((e: { id: string }) => e.id !== eventId);
+    applyCmsPublication('events', nextEvents, result.data.newVersion ?? expectedVersion);
+    setContentError(null);
+    return { ok: true, eventData: result.data.eventData };
+  };
+
+  const createGalleryAlbum: AppContextValue['createGalleryAlbum'] = async (album) => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'إنشاء الألبومات متاح لأعضاء الهيئة التنفيذية فقط.' };
+    }
+    const expectedVersion = selectCmsExpectedVersion('galleryAlbums', currentCmsVersions());
+    if (expectedVersion < 1) {
+      return { ok: false, error: 'لم تكتمل مزامنة النسخة الرسمية بعد. حدّث الصفحة ثم أعد المحاولة.' };
+    }
+    const result = await createGalleryAlbumService(album, expectedVersion);
+    const currentOwner = captureConfirmedAuthOwner();
+    if (!currentOwner || currentOwner.userId !== owner.userId || currentOwner.epoch !== owner.epoch || !isLeadershipRole(currentOwner.role)) {
+      return { ok: false, error: 'تغيرت صلاحية الحساب أثناء الإنشاء؛ لم تُعتمد النتيجة في هذه الجلسة.' };
+    }
+    if (!result.ok) {
+      const error = result.error.message || 'تعذر إنشاء الألبوم في قاعدة البيانات.';
+      setContentError(error);
+      return { ok: false, error };
+    }
+    applyCmsPublication('galleryAlbums', result.data.payload, result.data.version);
+    setContentError(null);
+    return { ok: true };
+  };
+
+  const updateOwnedGalleryAlbum: AppContextValue['updateOwnedGalleryAlbum'] = async (albumId, albumPatch) => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'تعديل الألبومات متاح لأعضاء الهيئة التنفيذية فقط.' };
+    }
+    const expectedVersion = selectCmsExpectedVersion('galleryAlbums', currentCmsVersions());
+    if (expectedVersion < 1) {
+      return { ok: false, error: 'لم تكتمل مزامنة النسخة الرسمية بعد. حدّث الصفحة ثم أعد المحاولة.' };
+    }
+    const result = await updateOwnedGalleryAlbumService(albumId, albumPatch, expectedVersion);
+    const currentOwner = captureConfirmedAuthOwner();
+    if (!currentOwner || currentOwner.userId !== owner.userId || currentOwner.epoch !== owner.epoch || !isLeadershipRole(currentOwner.role)) {
+      return { ok: false, error: 'تغيرت صلاحية الحساب أثناء التعديل؛ لم تُعتمد النتيجة في هذه الجلسة.' };
+    }
+    if (!result.ok) {
+      const error = result.error.message || 'تعذر تعديل الألبوم في قاعدة البيانات.';
+      setContentError(error);
+      return { ok: false, error };
+    }
+    applyCmsPublication('galleryAlbums', result.data.payload, result.data.version);
+    setContentError(null);
+    return { ok: true };
+  };
+
+  const appendOwnedGalleryMedia: AppContextValue['appendOwnedGalleryMedia'] = async (albumId, media) => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'إضافة الوسائط متاحة لأعضاء الهيئة التنفيذية فقط.' };
+    }
+    const expectedVersion = selectCmsExpectedVersion('galleryAlbums', currentCmsVersions());
+    if (expectedVersion < 1) {
+      return { ok: false, error: 'لم تكتمل مزامنة النسخة الرسمية بعد. حدّث الصفحة ثم أعد المحاولة.' };
+    }
+    const result = await appendOwnedGalleryMediaService(albumId, media, expectedVersion);
+    const currentOwner = captureConfirmedAuthOwner();
+    if (!currentOwner || currentOwner.userId !== owner.userId || currentOwner.epoch !== owner.epoch || !isLeadershipRole(currentOwner.role)) {
+      return { ok: false, error: 'تغيرت صلاحية الحساب أثناء الإضافة؛ لم تُعتمد النتيجة في هذه الجلسة.' };
+    }
+    if (!result.ok) {
+      const error = result.error.message || 'تعذر إضافة الوسائط في قاعدة البيانات.';
+      setContentError(error);
+      return { ok: false, error };
+    }
+    applyCmsPublication('galleryAlbums', result.data.payload, result.data.version);
+    setContentError(null);
+    return { ok: true };
+  };
+
+  const deleteOwnedGalleryAlbum: AppContextValue['deleteOwnedGalleryAlbum'] = async (albumId) => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'حذف الألبومات متاح لأعضاء الهيئة التنفيذية فقط.' };
+    }
+    const { data, error } = await supabase.rpc('delete_owned_gallery_album', { p_album_id: albumId });
+    if (error || !data || !data.deletedAlbumId) {
+      const errMsg = error?.message || 'تعذر حذف الألبوم في قاعدة البيانات.';
+      setContentError(errMsg);
+      return { ok: false, error: errMsg };
+    }
+
+    const newPayload = galleryAlbums.filter(a => a.id !== albumId);
+    applyCmsPublication('galleryAlbums', newPayload, contentVersionRef.current + 1);
+
+    setContentError(null);
+    return { ok: true, albumData: data.albumData };
+  };
+
+  const deleteOwnedGalleryMedia: AppContextValue['deleteOwnedGalleryMedia'] = async (albumId, mediaId) => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'حذف الوسائط متاح لأعضاء الهيئة التنفيذية فقط.' };
+    }
+    const { data, error } = await supabase.rpc('delete_owned_gallery_media', { p_album_id: albumId, p_media_id: mediaId });
+    if (error || !data || !data.deletedMediaId) {
+      const errMsg = error?.message || 'تعذر حذف الوسائط في قاعدة البيانات.';
+      setContentError(errMsg);
+      return { ok: false, error: errMsg };
+    }
+
+    const newPayload = galleryAlbums.map(album => {
+      if (album.id !== albumId) return album;
+      const targetMedia = album.media.find(m => m.id === mediaId);
+      return {
+        ...album,
+        media: album.media.filter(m => m.id !== mediaId),
+        photoCount: targetMedia?.type === 'photo' ? Math.max(0, album.photoCount - 1) : album.photoCount,
+        videoCount: targetMedia?.type === 'video' ? Math.max(0, album.videoCount - 1) : album.videoCount,
+      };
+    });
+    applyCmsPublication('galleryAlbums', newPayload, contentVersionRef.current + 1);
+
+    setContentError(null);
+    return { ok: true, mediaUrl: data.mediaData?.url };
+  };
+
+  const listOwnEventIds: AppContextValue['listOwnEventIds'] = async () => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'غير مصرح.' };
+    }
+    const result = await listOwnEventIdsService();
+    if (!result.ok) {
+      return { ok: false, error: result.error.message };
+    }
+    return { ok: true, data: result.data };
+  };
+
+  const listOwnAlbumIds: AppContextValue['listOwnAlbumIds'] = useCallback(async () => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !isLeadershipRole(owner.role)) {
+      return { ok: false, error: 'غير مصرح.' };
+    }
+    const result = await listOwnAlbumIdsService();
+    if (!result.ok) {
+      return { ok: false, error: result.error.message };
+    }
+    return { ok: true, data: result.data };
+  }, [captureConfirmedAuthOwner]);
+
   /** Media-head edits are persisted first; the UI changes only after RPC confirmation. */
   const submitSiteEdit: AppContextValue['submitSiteEdit'] = async (input) => {
     const owner = captureConfirmedAuthOwner();
@@ -3904,6 +4132,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saveOwnCommitteeContent,
       saveOwnCommitteeVision,
       createPublishedEvent,
+      updateOwnedEvent,
+      deleteOwnedEvent,
+      createGalleryAlbum,
+      updateOwnedGalleryAlbum,
+      deleteOwnedGalleryAlbum,
+      appendOwnedGalleryMedia,
+      deleteOwnedGalleryMedia,
+      listOwnEventIds,
+      listOwnAlbumIds,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

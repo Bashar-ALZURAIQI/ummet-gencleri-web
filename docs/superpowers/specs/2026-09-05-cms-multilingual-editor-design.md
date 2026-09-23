@@ -1,10 +1,11 @@
+
 # Architectural Design Specification: Inline Multilingual CMS Editing Experience & Fixed System Enum Localization
 
 - **Document ID**: `2026-09-05-cms-multilingual-editor-design`
 - **Branch**: `feature-multilingual-ar-tr-en`
-- **Task**: 7C2 (Architecture Specification Only — Amended)
+- **Task**: 7C2 (Architecture Specification Only)
 - **Target File**: `docs/superpowers/specs/2026-09-05-cms-multilingual-editor-design.md`
-- **Status**: Approved Architectural Design (Amended with Initial Backfill & Deferral of Debt Dashboard)
+- **Status**: Approved Architectural Design
 
 ---
 
@@ -24,25 +25,20 @@ However, all existing editing workflows only operate on Arabic text, and system 
 
 Forcing an editor to navigate away from an active editing session to a separate, remote translation management screen creates friction, context fragmentation, and editorial disconnect. An editor updating an announcement, hero headline, or event description must be empowered to author, inspect, and verify the Turkish and English translations within that exact same modal dialog.
 
-- **Small Inline Edit Modal**: Canonical Arabic editor at the top + collapsible translation section beneath containing editable Turkish and English fields with status indicators.
-- **Large Admin Content Modal**: Shared technical/metadata fields once at the top + multilingual editorial tabs (`[ العربية (المصدر) ] [ Türkçe ] [ English ]`) for translatable text fields.
-- **The Eventual Monitoring Dashboard Never Replaces This Workflow**: Any future central dashboard serves solely for macro-auditing and deep-linking into context; primary authoring and translation editing remain 100% in-place.
-
 ### 1.3 System Enum Presentation Correction
-Fixed system enums (such as event categories `workshop`, `lecture`, `volunteer`, `training`, `trip`, `entertainment`, `visit`, and activity types `MANDATORY`, `OPTIONAL`, `PAID`) represent machine-level invariants. They must never be treated as translatable CMS content, never stored in `cms_localizations`, and never submitted to machine translation. However, their visible labels must render in the active UI locale using centralized presentation mappers (`src/domain/eventCategoryPresentation.ts` and static dictionaries). Task 7C2A incorporates correcting administrative forms and tables so that system options display localized labels while preserving canonical machine keys.
+Fixed system enums (such as event categories `workshop`, `lecture`, `volunteer`, `training`, `trip`, `entertainment`, `visit`) represent machine-level invariants. They must never be treated as translatable CMS content, never stored in `cms_localizations`, and never submitted to machine translation. However, their visible labels must render in the active UI locale using centralized presentation mappers (`src/domain/eventCategoryPresentation.ts` and `src/domain/executivePresentation.ts`). Task 7C2 incorporates correcting administrative forms and tables so that system options display localized labels while preserving canonical machine keys.
 
 ---
 
 ## 2. Non-Goals
 
-1. **No Production Implementation in 7C2 Spec Task**: This task produces architectural documentation and implementation planning only. No production code (`src/*`), tests (`tests/*`), or dependencies (`package.json`) are modified in this step.
+1. **No Production Implementation in 7C2 Spec Task**: This task produces architectural documentation only. No production code (`src/*`), tests (`tests/*`), or dependencies (`package.json`) are modified in this step.
 2. **No Fake or Mocked Auto-Translation**: Task 7C2 will NOT simulate machine translation with hardcoded strings or mock network delays. Machine translation provider integration belongs exclusively to Task 7D.
 3. **No Direct Translation Provider Integration**: No client-side or server-side calls to Azure Translator, OpenAI, or external MT APIs will be made in 7C2.
 4. **No Remote Supabase Migrations or Database Mutations**: Task 7C2 interacts strictly via the `CmsLocalizationRepository` abstraction. Physical Supabase tables (`cms_localizations`), RLS policies, indexes, and migrations belong to a dedicated persistence phase.
 5. **No Route-Based Language Prefixes**: Routing remains locale-independent. URLs such as `/ar/events`, `/tr/news`, or `/en/admin` are strictly forbidden.
 6. **No Translation of Identity or Technical Fields**: Usernames, member names, account emails, phone numbers, UUIDs, numeric metrics, timestamps, dates, and media URLs are strictly excluded from localization.
 7. **No Elimination of Canonical Arabic Authority**: Arabic remains the singular canonical source of truth. Turkish and English cannot exist as standalone canonical entities without an Arabic parent.
-8. **No Premature Translation Debt Dashboard**: The Translation Debt Monitoring Dashboard must NOT be deployed before durable production persistence exists, preventing fake or non-durable metric display.
 
 ---
 
@@ -243,9 +239,8 @@ The modal architecture separates **Technical/Shared Fields** from **Editorial Co
 
 ---
 
-## 7. Event Form Detailed Field Breakdown & Defect Correction
+## 7. Event Form Detailed Field Breakdown
 
-### 7.1 Field-by-Field Matrix
 To ensure zero ambiguity during implementation, the following matrix defines the exact handling of every field in the Event Form (`AdminDashboard.tsx`):
 
 | Field Identifier | Technical Data Type | Classification | Storage Destination | Translation Handling | UI Presentation & Direction |
@@ -264,7 +259,7 @@ To ensure zero ambiguity during implementation, the following matrix defines the
 | `location` | `string` | **Value-Aware Editorial** | If text: AR canonical + TR/EN overlay.<br>If URL: Canonical ONLY. | Conditionally translatable via `isTranslatableLocationValue(...)`. | If text: AR RTL, TR/EN LTR.<br>If URL: Shared LTR text input. |
 | `status` | `'upcoming' \| 'past'` | Fixed System State | Canonical Event ONLY | No translation | Select option values = canonical key.<br>Visible labels = localized static i18n string. |
 
-### 7.2 Rectifying Existing Event Form & Table Defects in 7C2A
+### 7.1 Rectifying Existing Event Form & Table Defects
 Inspection of `src/pages/AdminDashboard.tsx` revealed that lines 1938 and 1978 currently read:
 ```tsx
 // Table row category badge (line 1938):
@@ -277,7 +272,7 @@ Inspection of `src/pages/AdminDashboard.tsx` revealed that lines 1938 and 1978 c
 ```
 Because `categoryLabels` in `mockData.ts` contains hardcoded Arabic text (`'ورشة عمل'`, etc.), this forces Arabic text to display even when the Admin UI is rendered in Turkish or English.
 
-**Approved 7C2A Correction**:
+**Approved 7C2 Correction**:
 ```tsx
 // Table row category badge:
 <span className={`... ${categoryColors[e.category]}`}>
@@ -292,17 +287,6 @@ Because `categoryLabels` in `mockData.ts` contains hardcoded Arabic text (`'ور
 ))}
 ```
 The stored canonical form value remains the exact canonical key (`c`), while the visible option text is translated via `getEventCategoryLabel`.
-
-**Activity Type Invariant**:
-The `activityType` select in `AdminDashboard.tsx` (lines 1989-1993) already uses stable canonical values (`MANDATORY`, `OPTIONAL`, `PAID`) with localized `t(...)` labels:
-```tsx
-<select id={fieldId('activityType')} ...>
-  <option value="MANDATORY">{t('admin.events.modal.activityTypes.mandatory', 'إلزامي')}</option>
-  <option value="OPTIONAL">{t('admin.events.modal.activityTypes.optional', 'اختياري')}</option>
-  <option value="PAID">{t('admin.events.modal.activityTypes.paid', 'حصري مدفوع بالنقاط')}</option>
-</select>
-```
-This behavior is completely correct, stores canonical tokens, displays localized text, and will be strictly preserved without regressions.
 
 ---
 
@@ -514,120 +498,10 @@ In development, test suites, and preview environments, the application provides 
 - Enforces source hash mismatch detection.
 - Guarantees zero remote database calls.
 - Guarantees that Arabic write requests throw `INVALID_LOCALE`.
-- **UI Copy Invariant**: In-memory development persistence must NEVER claim to the user that changes are "permanently saved to cloud" before durable persistence is introduced.
 
 ---
 
-## 14. Initial Existing-Content Localization Backfill
-
-### 14.1 Multilingual Scope Includes Existing Content
-Multilingual support is NOT restricted to newly created content. It applies retroactively to all **EXISTING** canonical Arabic CMS content across the platform.
-
-```
-+-----------------------------------------------------------------------+
-|              Initial Existing-Content Localization Backfill           |
-+-----------------------------------------------------------------------+
-| Existing Canonical Arabic Content (Homepage, Events, News, Guide, etc.)|
-|                                  ↓                                    |
-| Safe Extraction: extractTranslatableCmsFields (CMS_TRANSLATABLE_SCHEMA)|
-|                                  ↓                                    |
-| Translation Engine (Task 7D): AR -> TR and AR -> EN                   |
-|                                  ↓                                    |
-| Human Review & Manual Editorial Correction (Where Desired)            |
-|                                  ↓                                    |
-| Durable Persistence: Saved & Published into cms_localizations Table   |
-+-----------------------------------------------------------------------+
-```
-
-### 14.2 Eligible Existing Content Scope
-Where permitted by `CMS_TRANSLATABLE_SCHEMA`, existing content eligible for backfill includes:
-- Homepage editable CMS text (hero headlines, badges, about preview, stats labels, footer)
-- About page (mission, vision, story, goal cards, CTA)
-- Programs content overview
-- Existing Events (title, description, textual human location)
-- Media Gallery albums (titles, descriptions, textual locations, media captions) and category labels
-- Student Guide (sections, intros, headings, rich text bodies, tips) and Quick Info
-- FAQ categories and items (questions, answers)
-- Contact page cards (titles, subtitles) and map text
-- Existing News items (titles, excerpts, full rich text content)
-- Executive Plans (titles, descriptions)
-- Administrative Reports (titles, summaries, free-form period text)
-- Committee descriptions, vision, goals, and ordinary member free-form positions/responsibilities
-
-### 14.3 Backfill Safety & Strict Exclusions
-The backfill pipeline executes strictly through `extractTranslatableCmsFields(...)` against `CMS_TRANSLATABLE_SCHEMA`.
-Under no circumstances may the backfill translate:
-- Technical IDs and UUIDs
-- Person/member names (e.g., Executive Board members, Committee Heads)
-- Email addresses and phone numbers
-- URLs, media links, document download URLs, and Google Map links
-- Machine dates, timestamps, and temporal values
-- Numbers, counts, capacities, and points
-- Boolean flags and system status keys
-- Fixed system enums (`workshop`, `lecture`, `MANDATORY`, `OPTIONAL`, `PAID`)
-- Fixed executive roles (`PRESIDENT`, `MEDIA_HEAD`)
-- Plan quarters (`Q1`-`Q4`) and report types (`financial`, `administrative`, `annual`)
-
-### 14.4 Backfill Idempotency and Cost Control
-Backfill is NOT a naive "translate everything on every run" script. To prevent excessive character consumption and avoid destroying editorial work:
-1. **`missing`**: Fully eligible for initial automatic translation.
-2. **`fresh`**: Skipped completely; never translated again.
-3. **`manual`**: Paths recorded in `manualPaths` are strictly protected and NEVER blindly overwritten.
-4. **`stale`**: Only the specific paths recorded in `stalePaths` are re-translated when an explicit refresh operation is approved.
-
-### 14.5 Backfill Task Boundary & Architectural Sequencing
-The Initial Backfill script requires BOTH:
-1. A production-ready `TranslationProvider` (Task 7D)
-2. Durable production localization persistence in Supabase (`cms_localizations`)
-
-Therefore, backfill is formally sequenced as follows:
-```
-1. Task 7C2A: Reusable multilingual editing foundation + fixed enum corrections
-2. Task 7C2B: Large Admin content modal multilingual editing
-3. Task 7D:   Real automatic AR -> TR/EN translation provider
-4. Persistence: Durable Supabase localization storage & RLS
-5. Initial Backfill: One-time batch translation of all existing Arabic CMS content
-6. Translation Debt Dashboard: Audit and monitor completion ratios
-```
-
----
-
-## 15. Translation Provider Task Boundary & Future UX (Task 7D)
-
-Task 7C2 creates the editorial canvas and state contracts; it does **NOT** perform machine translation.
-
-### 15.1 Provider Architecture (Deferred to Task 7D)
-1. **`TranslationProvider` Interface**: Formal contract for external MT engines (`translateText(sourceText, from, to)`).
-2. **Azure Translator Edge Function**: The server-side proxy (`supabase/functions/translate-cms-content`) that securely holds Azure API keys and authenticates callers.
-3. **UI Constraint**: Task 7C2 will **NOT** render fake or non-functional "ترجمة آلية (Auto Translate)" buttons. If a button cannot execute real translation, it must remain hidden until Task 7D to avoid user confusion.
-
-### 15.2 Future Automated Translation User Workflows
-Once Task 7D is deployed, three distinct user workflows operate seamlessly:
-
-#### Workflow 1: Existing Content Backfill
-1. Batch process extracts missing translatable fields from canonical Arabic CMS data.
-2. Provider translates `AR -> TR` and `AR -> EN`.
-3. Overlays are published with `sourceHash` matching canonical content (`status = 'fresh'`).
-4. Editors can inspect and refine translations at any time directly in context.
-
-#### Workflow 2: Authoring Brand-New Content
-1. Editor authors canonical content in Arabic (e.g., enters event title and description).
-2. Editor clicks `"ترجمة تلقائية" (Auto Translate)`.
-3. System extracts translatable fields, sends them to the Task 7D Edge Function, and populates the Turkish and English fields.
-4. Editor reviews and refines the generated translations.
-5. Editor saves drafts or clicks `"نشر" (Publish)`.
-
-#### Workflow 3: Editing Existing Content
-1. Editor modifies the canonical Arabic text (e.g., updates the event description).
-2. The existing Turkish and English translations are **preserved** (never deleted).
-3. The affected paths are flagged as `stale`, displaying the warning: `"الترجمة بحاجة لتحديث" (Translation needs update)`.
-4. Editor clicks `"تحديث الترجمات المعدلة" (Translate Changes)`.
-5. Only the modified, stale paths are sent to the translation provider; untouched paths and `manualPaths` are preserved without unnecessary token consumption.
-6. Editor reviews and publishes.
-
----
-
-## 16. Persistence Task Boundary (Post-7C2)
+## 14. Persistence Task Boundary (Post-7C2)
 
 The 7C2 design strictly isolates frontend editorial state from physical database infrastructure. The following concerns are formally designated as **OUT OF SCOPE for 7C2** and deferred to a dedicated persistence task:
 
@@ -639,28 +513,40 @@ The 7C2 design strictly isolates frontend editorial state from physical database
 
 ---
 
-## 17. Public Read Integration Boundary
+## 15. Translation Provider Task Boundary (Task 7D)
 
-### 17.1 Target Public Architecture
+Task 7C2 creates the editorial canvas and state contracts; it does **NOT** perform machine translation. The following capabilities belong strictly to **Task 7D**:
+
+1. **`TranslationProvider` Interface**: Formal contract for external MT engines (`translateText(sourceText, from, to)`).
+2. **Azure Translator Edge Function**: The server-side proxy (`supabase/functions/translate-cms-content`) that securely holds Azure API keys and authenticates callers.
+3. **Automatic AR -> TR/EN Translation**: Generating initial draft text from Arabic source.
+4. **Retry & Backoff Logic**: Managing rate limits, timeout handling, and failure recovery.
+5. **UI Constraint**: Task 7C2 will **NOT** render fake or non-functional "ترجمة آلية (Auto Translate)" buttons. If a button cannot execute real translation, it must remain hidden until Task 7D to avoid user confusion.
+
+---
+
+## 16. Public Read Integration Boundary
+
+### 16.1 Target Public Architecture
 In the final architecture, public client pages will consume localized data via `resolveCmsTargetForLocale(repository, target, activeLocale, canonicalPayload)`:
 - `ar` -> Returns canonical Arabic immediately (0ms, 0 repository queries).
 - `tr` / `en` -> Queries published localization overlay; if fresh or stale, overlays translated fields onto canonical payload; if missing or draft, falls back to Arabic.
 
-### 17.2 Rollout Recommendation
+### 16.2 Rollout Recommendation
 To avoid destabilizing public page rendering during authoring workflow development, **Public Read Integration is explicitly decoupled from Task 7C2A**.
 - **Phase 7C2A**: Focuses exclusively on the authoring and editing experience within administrative and inline modals, plus correcting the Event Form enum bug.
 - **Phase 7C2B**: Migrates public page data hooks (`useSiteContent`, etc.) to resolve published localizations dynamically.
 
 ---
 
-## 18. Access Control and Authorization
+## 17. Access Control and Authorization
 
-### 18.1 Inherited Editorial Permissions
+### 17.1 Inherited Editorial Permissions
 Translation editing authority mirrors canonical target editing permissions:
 - An editor who holds authorized edit permissions for a canonical section (e.g., Media Head editing News or Events) automatically holds edit permissions for the Turkish and English translations of that section.
 - If an editor has view-only access (e.g., non-presidential roles on locked sections), all translation inputs render in a disabled, view-only state.
 
-### 18.2 President-Only Emergency Arabic Publish
+### 17.2 President-Only Emergency Arabic Publish
 In urgent operational scenarios (e.g., an urgent safety alert, sudden schedule change, or time-sensitive announcement), waiting for Turkish and English translations to be drafted and reviewed may be unacceptable.
 
 The design incorporates an **Emergency Arabic-Only Publish** workflow:
@@ -672,14 +558,14 @@ The design incorporates an **Emergency Arabic-Only Publish** workflow:
 
 ---
 
-## 19. Error Handling and Unsaved Changes UX
+## 18. Error Handling and Unsaved Changes UX
 
-### 19.1 Failure Recovery & Canonical Save Isolation
-1. **Canonical Save Failure Isolation**: The canonical Arabic save and localized overlay saves are decoupled. If saving a localized draft or published translation fails, the successfully saved Arabic canonical content is **NEVER lost or rolled back**. The UI reports the translation error independently.
-2. **Draft Save Failure**: If saving a localized draft fails (e.g., network error or concurrency conflict), the error is displayed in an alert badge within the translation section.
-3. **Optimistic Concurrency Conflict (`CONFLICT`)**: If another editor modified the Arabic source or translation record concurrently, the repository throws `CmsLocalizationRepositoryError('CONFLICT')`. The modal prompts: `"تم تعديل المحتوى في جلسة أخرى. هل ترغب في إعادة تحميل أحدث نسخة؟"`.
+### 18.1 Failure Recovery
+1. **Draft Save Failure**: If saving a localized draft fails (e.g., network error or concurrency conflict), the error is displayed in an alert badge within the translation section. The canonical Arabic draft remains completely untouched and safe.
+2. **Optimistic Concurrency Conflict (`CONFLICT`)**: If another editor modified the Arabic source or translation record concurrently, the repository throws `CmsLocalizationRepositoryError('CONFLICT')`. The modal prompts: `"تم تعديل المحتوى في جلسة أخرى. هل ترغب في إعادة تحميل أحدث نسخة؟"`.
+3. **Partial Save Resilience**: Canonical Arabic save and localized overlay saves are decoupled. A failure in Turkish translation persistence cannot cause the loss of approved Arabic canonical edits.
 
-### 19.2 Unsaved Changes Guard
+### 18.2 Unsaved Changes Guard
 If an editor inputs changes into any Arabic, Turkish, or English field and attempts to dismiss the modal (via backdrop click, Escape key, or Cancel button) while `isDirty === true`:
 - The modal dismiss action is intercepted.
 - A confirmation dialog appears:
@@ -689,7 +575,7 @@ If an editor inputs changes into any Arabic, Turkish, or English field and attem
 
 ---
 
-## 20. Directionality and Content Typography
+## 19. Directionality and Content Typography
 
 A frequent bug in multilingual CMS tools is forcing text inputs to inherit the application interface's layout direction. In this design:
 
@@ -704,7 +590,7 @@ A frequent bug in multilingual CMS tools is forcing text inputs to inherit the a
 
 ---
 
-## 21. Comprehensive Testing Strategy (28 Mandatory TDD Scenarios)
+## 20. Comprehensive Testing Strategy (28 Mandatory TDD Scenarios)
 
 Implementation of Task 7C2 must adhere to Test-Driven Development (TDD), fulfilling the following 28 automated test specifications before declaring completion:
 
@@ -748,9 +634,9 @@ Implementation of Task 7C2 must adhere to Test-Driven Development (TDD), fulfill
 
 ---
 
-## 22. Architectural Sequencing & Scope Decomposition
+## 21. Recommended Scope Decomposition
 
-To guarantee manageable PR sizes, zero regressions, and high architectural quality, the implementation and rollout order is formally structured into the following sequence:
+To guarantee manageable PR sizes, zero regressions, and high architectural quality, implementing Task 7C2 as a single monolithic PR is strongly discouraged. The recommended decomposition is structured into three sequential phases:
 
 ```
 +-----------------------------------------------------------------------------------+
@@ -770,58 +656,42 @@ To guarantee manageable PR sizes, zero regressions, and high architectural quali
                                           |
                                           v
 +-----------------------------------------------------------------------------------+
-|                        Phase 7D: Real Machine Translation Provider                |
-| - TranslationProvider contract & Azure Translator Edge Function integration       |
-| - Automated translation endpoint with secrets & rate-limit handling               |
-+-----------------------------------------------------------------------------------+
-                                          |
-                                          v
-+-----------------------------------------------------------------------------------+
-|                        Phase Persistence: Production Localization Storage         |
-| - Supabase public.cms_localizations table, draft partition, RLS, indexes          |
-| - Production CmsLocalizationRepository implementation replacing InMemory          |
-+-----------------------------------------------------------------------------------+
-                                          |
-                                          v
-+-----------------------------------------------------------------------------------+
-|                        Phase Backfill: Initial Existing-Content Migration         |
-| - Batch translation of all existing canonical Arabic CMS content                  |
-| - Idempotent, cost-controlled, manual-preserving extraction & persistence        |
-+-----------------------------------------------------------------------------------+
-                                          |
-                                          v
-+-----------------------------------------------------------------------------------+
-|                        Phase Dashboard: Translation Debt Monitoring Cockpit       |
+|                        Phase 7C2C: Translation Debt Monitoring                    |
 | - Admin Dashboard "Translation Monitoring" tab (Read-Only metrics)                |
 | - Entity-by-entity completion gauges (% translated, missing, stale counts)        |
 | - Direct deep-links from debt table to in-context edit modals                     |
 +-----------------------------------------------------------------------------------+
 ```
 
-### 22.1 Phase 7C2A: Core Reusable UI Foundation & Inline Editing
+### 21.1 Phase 7C2A: Core Reusable UI Foundation & Inline Editing
 - **Scope**:
-  - Build `TranslationStatusBadge`, `LocalizedFieldEditor`, and `CmsTranslationSection`.
+  - Build `TranslationStatusBadge`, `LocalizedFieldEditor`, `LocaleTranslationTabs`, and `CmsTranslationSection`.
   - Integrate `CmsTranslationSection` into `InlineEditOverlay.tsx` (`EditableField` and `EditableCard`).
-  - Fix the raw Arabic event category display bug in `AdminDashboard.tsx` using `getEventCategoryLabel(c, t)` for options and table badges.
+  - Fix the raw Arabic event category display bug in `AdminDashboard.tsx` using `getEventCategoryLabel(c, t)`.
   - Wire `InMemoryCmsLocalizationRepository` into React context for development and automated tests.
-  - Establish value-aware location checking foundation.
+- **Estimated Size**: ~400 lines of modular component code + comprehensive unit test suite.
 
-### 22.2 Phase 7C2B: Large Admin Content Modals
+### 21.2 Phase 7C2B: Large Admin Content Modals
 - **Scope**:
-  - Introduce `LocaleTranslationTabs` and adapt `AdminDashboard.tsx` modal dialogs to adopt `CmsTranslationSection` across:
+  - Refactor `AdminDashboard.tsx` modal dialogs to adopt `LocaleTranslationTabs` and `CmsTranslationSection` across:
     - Events (Title, Description, Location)
     - News (Title, Excerpt, Full Body)
     - Media Gallery (Album Title, Description, Location, Captions)
     - Student Guide & FAQ (Headings, Questions, Answers, Tips)
     - Plans & Reports (Titles, Summaries, Free-form Period)
     - Committees (Descriptions, Vision, Goals, Member Positions)
+- **Estimated Size**: Concentrated in `AdminDashboard.tsx` and modal sub-components.
 
-### 22.3 Deferral of Translation Debt Monitoring Dashboard
-The Translation Debt Monitoring Dashboard is **DEFERRED** until durable production persistence exists. Rendering audit metrics (`TR 95%`, `EN 70%`, `Missing 8`) on an ephemeral in-memory repository would mislead administrators. Once the database persistence phase is completed, the dashboard will be deployed strictly as a read-only monitoring and deep-linking tool. Primary editing remains same-place editing.
+### 21.3 Phase 7C2C: Central Translation Debt Monitoring Dashboard
+- **Scope**:
+  - Add an optional monitoring tab in `AdminDashboard.tsx`: **"حالة الترجمة" (Translation Status)**.
+  - Read-only audit view displaying completion ratios across all 15 CMS targets (e.g., `Events: TR 100%, EN 85%`).
+  - Lists stale and missing debt items with a **"تعديل في المكان" (Edit in Place)** button that deep-links directly to the relevant edit modal.
+  - No translation editing takes place inside this dashboard; it serves solely as an executive audit cockpit.
 
 ---
 
-## 23. Explicit Acceptance Criteria
+## 22. Explicit Acceptance Criteria
 
 To declare Task 7C2 successfully implemented upon execution of the phases above, the system must fulfill the following criteria:
 
@@ -842,7 +712,7 @@ To declare Task 7C2 successfully implemented upon execution of the phases above,
 
 ---
 
-## 24. Risks, Edge Cases, and Mitigation Strategies
+## 23. Risks, Edge Cases, and Mitigation Strategies
 
 | Risk / Edge Case | Architectural Impact | Mitigation Strategy |
 | :--- | :--- | :--- |

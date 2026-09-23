@@ -156,6 +156,34 @@ export interface CmsLocalizationRepository {
   ): Promise<void>;
 
   /**
+   * Scoped mutation for an executive to safely overwrite localization of a specific album they own.
+   */
+  publishOwnedGalleryAlbumLocalization(
+    albumId: string,
+    locale: LocalizedCmsLocale,
+    translation: { title?: string; description?: string; location?: string },
+  ): Promise<void>;
+
+  /**
+   * Scoped mutation for an executive to safely overwrite localization of a specific event they own.
+   */
+  publishOwnedEventLocalization(
+    eventId: string,
+    locale: LocalizedCmsLocale,
+    translation: { title?: string; description?: string; location?: string },
+  ): Promise<void>;
+
+  /**
+   * Scoped mutation for an executive to safely overwrite localization of specific media inside an album they own.
+   */
+  publishOwnedGalleryMediaLocalization(
+    albumId: string,
+    mediaId: string,
+    locale: LocalizedCmsLocale,
+    translation: { caption?: string },
+  ): Promise<void>;
+
+  /**
    * Reads all published and draft localization records for 'tr' and 'en'
    * for monitoring and health inspection. Zero writes, read-only.
    */
@@ -377,6 +405,123 @@ export class InMemoryCmsLocalizationRepository implements CmsLocalizationReposit
 
     const updatedRecord: CmsLocalizationRecord<unknown> = {
       target: 'events',
+      locale,
+      payload: currentPayload,
+      status: 'fresh',
+      manualPaths,
+      stalePaths: existing?.stalePaths ? existing.stalePaths.filter((p) => p !== pathToAdd) : [],
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.publishedStore.set(key, updatedRecord);
+  }
+
+  public async publishOwnedEventLocalization(
+    eventId: string,
+    locale: LocalizedCmsLocale,
+    translation: { title?: string; description?: string; location?: string },
+  ): Promise<void> {
+    // In-memory implementation delegates to the standard publish
+    // since there's no real DB owner check anyway.
+    return this.publishEventLocalization(eventId, locale, translation);
+  }
+
+  public async publishOwnedGalleryAlbumLocalization(
+    albumId: string,
+    locale: LocalizedCmsLocale,
+    translation: { title?: string; description?: string; location?: string },
+  ): Promise<void> {
+    this.assertSupportedLocalizedLocale(locale);
+    const trimmedId = albumId.trim();
+    if (!trimmedId) {
+      throw new CmsLocalizationRepositoryError('UNKNOWN', 'Valid albumId is required');
+    }
+
+    const key = this.makeKey('galleryAlbums', locale);
+    const existing = this.publishedStore.get(key);
+    const currentPayload = Array.isArray(existing?.payload)
+      ? safeClone(existing.payload as Record<string, unknown>[])
+      : [];
+
+    const sanitized: Record<string, unknown> = { id: trimmedId };
+    if (translation.title?.trim()) sanitized.title = translation.title.trim();
+    if (translation.description?.trim()) sanitized.description = translation.description.trim();
+    if (translation.location?.trim()) sanitized.location = translation.location.trim();
+
+    const idx = currentPayload.findIndex((item) => item && typeof item === 'object' && item.id === trimmedId);
+    if (idx >= 0) {
+      currentPayload[idx] = { ...currentPayload[idx], ...sanitized };
+    } else {
+      currentPayload.push(sanitized);
+    }
+
+    const manualPaths = existing?.manualPaths ? [...existing.manualPaths] : [];
+    const pathToAdd = `${trimmedId}.title`;
+    if (!manualPaths.includes(pathToAdd)) {
+      manualPaths.push(pathToAdd);
+    }
+
+    const updatedRecord: CmsLocalizationRecord<unknown> = {
+      target: 'galleryAlbums',
+      locale,
+      payload: currentPayload,
+      status: 'fresh',
+      manualPaths,
+      stalePaths: existing?.stalePaths ? existing.stalePaths.filter((p) => p !== pathToAdd) : [],
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.publishedStore.set(key, updatedRecord);
+  }
+
+  public async publishOwnedGalleryMediaLocalization(
+    albumId: string,
+    mediaId: string,
+    locale: LocalizedCmsLocale,
+    translation: { caption?: string },
+  ): Promise<void> {
+    this.assertSupportedLocalizedLocale(locale);
+    const trimmedAlbumId = albumId.trim();
+    const trimmedMediaId = mediaId.trim();
+    if (!trimmedAlbumId || !trimmedMediaId) {
+      throw new CmsLocalizationRepositoryError('UNKNOWN', 'Valid albumId and mediaId are required');
+    }
+
+    const key = this.makeKey('galleryAlbums', locale);
+    const existing = this.publishedStore.get(key);
+    const currentPayload = Array.isArray(existing?.payload)
+      ? safeClone(existing.payload as Record<string, unknown>[])
+      : [];
+
+    const sanitized: Record<string, unknown> = { id: trimmedMediaId };
+    if (translation.caption?.trim()) sanitized.caption = translation.caption.trim();
+
+    const albumIdx = currentPayload.findIndex((item) => item && typeof item === 'object' && item.id === trimmedAlbumId);
+    if (albumIdx >= 0) {
+      const album = currentPayload[albumIdx] as { media?: Record<string, unknown>[] };
+      const mediaArray = Array.isArray(album.media) ? album.media : [];
+      const mediaIdx = mediaArray.findIndex((m) => m && typeof m === 'object' && m.id === trimmedMediaId);
+      if (mediaIdx >= 0) {
+        mediaArray[mediaIdx] = { ...mediaArray[mediaIdx], ...sanitized };
+      } else {
+        mediaArray.push(sanitized);
+      }
+      album.media = mediaArray;
+    } else {
+      currentPayload.push({
+        id: trimmedAlbumId,
+        media: [sanitized],
+      });
+    }
+
+    const manualPaths = existing?.manualPaths ? [...existing.manualPaths] : [];
+    const pathToAdd = `${trimmedAlbumId}.media.${trimmedMediaId}.caption`;
+    if (!manualPaths.includes(pathToAdd)) {
+      manualPaths.push(pathToAdd);
+    }
+
+    const updatedRecord: CmsLocalizationRecord<unknown> = {
+      target: 'galleryAlbums',
       locale,
       payload: currentPayload,
       status: 'fresh',

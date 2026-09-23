@@ -100,12 +100,12 @@ export function serializePushSubscription(
   };
 }
 
-export type PushDestination = 'news' | 'programs' | 'gallery';
+export type PushDestination = 'news' | 'programs' | 'gallery' | 'student-dashboard' | 'admin-applications';
 
 export function pushDestinationFromUrl(value: string): PushDestination | null {
   try {
     const destination = new URL(value).searchParams.get('push');
-    return destination === 'news' || destination === 'programs' || destination === 'gallery'
+    return destination === 'news' || destination === 'programs' || destination === 'gallery' || destination === 'student-dashboard' || destination === 'admin-applications'
       ? destination
       : null;
   } catch {

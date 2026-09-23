@@ -56,7 +56,11 @@ function Router() {
 
     const destination = pushDestinationFromUrl(window.location.href);
     if (!destination) return;
-    navigate({ kind: destination }, { replace: true });
+    if (destination === 'admin-applications') {
+      navigate({ kind: 'admin', tab: 'applications' }, { replace: true });
+    } else {
+      navigate({ kind: destination }, { replace: true });
+    }
     const cleanUrl = new URL(window.location.href);
     cleanUrl.searchParams.delete('push');
     window.history.replaceState(

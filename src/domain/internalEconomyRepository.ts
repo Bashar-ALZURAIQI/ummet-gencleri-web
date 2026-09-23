@@ -69,6 +69,9 @@ function serverFailure<T>(error: RpcErrorLike): InternalEconomyResult<T> {
   const rawMessage = typeof error.message === 'string' ? error.message.toLowerCase() : '';
   if (code === '42501') return fail(code, 'ليست لديك صلاحية استخدام هذه الميزة.');
   if (rawMessage.includes('points')) return fail(code, 'نقاطك غير كافية للانضمام إلى هذا النشاط.');
+  if (rawMessage.includes('final excuse review')) {
+    return fail(code, 'تم اعتماد نتيجة العذر، لذلك لم يعد من الممكن تغيير قرار المشاركة.');
+  }
   if (rawMessage.includes('excuse') || rawMessage.includes('mandatory')) {
     return fail(code, 'يجب كتابة عذر الغياب للنشاط الإلزامي.');
   }

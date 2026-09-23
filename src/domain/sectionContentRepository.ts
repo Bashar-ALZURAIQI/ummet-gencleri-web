@@ -50,8 +50,8 @@ interface SingletonQuery {
 export interface SectionContentClient {
   from(table: 'student_guide' | 'faq'): SingletonQuery;
   rpc(
-    name: 'publish_cms_target' | 'create_published_event' | 'publish_own_committee' | 'publish_own_committee_fields',
-    args: Record<string, unknown>,
+    name: 'publish_cms_target' | 'create_published_event' | 'publish_own_committee' | 'publish_own_committee_fields' | 'update_owned_published_event' | 'delete_owned_published_event' | 'create_gallery_album' | 'update_owned_gallery_album' | 'append_owned_gallery_media' | 'list_own_event_ids' | 'list_own_album_ids',
+    args?: Record<string, unknown>,
   ): Promise<QueryResponse>;
 }
 
@@ -195,8 +195,8 @@ export function createSectionContentRepository(client: SectionContentClient) {
               ? response.error.code
               : 'EVENT_CREATION_FAILED',
           conflict
-            ? 'أضيفت فعالية أحدث. حدّث الصفحة ثم أعد المحاولة.'
-            : 'تعذر إنشاء الفعالية على الخادم.',
+            ? 'تحديث متعارض للفعالية. يرجى إعادة تحميل الصفحة والمحاولة مجدداً.'
+            : 'تعذر إنشاء الفعالية على الخادم: ' + response.error.message,
           response.error,
         );
       }
@@ -282,6 +282,131 @@ export function createSectionContentRepository(client: SectionContentClient) {
       return publication?.target === 'committees'
         ? { ok: true, data: publication }
         : fail('SECTION_CONTENT_RESPONSE_INVALID', 'أعاد الخادم نتيجة نشر غير صالحة.');
+    },
+
+    async updateOwnedEvent(eventId: string, eventPatch: unknown, expectedVersion: number): Promise<RepositoryResult<CmsPublication>> {
+      const response = await client.rpc('update_owned_published_event', {
+        p_event_id: eventId,
+        p_event_patch: eventPatch,
+        p_expected_version: expectedVersion,
+      });
+      if (response.error) {
+        const conflict = response.error.code === '40001' || response.error.message === 'CONTENT_VERSION_CONFLICT';
+        return fail(
+          conflict ? 'CONTENT_VERSION_CONFLICT' : typeof response.error.code === 'string' ? response.error.code : 'EVENT_UPDATE_FAILED',
+          conflict ? 'نُشر تعديل أحدث. حدّث الصفحة ثم أعد المحاولة.' : 'تعذر تعديل الفعالية. تأكد من صلاحياتك.',
+          response.error,
+        );
+      }
+      const publication = parseCmsPublication(response.data);
+      return publication?.target === 'events'
+        ? { ok: true, data: publication }
+        : fail('SECTION_CONTENT_RESPONSE_INVALID', 'أعاد الخادم نتيجة تعديل فعالية غير صالحة.');
+    },
+
+    async deleteOwnedEvent(eventId: string): Promise<RepositoryResult<{ deletedEventId: string; eventData: unknown, newVersion?: number }>> {
+      const response = await client.rpc('delete_owned_published_event', {
+        p_event_id: eventId,
+      });
+      if (response.error) {
+        return fail(
+          typeof response.error.code === 'string' ? response.error.code : 'EVENT_DELETE_FAILED',
+          'تعذر حذف الفعالية. قد لا تملك الصلاحية الكافية.',
+          response.error,
+        );
+      }
+      if (!response.data || typeof response.data !== 'object' || !('deletedEventId' in response.data)) {
+        return fail('SECTION_CONTENT_RESPONSE_INVALID', 'أعاد الخادم نتيجة حذف غير صالحة.');
+      }
+      return {
+        ok: true,
+        data: {
+          deletedEventId: (response.data as Record<string, unknown>).deletedEventId as string,
+          eventData: (response.data as Record<string, unknown>).eventData,
+          newVersion: (response.data as Record<string, unknown>).newVersion as number | undefined
+        }
+      };
+    },
+
+    async createGalleryAlbum(album: unknown, expectedVersion: number): Promise<RepositoryResult<CmsPublication>> {
+      const response = await client.rpc('create_gallery_album', {
+        p_album: album,
+        p_expected_version: expectedVersion,
+      });
+      if (response.error) {
+        const conflict = response.error.code === '40001' || response.error.message === 'CONTENT_VERSION_CONFLICT';
+        return fail(
+          conflict ? 'CONTENT_VERSION_CONFLICT' : typeof response.error.code === 'string' ? response.error.code : 'ALBUM_CREATE_FAILED',
+          conflict ? 'نُشر تعديل أحدث. حدّث الصفحة ثم أعد المحاولة.' : 'تعذر إنشاء الألبوم.',
+          response.error,
+        );
+      }
+      const publication = parseCmsPublication(response.data);
+      return publication?.target === 'galleryAlbums'
+        ? { ok: true, data: publication }
+        : fail('SECTION_CONTENT_RESPONSE_INVALID', 'أعاد الخادم نتيجة إنشاء ألبوم غير صالحة.');
+    },
+
+    async updateOwnedGalleryAlbum(albumId: string, albumPatch: unknown, expectedVersion: number): Promise<RepositoryResult<CmsPublication>> {
+      const response = await client.rpc('update_owned_gallery_album', {
+        p_album_id: albumId,
+        p_album_patch: albumPatch,
+        p_expected_version: expectedVersion,
+      });
+      if (response.error) {
+        const conflict = response.error.code === '40001' || response.error.message === 'CONTENT_VERSION_CONFLICT';
+        return fail(
+          conflict ? 'CONTENT_VERSION_CONFLICT' : typeof response.error.code === 'string' ? response.error.code : 'ALBUM_UPDATE_FAILED',
+          conflict ? 'نُشر تعديل أحدث. حدّث الصفحة ثم أعد المحاولة.' : 'تعذر تعديل الألبوم. تأكد من صلاحياتك.',
+          response.error,
+        );
+      }
+      const publication = parseCmsPublication(response.data);
+      return publication?.target === 'galleryAlbums'
+        ? { ok: true, data: publication }
+        : fail('SECTION_CONTENT_RESPONSE_INVALID', 'أعاد الخادم نتيجة تعديل ألبوم غير صالحة.');
+    },
+
+    async appendOwnedGalleryMedia(albumId: string, media: unknown, expectedVersion: number): Promise<RepositoryResult<CmsPublication>> {
+      const response = await client.rpc('append_owned_gallery_media', {
+        p_album_id: albumId,
+        p_media: media,
+        p_expected_version: expectedVersion,
+      });
+      if (response.error) {
+        const conflict = response.error.code === '40001' || response.error.message === 'CONTENT_VERSION_CONFLICT';
+        return fail(
+          conflict ? 'CONTENT_VERSION_CONFLICT' : typeof response.error.code === 'string' ? response.error.code : 'MEDIA_APPEND_FAILED',
+          conflict ? 'نُشر تعديل أحدث. حدّث الصفحة ثم أعد المحاولة.' : 'تعذر إضافة الوسائط للألبوم. تأكد من صلاحياتك.',
+          response.error,
+        );
+      }
+      const publication = parseCmsPublication(response.data);
+      return publication?.target === 'galleryAlbums'
+        ? { ok: true, data: publication }
+        : fail('SECTION_CONTENT_RESPONSE_INVALID', 'أعاد الخادم نتيجة إضافة وسائط غير صالحة.');
+    },
+
+    async listOwnEventIds(): Promise<RepositoryResult<string[]>> {
+      const response = await client.rpc('list_own_event_ids', {});
+      if (response.error) {
+        return fail(typeof response.error.code === 'string' ? response.error.code : 'EVENT_LIST_FAILED', 'تعذر جلب الفعاليات المملوكة.', response.error);
+      }
+      if (Array.isArray(response.data)) {
+        return { ok: true, data: response.data as string[] };
+      }
+      return { ok: true, data: [] };
+    },
+
+    async listOwnAlbumIds(): Promise<RepositoryResult<string[]>> {
+      const response = await client.rpc('list_own_album_ids', {});
+      if (response.error) {
+        return fail(typeof response.error.code === 'string' ? response.error.code : 'ALBUM_LIST_FAILED', 'تعذر جلب الألبومات المملوكة.', response.error);
+      }
+      if (Array.isArray(response.data)) {
+        return { ok: true, data: response.data as string[] };
+      }
+      return { ok: true, data: [] };
     },
   };
 }

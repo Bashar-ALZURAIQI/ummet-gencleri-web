@@ -41,6 +41,8 @@ export default function ProgramsPage() {
     uploadManagedFile,
     savePublishedSiteTarget,
     createPublishedEvent,
+    updateOwnedEvent,
+    listOwnEventIds,
     refreshPublishedLocalizations,
   } = useApp();
   const { t } = useTranslation();
@@ -54,6 +56,7 @@ export default function ProgramsPage() {
   });
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [ownedEventIds, setOwnedEventIds] = useState<Set<string>>(new Set());
   const [invalid, setInvalid] = useState<string[]>([]);
   const [draftEventId, setDraftEventId] = useState('');
   const [activityBoard, setActivityBoard] = useState<StudentActivityBoardItem[]>([]);
@@ -101,7 +104,7 @@ export default function ProgramsPage() {
 
   const saveStudentDecision = useCallback(async (
     activity: StudentActivityBoardItem,
-    decision: 'JOINING' | 'DECLINING',
+    decision: 'JOINING' | 'DECLINING' | 'IGNORED',
     excuse?: string | null,
   ) => {
     const request = buildActivityDecisionRequest({
@@ -128,6 +131,10 @@ export default function ProgramsPage() {
   }, [notify, refreshActivityBoard]);
 
   const declineActivity = (activity: StudentActivityBoardItem) => {
+    if (activity.decision === 'DECLINING') {
+      void saveStudentDecision(activity, 'IGNORED', null);
+      return;
+    }
     if (activity.type === 'MANDATORY') {
       setExcuseActivity(activity);
       setExcuseText(activity.excuseText ?? '');
@@ -140,6 +147,16 @@ export default function ProgramsPage() {
   // existing published cards keep their narrower, existing authorization.
   const isPresident = currentUser?.role === 'PRESIDENT';
   const canAddEvent = canCreateExecutiveContent(currentUser?.role);
+
+  useEffect(() => {
+    if (canAddEvent && !isPresident) {
+      listOwnEventIds().then(res => {
+        if (res.ok && res.data) {
+          setOwnedEventIds(new Set(res.data));
+        }
+      });
+    }
+  }, [canAddEvent, isPresident, listOwnEventIds]);
 
   const filtered = events.filter((e) => {
     if (tab === 'upcoming' && e.status !== 'upcoming') return false;
@@ -260,11 +277,19 @@ export default function ProgramsPage() {
         setModalOpen(false);
         return;
       }
-      const saved = await savePublishedSiteTarget(
-        'events',
-        (canonicalEvents ?? events).map((ev) => (ev.id === editId ? next : ev)),
-      );
-      if (!saved.ok) return;
+      let saved;
+      if (isPresident) {
+        saved = await savePublishedSiteTarget(
+          'events',
+          (canonicalEvents ?? events).map((ev) => (ev.id === editId ? next : ev)),
+        );
+      } else {
+        saved = await updateOwnedEvent(editId, next);
+      }
+      if (!saved.ok) {
+        if (!isPresident) notify('error', saved.error ?? 'تعذر تعديل الفعالية.');
+        return;
+      }
     } else {
       const newEvent: UEvent = {
         id: publicEventId, title: form.title, category: form.category, date: iso,
@@ -612,10 +637,16 @@ const saveHeader = async (e: React.FormEvent) => {
                   activity={activityByEventId.get(e.id) ?? null}
                   activityLoading={activityLoading}
                   activityBusy={activityBusyId === activityByEventId.get(e.id)?.activityId}
-                  onJoin={(activity) => void saveStudentDecision(activity, 'JOINING', null)}
+                  onJoin={(activity) => {
+                    if (activity.decision === 'JOINING') {
+                      void saveStudentDecision(activity, 'IGNORED', null);
+                    } else {
+                      void saveStudentDecision(activity, 'JOINING', null);
+                    }
+                  }}
                   onDecline={declineActivity}
                 />
-                {isPresident && (
+                {(isPresident || ownedEventIds.has(e.id)) && (
                   <div className="absolute top-3 left-3 z-10 flex gap-1.5">
                     <button
                       onClick={() => openEdit(e)}
@@ -624,13 +655,15 @@ const saveHeader = async (e: React.FormEvent) => {
                     >
                       <Edit3 className="h-4 w-4" />
                     </button>
-                    <button
-                      onClick={() => removeEvent(e.id)}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/90 text-rose-600 shadow-md backdrop-blur-sm transition-colors hover:bg-white"
-                      title={t('common.delete')}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {isPresident && (
+                      <button
+                        onClick={() => removeEvent(e.id)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/90 text-rose-600 shadow-md backdrop-blur-sm transition-colors hover:bg-white"
+                        title={t('common.delete')}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -791,8 +824,8 @@ const saveHeader = async (e: React.FormEvent) => {
                 placeholder: 'وصف الفعالية',
               },
             ]}
-            canEdit={canAddEvent && (!editId || isPresident)}
-            canPublish={canAddEvent && (!editId || isPresident)}
+            canEdit={canAddEvent && (!editId || isPresident || ownedEventIds.has(editId))}
+            canPublish={canAddEvent && (!editId || isPresident || ownedEventIds.has(editId))}
             translations={translations}
             onTranslationChange={(loc, name, val) => {
               setTranslations((prev) => ({

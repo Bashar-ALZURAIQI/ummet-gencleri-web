@@ -113,7 +113,7 @@ type ActivityDecisionBuildResult =
 export function buildActivityDecisionRequest(input: {
   activityId: string;
   activityType: ActivityType;
-  decision: Extract<ActivityDecision, 'JOINING' | 'DECLINING'>;
+  decision: Extract<ActivityDecision, 'JOINING' | 'DECLINING' | 'IGNORED'>;
   excuseText?: string | null;
 }): ActivityDecisionBuildResult {
   const activityId = input.activityId.trim();
@@ -130,9 +130,20 @@ export function buildActivityDecisionRequest(input: {
     };
   }
 
+  if (input.decision === 'IGNORED') {
+    return {
+      ok: true,
+      value: {
+        p_activity_id: activityId,
+        p_decision: 'IGNORED',
+        p_excuse_text: null,
+      },
+    };
+  }
+
   const excuse = input.excuseText?.trim() || '';
   if (input.activityType === 'MANDATORY' && !excuse) {
-    return { ok: false, error: 'العذر مطلوب للنشاط الإلزامي.' };
+    return { ok: false, error: 'الرجاء إدخال العذر.' };
   }
 
   return {

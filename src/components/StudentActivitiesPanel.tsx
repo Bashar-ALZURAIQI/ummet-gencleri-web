@@ -45,7 +45,7 @@ export default function StudentActivitiesPanel({ onJoiningCountChange }: { onJoi
 
   const submit = useCallback(async (
     item: StudentActivityBoardItem,
-    decision: 'JOINING' | 'DECLINING',
+    decision: 'JOINING' | 'DECLINING' | 'IGNORED',
     excuse?: string | null,
   ) => {
     const request = buildActivityDecisionRequest({
@@ -101,12 +101,22 @@ export default function StudentActivitiesPanel({ onJoiningCountChange }: { onJoi
               loading={false}
               busy={busyId === item.activityId}
               onLogin={() => undefined}
-              onJoin={() => void submit(item, 'JOINING', null)}
+              onJoin={() => {
+                if (item.decision === 'JOINING') {
+                  void submit(item, 'IGNORED', null);
+                } else {
+                  void submit(item, 'JOINING', null);
+                }
+              }}
               onDecline={() => {
-                if (item.type === 'MANDATORY') {
-                  setExcuseItem(item);
-                  setExcuseText(item.excuseText ?? '');
-                } else void submit(item, 'DECLINING', null);
+                if (item.decision === 'DECLINING') {
+                  void submit(item, 'IGNORED', null);
+                } else {
+                  if (item.type === 'MANDATORY') {
+                    setExcuseItem(item);
+                    setExcuseText(item.excuseText ?? '');
+                  } else void submit(item, 'DECLINING', null);
+                }
               }}
             />
           </div>
