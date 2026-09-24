@@ -12,6 +12,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase, type ServiceResult } from '../lib/supabase';
 import { i18n } from '../i18n/config.ts';
 import { overlayLocalizedCmsPayload } from '../domain/cmsPublicRead.ts';
+import { createVisibilityRefreshPolling } from '../domain/visibilityRefreshPolling.ts';
 import {
   listAssignableMembers,
   listPresidentAssignableMembers,
@@ -1215,23 +1216,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     reload();
 
-    const channel = supabase
-      .channel(`edit-requests:${currentUser.userId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'edit_requests' },
-        reload,
-      )
-      .subscribe((status) => {
-        if (!active || status === 'SUBSCRIBED') return;
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          setEditRequestsError('تعذرت المزامنة اللحظية للسجل؛ سيتم تحديثه بعد كل عملية وعند إعادة فتح الصفحة.');
-        }
-      });
+    const stopPolling = createVisibilityRefreshPolling({
+      requestRefresh: reload,
+    });
 
     return () => {
       active = false;
-      void supabase.removeChannel(channel);
+      stopPolling();
     };
   }, [currentUser, refreshEditRequests]);
 
@@ -1611,19 +1602,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     void refresh();
-    const messagesChannel = supabase
-      .channel(`contact-messages:${currentUser.userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_messages' }, () => { void refresh(); })
-      .subscribe();
-    const repliesChannel = supabase
-      .channel(`contact-replies:${currentUser.userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_message_replies' }, () => { void refresh(); })
-      .subscribe();
+    const stopPolling = createVisibilityRefreshPolling({
+      requestRefresh: () => void refresh(),
+    });
 
     return () => {
       active = false;
-      void supabase.removeChannel(messagesChannel);
-      void supabase.removeChannel(repliesChannel);
+      stopPolling();
     };
   }, [currentUser?.userId]);
 
@@ -1663,24 +1648,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
     });
 
-    let realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
-    if (currentUser?.role === 'PRESIDENT') {
-      realtimeChannel = supabase
-        .channel('president_applications_refresh')
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'student_applications' },
-          () => void refreshApplications(),
-        )
-        .subscribe();
-    }
-
     return () => {
       active = false;
       stopPresidentRefresh();
-      if (realtimeChannel) {
-        void supabase.removeChannel(realtimeChannel);
-      }
     };
   }, [currentUser?.userId, currentUser?.role]);
 
