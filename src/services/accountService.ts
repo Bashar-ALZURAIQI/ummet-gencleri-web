@@ -13,11 +13,10 @@ import {
   type PublicExecutiveDirectoryMember,
   type PublicExecutiveDirectoryRow,
 } from '../domain/supabaseMappers.ts';
-import {
-  createIdentitySubscription,
-  type IdentityRealtimeClient,
-  type IdentityRealtimeChangeKind,
+import type {
+  IdentityRealtimeChangeKind,
 } from '../domain/realtimeIdentitySubscription.ts';
+import { createIdentityRefreshPolling } from '../domain/identityRefreshPolling.ts';
 import {
   executeTransferRpcRequest,
   type ExecutiveTransferServiceOutcome,
@@ -257,13 +256,22 @@ export function subscribeToOwnProfileAndAssignment(
   onError: (error: ServiceError) => void,
   onSubscribed: () => void,
 ): () => Promise<ServiceResult<void>> {
-  return createIdentitySubscription({
-    client: supabase as unknown as IdentityRealtimeClient,
-    userId,
-    requestConfirmedRefresh,
-    onError,
-    onSubscribed,
-  });
+  try {
+    const cleanup = createIdentityRefreshPolling({
+      requestRefresh: () => requestConfirmedRefresh('profile'),
+    });
+    onSubscribed();
+    return async () => {
+      cleanup();
+      return serviceSuccess(undefined);
+    };
+  } catch (error) {
+    onError({
+      code: 'IDENTITY_POLLING_SETUP_FAILED',
+      message: 'Unable to start identity polling.',
+    } as ServiceError);
+    return async () => serviceSuccess(undefined);
+  }
 }
 
 export async function changeOwnPassword(
