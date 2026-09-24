@@ -54,4 +54,13 @@ describe('Audit: No Runtime Postgres Changes Channels', async () => {
         assert.ok(content.includes('createIdentityRefreshPolling'), 'Should use createIdentityRefreshPolling');
         assert.ok(!content.includes('createIdentitySubscription'), 'Should NOT use createIdentitySubscription');
     });
+
+    it('verifies SQL migration syntax for disabling postgres changes', async () => {
+        const migrationPath = path.resolve('supabase/migrations/20260924190000_disable_app_postgres_changes.sql');
+        const content = await fs.readFile(migrationPath, 'utf8');
+        const hasClosedDoBlock = content.includes('END;\r\n$$;') || content.includes('END;\n$$;');
+        assert.ok(hasClosedDoBlock, 'Migration must contain a syntactically closed DO block ending with END;\\n$$;');
+        const hasOpenDoBlock = content.includes('END\r\n$$;') || content.includes('END\n$$;');
+        assert.ok(!hasOpenDoBlock, 'Migration must not have a missing semicolon after END');
+    });
 });
