@@ -351,11 +351,24 @@ test('10. Application motivation remains untouched', async () => {
   assert.doesNotMatch(code, /t\([^)]*motivation/);
 });
 
-test('11. Interview URLs remain untouched', async () => {
+test('11. Interview URLs remain untranslated while security normalization is preserved', async () => {
   const code = await read('src/pages/AdminDashboard.tsx');
 
-  assert.match(code, /interviewForm\.meetingUrl/);
-  assert.match(code, /meetingUrl:\s*interviewForm\.meetingUrl/);
+  assert.match(code, /value=\{interviewForm\.meetingUrl\}/);
+  assert.match(
+    code,
+    /normalizeMeetingUrl\(interviewForm\.meetingUrl\)/,
+  );
+  assert.match(code, /meetingUrl:\s*normalizedUrl/);
+
+  assert.doesNotMatch(
+    code,
+    /t\([^)]*interviewForm\.meetingUrl/,
+  );
+  assert.doesNotMatch(
+    code,
+    /t\([^)]*normalizedUrl/,
+  );
 });
 
 test('12. Internal role keys remain unchanged', async () => {
