@@ -56,7 +56,7 @@ describe('Audit: No Runtime Postgres Changes Channels', async () => {
     });
 
     it('verifies SQL migration syntax for disabling postgres changes', async () => {
-        const migrationPath = path.resolve('supabase/migrations/20260924190000_disable_app_postgres_changes.sql');
+        const migrationPath = path.resolve('supabase/migrations/20260924220118_disable_app_postgres_changes.sql');
         const content = await fs.readFile(migrationPath, 'utf8');
         const hasClosedDoBlock = content.includes('END;\r\n$$;') || content.includes('END;\n$$;');
         assert.ok(hasClosedDoBlock, 'Migration must contain a syntactically closed DO block ending with END;\\n$$;');

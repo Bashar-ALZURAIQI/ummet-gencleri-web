@@ -20,4 +20,4 @@ BEGIN
         ALTER PUBLICATION supabase_realtime DROP TABLE public.executive_assignments;
     END IF;
 END;
-$$;
+$$;;
