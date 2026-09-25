@@ -143,7 +143,7 @@ export function buildActivityDecisionRequest(input: {
 
   const excuse = input.excuseText?.trim() || '';
   if (input.activityType === 'MANDATORY' && !excuse) {
-    return { ok: false, error: 'الرجاء إدخال العذر.' };
+    return { ok: false, error: 'العذر مطلوب للنشاط الإلزامي.' };
   }
 
   return {
