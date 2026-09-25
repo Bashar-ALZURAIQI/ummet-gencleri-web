@@ -454,14 +454,23 @@ test('28. Published localization is publicly readable with Arabic fallback', () 
   assert.equal(result[0].description, 'وصف الفعالية', 'Missing description falls back to Arabic');
 });
 
-test('29. President protections elsewhere in the application remain unchanged', async () => {
+test('29. President generic publishing remains protected while event deletion is ownership-scoped', async () => {
   const appCode = await readFile(new URL('../src/context/AppContext.tsx', import.meta.url), 'utf8');
   // publishCmsTarget requires PRESIDENT
   assert.match(appCode, /if \(!owner \|\| owner\.role !== 'PRESIDENT'\) \{\s*return \{ ok: false, error: 'النشر المباشر متاح لرئيس الاتحاد الحالي فقط\.' \};/);
 
   const adminCode = await readFile(new URL('../src/pages/AdminDashboard.tsx', import.meta.url), 'utf8');
-  // Deleting published events is restricted to President
-  assert.match(adminCode, /if \(!isPresident\) \{\s*setToast\(\{ id: Date\.now\(\), type: 'error', text: t\('admin\.events\.deleteRestrictedPresident'/);
+  assert.match(adminCode, /if \(!isPresident && !ownedEventIds\.has\(id\)\) \{/);
+  assert.match(adminCode, /deleteOwnedEvent\(id\)/);
+  assert.doesNotMatch(adminCode, /deleteRestrictedPresident/);
+
+  const sqlCode = await readFile(new URL('../supabase/migrations/20260921160000_event_ownership_complete.sql', import.meta.url), 'utf8');
+  assert.match(sqlCode, /IF NOT \(SELECT private\.is_current_executive\(\)\) THEN/);
+  assert.match(sqlCode, /v_is_president := \(SELECT private\.is_current_president\(\)\);/);
+  assert.match(sqlCode, /IF NOT v_is_president THEN/);
+  assert.match(sqlCode, /activity\.public_event_id = v_event_id/);
+  assert.match(sqlCode, /AND activity\.created_by = v_actor_id/);
+  assert.match(sqlCode, /ERRCODE = '42501'/);
 });
 
 test('30. No translation-specific role system is introduced', async () => {
