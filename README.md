@@ -237,6 +237,8 @@ Administrative actions are handled through protected server-side functions and r
 
 ## 👤 Initial President Bootstrap
 
+**تهيئة الرئيس الأول:** يتم إنشاء حساب الرئيس الأول عبر Supabase Authentication أولًا، ثم ربط UUID الخاص به بمنصب PRESIDENT من خلال إجراء التهيئة الآمن الموضح أدناه.
+
 A new database does not initially contain a president account with administrative authority.
 
 First, create the president account normally through Supabase Authentication.
@@ -290,6 +292,9 @@ END
 $bootstrap_first_president$;
 ```
 
+> Note: The bootstrap explicitly assigns `position_key, committee_key` as `'PRESIDENT', 'presidency'`.
+
+
 This procedure must not be executed from the browser.
 
 Do not expose administrative database credentials to frontend code.
@@ -299,6 +304,12 @@ After the first president is initialized, future executive-role transfers must u
 ---
 
 ## 👤 Accounts and Profiles
+
+**بريد الدخول:** هو البريد المرتبط بحساب Supabase Auth والمستخدم لتسجيل الدخول.
+
+**البريد للتواصل:** هو البريد العام الموجود في الملف الشخصي، وهو منفصل عن بريد الدخول ولا يغيّر هوية تسجيل الدخول.
+
+**كلمة المرور:** تُدار من خلال Supabase Auth، ويستطيع المستخدم تغيير كلمة مرور حسابه فقط. لا توجد كلمة مرور إدارية مشتركة.
 
 Authentication credentials are managed by Supabase Auth.
 
@@ -343,6 +354,8 @@ This prevents identity changes from accidentally changing permissions.
 
 ### President Transfer Testing
 
+**نقل الرئيس:** يتم نقل صلاحية الرئيس من خلال مسار إدارة الأدوار المحمي، وليس بتغيير الاسم أو البريد الإلكتروني.
+
 To test a president transfer:
 
 1. Sign in as the current president.
@@ -371,6 +384,8 @@ The application does not use `localStorage` as the authoritative source for offi
 ---
 
 ## 📜 Edit and Decision Logs
+
+**سجل التعديلات:** يخضع الوصول إلى سجلات التعديلات والقرارات لصلاحيات المستخدم الحالية كما هو موضح أدناه.
 
 Access to administrative logs depends on the user's current role.
 
