@@ -511,12 +511,6 @@ test('27. No machine translation API added', async () => {
   }
 });
 
-test('28. No Supabase schema/database changes', async () => {
-  // Verifies no unexpected migration files were created
-  const gitStatus = await read('.git/HEAD');
-  assert.ok(gitStatus, 'git head exists');
-});
-
 test('29. No URL locale routing added', async () => {
   const routerCode = await read('src/App.tsx');
   assert.doesNotMatch(routerCode, /path=["']\/:locale/);
