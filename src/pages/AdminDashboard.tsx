@@ -67,7 +67,6 @@ import {
 export type AdminTab = 'stats' | 'board' | 'pending-edits' | 'site-pending' | 'branding' | 'history' | 'events' | 'gallery' | 'news' | 'members' | 'applications' | 'inbox' | 'plans' | 'suggestions' | 'guide-suggestions' | 'excuses' | 'oversight' | 'task-management' | 'member-points' | 'translation-monitoring' | 'profile';
 
 import { supabase } from '../lib/supabase';
-import { SupabaseCmsLocalizationRepository } from '../services/localization/SupabaseCmsLocalizationRepository';
 
 export default function AdminDashboard() {
   const { t } = useTranslation();
@@ -2004,8 +2003,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
             canPublish={editingAlbum == null ? false : canPublishEditingGalleryAlbum}
             onPublishOverride={isPresident ? undefined : async (loc, fields) => {
               if (!editingAlbum?.id) return;
-              const localizationRepo = new SupabaseCmsLocalizationRepository(supabase);
-              await localizationRepo.publishOwnedGalleryAlbumLocalization(editingAlbum.id, loc, fields);
+              await repository.publishOwnedGalleryAlbumLocalization(editingAlbum.id, loc, fields);
             }}
             translations={translations}
             onTranslationChange={(loc, name, val) => {
@@ -2457,8 +2455,7 @@ function EventsTab({ events, currentUser }: {
             recordId={editId}
             onPublishOverride={async (loc, fields) => {
               if (!editId) return;
-              const localizationRepo = new SupabaseCmsLocalizationRepository(supabase);
-              await localizationRepo.publishOwnedEventLocalization(editId, loc, fields);
+              await repository.publishOwnedEventLocalization(editId, loc, fields);
             }}
             canonicalPayload={editId ? events.map((ev) => (ev.id === editId ? { ...ev, title: form.title, description: form.description, location: form.location } : ev)) : events}
             fields={[
