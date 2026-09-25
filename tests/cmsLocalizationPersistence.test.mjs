@@ -675,7 +675,7 @@ test('28. corrective migration restricts generic published write policies to Pre
   assert.match(alignMigrationSql, /GRANT EXECUTE ON FUNCTION public\.publish_event_localization[\s\S]*?TO authenticated/);
 });
 
-test('29. InMemoryCmsLocalizationRepository supports scoped publishEventLocalization without mutating other events', async () => {
+test('29. InMemoryCmsLocalizationRepository supports scoped publishOwnedEventLocalization without mutating other events', async () => {
   const repo = new InMemoryCmsLocalizationRepository();
   // Prepopulate with existing event localization
   await repo.savePublished({
@@ -691,7 +691,7 @@ test('29. InMemoryCmsLocalizationRepository supports scoped publishEventLocaliza
   });
 
   // Publish localization for a new event e2
-  await repo.publishEventLocalization('e2', 'tr', {
+  await repo.publishOwnedEventLocalization('e2', 'tr', {
     title: 'İkinci Etkinlik',
     description: 'Açıklama 2',
     location: 'Salon 2',
@@ -705,12 +705,12 @@ test('29. InMemoryCmsLocalizationRepository supports scoped publishEventLocaliza
   assert.ok(updated.manualPaths.includes('e2.title'));
 });
 
-test('30. SupabaseCmsLocalizationRepository delegates publishEventLocalization to RPC or fallback query client', async () => {
+test('30. SupabaseCmsLocalizationRepository delegates publishOwnedEventLocalization to the owned-event RPC', async () => {
   let rpcCalled = false;
   let rpcArgs = null;
   const mockClient = {
     rpc(fnName, args) {
-      if (fnName === 'publish_event_localization') {
+      if (fnName === 'publish_owned_event_translation') {
         rpcCalled = true;
         rpcArgs = args;
         return Promise.resolve({ data: { status: 'fresh' }, error: null });
@@ -720,10 +720,17 @@ test('30. SupabaseCmsLocalizationRepository delegates publishEventLocalization t
   };
 
   const repo = new SupabaseCmsLocalizationRepository(mockClient);
-  await repo.publishEventLocalization('ev-99', 'tr', { title: 'Test Başlık' });
+  await repo.publishOwnedEventLocalization(
+    'ev-99',
+    'tr',
+    { title: 'Test Başlık' }
+  );
 
   assert.equal(rpcCalled, true);
   assert.equal(rpcArgs.p_event_id, 'ev-99');
   assert.equal(rpcArgs.p_locale, 'tr');
-  assert.deepEqual(rpcArgs.p_translation, { title: 'Test Başlık' });
+  assert.equal(rpcArgs.p_title, 'Test Başlık');
+  assert.equal(rpcArgs.p_description, null);
+  assert.equal(rpcArgs.p_location, null);
+  assert.equal(rpcArgs.p_expected_version, 0);
 });

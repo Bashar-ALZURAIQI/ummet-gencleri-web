@@ -145,17 +145,6 @@ export interface CmsLocalizationRepository {
   ): Promise<boolean>;
 
   /**
-   * Scoped publication for a single event's localization.
-   * Merges or appends the localized fields for the specified event into the published
-   * events overlay without granting broad target-wide overwrite authority.
-   */
-  publishEventLocalization(
-    eventId: string,
-    locale: LocalizedCmsLocale,
-    translation: { title?: string; description?: string; location?: string },
-  ): Promise<void>;
-
-  /**
    * Scoped mutation for an executive to safely overwrite localization of a specific album they own.
    */
   publishOwnedGalleryAlbumLocalization(
@@ -368,7 +357,7 @@ export class InMemoryCmsLocalizationRepository implements CmsLocalizationReposit
     return this.draftStore.delete(key);
   }
 
-  public async publishEventLocalization(
+  private async publishEventLocalizationInMemory(
     eventId: string,
     locale: LocalizedCmsLocale,
     translation: { title?: string; description?: string; location?: string },
@@ -423,7 +412,7 @@ export class InMemoryCmsLocalizationRepository implements CmsLocalizationReposit
   ): Promise<void> {
     // In-memory implementation delegates to the standard publish
     // since there's no real DB owner check anyway.
-    return this.publishEventLocalization(eventId, locale, translation);
+    return this.publishEventLocalizationInMemory(eventId, locale, translation);
   }
 
   public async publishOwnedGalleryAlbumLocalization(

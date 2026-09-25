@@ -355,7 +355,7 @@ test('24. Authorized activity creator/editor retains AR/TR/EN workflow with auth
 
   // Simulating AdminDashboard / ProgramsPage binding and publishing on event creation via scoped RPC
   for (const loc of ['tr', 'en']) {
-    await repo.publishEventLocalization(authoritativeEventId, loc, translations[loc]);
+    await repo.publishOwnedEventLocalization(authoritativeEventId, loc, translations[loc]);
     const list = [{ id: authoritativeEventId, ...translations[loc] }];
     await repo.saveDraft({
       target: 'events',
@@ -551,36 +551,50 @@ test('34. Invariant 2: Normal executive cannot generically overwrite target-wide
 
 test('35. Invariant 3: Authorized executive can publish localization for their own newly-created event through the safe scoped path', async () => {
   const alignSql = await readFile(
-    new URL('../supabase/migrations/20260907060000_align_cms_localizations_authorization.sql', import.meta.url),
+    new URL('../supabase/migrations/20260921220000_fix_event_localization_version_field.sql', import.meta.url),
     'utf8',
   );
-  // Scoped function exists with executive check
-  assert.match(alignSql, /CREATE OR REPLACE FUNCTION public\.publish_event_localization/);
+  assert.match(alignSql, /CREATE OR REPLACE FUNCTION public\.publish_owned_event_translation/);
   assert.match(alignSql, /private\.is_current_executive\(\)/);
   assert.match(alignSql, /SECURITY DEFINER/);
   assert.match(alignSql, /SET search_path = ''/);
 
-  // AdminDashboard and ProgramsPage wire publishEventLocalization on event creation
   const adminCode = await readFile(new URL('../src/pages/AdminDashboard.tsx', import.meta.url), 'utf8');
-  assert.match(adminCode, /repository\.publishEventLocalization\(publicEventId, loc, trData\)/);
+  assert.match(adminCode, /repository\.publishOwnedEventLocalization\(publicEventId, loc, trData\)/);
+  assert.doesNotMatch(adminCode, /publishEventLocalization\(/);
 
   const programsCode = await readFile(new URL('../src/pages/ProgramsPage.tsx', import.meta.url), 'utf8');
-  assert.match(programsCode, /repository\.publishEventLocalization\(publicEventId, loc, trData\)/);
+  assert.match(programsCode, /repository\.publishOwnedEventLocalization\(publicEventId, loc, trData\)/);
+  assert.doesNotMatch(programsCode, /publishEventLocalization\(/);
+
+  const supabaseAdapterCode = await readFile(new URL('../src/services/localization/SupabaseCmsLocalizationRepository.ts', import.meta.url), 'utf8');
+  assert.match(supabaseAdapterCode, /rpc\('publish_owned_event_translation',/);
 });
 
 test("36. Invariant 4: That executive cannot change another event's localization", async () => {
   const alignSql = await readFile(
-    new URL('../supabase/migrations/20260907060000_align_cms_localizations_authorization.sql', import.meta.url),
+    new URL('../supabase/migrations/20260921220000_fix_event_localization_version_field.sql', import.meta.url),
     'utf8',
   );
-  // Verifies event createdByRole matches caller's position for non-president
   assert.match(alignSql, /IF NOT v_is_president THEN/);
-  assert.match(alignSql, /\(v_canonical_event ->> 'createdByRole'\) IS DISTINCT FROM v_position/);
-  assert.match(alignSql, /Not authorized to localize events created by another role/);
+  assert.match(alignSql, /activity\.public_event_id = v_event_id/);
+  assert.match(alignSql, /activity\.created_by = v_actor_id/);
+  assert.match(alignSql, /Not authorized to translate events created by another executive/);
+});
 
-  // Verifies that only the matching event ID item is modified in the payload array
-  assert.match(alignSql, /WHEN item ->> 'id' = v_event_id THEN v_sanitized_translation/);
-  assert.match(alignSql, /ELSE item/);
+test("36.5. Legacy public RPC retired by migration", async () => {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const files = readdirSync(new URL('../supabase/migrations', import.meta.url));
+  let foundRetirement = false;
+  for (const file of files) {
+    if (file.endsWith('.sql')) {
+      const sql = readFileSync(new URL(`../supabase/migrations/${file}`, import.meta.url), 'utf8');
+      if (sql.includes('DROP FUNCTION IF EXISTS public.publish_event_localization(text, text, jsonb)')) {
+        foundRetirement = true;
+      }
+    }
+  }
+  assert.ok(foundRetirement, 'Retirement migration for publish_event_localization must exist');
 });
 
 test('37. Invariant 5: Media Head cannot bypass proposal workflow to publish News localization', async () => {

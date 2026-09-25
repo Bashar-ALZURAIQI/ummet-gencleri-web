@@ -317,7 +317,7 @@ export default function ProgramsPage() {
         const trData = translations[loc];
         if (trData.title?.trim() || trData.description?.trim() || trData.location?.trim()) {
           try {
-            await repository.publishEventLocalization(publicEventId, loc, trData);
+            await repository.publishOwnedEventLocalization(publicEventId, loc, trData);
           } catch {
             notify('error', t('cmsLocalization.publishFailed', 'تعذر نشر الترجمة.'));
             return;

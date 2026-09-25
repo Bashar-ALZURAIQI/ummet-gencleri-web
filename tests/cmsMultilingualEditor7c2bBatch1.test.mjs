@@ -338,7 +338,7 @@ test('26. Human-readable location rule remains guarded with isLocation in both f
 test('27. Actual-page flow uses real Event identity and authoritative ID binding', async () => {
   const programsSource = await readProgramsPage();
   assert.match(programsSource, /recordId=\{editId\}/);
-  assert.match(programsSource, /repository\.publishEventLocalization/);
+  assert.match(programsSource, /repository\.publishOwnedEventLocalization/);
   assert.match(programsSource, /target:\s*['"]events['"]/);
 });
 
