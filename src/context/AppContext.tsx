@@ -1,3 +1,6 @@
+import { studentSuggestionService } from '../services/studentSuggestionService.ts';
+import { createSuggestionStateIntegration } from '../domain/studentSuggestionRefreshGate.ts';
+import type { StudentSuggestion } from '../domain/studentSuggestionGateway.ts';
 import {
   createContext,
   useContext,
@@ -930,6 +933,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     return mockSuggestions.map(normalizeSuggestion);
   });
+
+  
   const [editRequestRows, setEditRequestRows] = useState<EditRequest[]>([]);
   const [legacyEditsHistory] = useState<EditsHistoryEntry[]>(loadLegacyHistoryOnce);
   const [editRequestsLoading, setEditRequestsLoading] = useState(false);
@@ -939,6 +944,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentStudent, setCurrentStudent] = useState<Student | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authInitializing, setAuthInitializing] = useState(true);
+
+  
   const [identityRefreshing, setIdentityRefreshing] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [passwordRecoveryGate, setPasswordRecoveryGateState] = useState<PasswordRecoveryGate>('IDLE');
@@ -956,12 +963,66 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
   const ownProfileOperationOwnerRef = useRef<string | null>(null);
   const authEpoch = useRef(new AuthEpochController(browserAuthTimerScheduler)).current;
+
+  
   const confirmedAuthOwner = useRef(new ConfirmedAuthOwnerStore()).current;
   const backgroundProfileRefresh = useRef(createBackgroundProfileRefreshCoordinator()).current;
   const identitySubscriptionGeneration = useRef(createIdentitySubscriptionGeneration()).current;
   const latestAuthEventRef = useRef<{ epoch: number; session: Session | null } | null>(null);
   const passwordRecoveryGateRef = useRef<PasswordRecoveryGate>('IDLE');
   const explicitLoginIntentEpochRef = useRef<number | null>(null);
+
+  const suggestionsIntegration = useMemo(() => {
+    return createSuggestionStateIntegration({
+      load: async () => {
+        const res = await studentSuggestionService.loadVisibleStudentSuggestions();
+        if (!res.ok) return { ok: false, error: res.error };
+        // Map backend to frontend
+        const mapped = res.data.map(d => ({
+          id: d.id,
+          studentId: '',
+          studentName: 'Anonymous',
+          targetRole: d.targetRole as any,
+          category: d.category,
+          title: d.title,
+          content: d.content,
+          status: d.status as any,
+          createdAt: d.createdAt,
+          responses: d.responses.map(r => ({
+            id: r.id,
+            by: 'Exec',
+            byRole: 'Exec',
+            text: r.responseText,
+            at: r.createdAt,
+          }))
+        }));
+        return { ok: true, data: mapped };
+      },
+      submit: async (params) => {
+        return studentSuggestionService.submitStudentSuggestion(params);
+      },
+      respond: async (params) => {
+        return studentSuggestionService.respondToStudentSuggestion(params);
+      },
+      onUpdate: (data) => setSuggestions(data),
+      onStorageRetire: () => localStorage.removeItem(LS_SUGGESTIONS_KEY)
+    });
+  }, []);
+
+  // Poll
+  useEffect(() => {
+    if (!currentUser) return;
+    const auth = { epoch: latestAuthEventRef.current?.epoch ?? 0, userId: currentUser.userId, role: currentUser.role };
+    const cancel = createVisibilityRefreshPolling({
+      requestRefresh: () => suggestionsIntegration.performRefresh(auth),
+      
+    });
+    suggestionsIntegration.performRefresh(auth);
+    return () => {
+      cancel();
+      suggestionsIntegration.clear();
+    };
+  }, [currentUser, suggestionsIntegration]);
 
   const setPasswordRecoveryGate = useCallback((gate: PasswordRecoveryGate) => {
     passwordRecoveryGateRef.current = gate;
@@ -1251,7 +1312,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Suggestions persistence — single source under `app_suggestions`.
   useEffect(() => {
-    safeWrite(LS_SUGGESTIONS_KEY, suggestions);
+    // Auth server handles state
   }, [suggestions]);
 
   // Persist plans + reports to localStorage
