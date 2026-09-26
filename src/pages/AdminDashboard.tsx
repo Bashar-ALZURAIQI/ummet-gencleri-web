@@ -436,11 +436,11 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
     setReplyOpen(true);
   };
 
-  const submitReply = (e: React.FormEvent) => {
+  const submitReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeSuggestion) return;
     if (!validateRequired({ replyText }, ['replyText'], setInvalid)) return;
-    const ok = respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
+    const ok = await respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
     setReplyOpen(false);
     if (ok) {
       setToast(true);
@@ -674,11 +674,11 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
     setReplyOpen(true);
   };
 
-  const submitReply = (e: React.FormEvent) => {
+  const submitReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeSuggestion) return;
     if (!validateRequired({ replyText }, ['replyText'], setInvalid)) return;
-    const ok = respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
+    const ok = await respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
     if (ok) {
       setReplyOpen(false);
       setToast(true);

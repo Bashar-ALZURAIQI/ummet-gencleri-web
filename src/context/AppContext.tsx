@@ -601,7 +601,7 @@ interface AppContextValue {
   setNews: React.Dispatch<React.SetStateAction<NewsItem[]>>;
   students: Student[];
   suggestions: Suggestion[];
-  setSuggestions: React.Dispatch<React.SetStateAction<Suggestion[]>>;
+  submitSuggestion: (params: { targetRole: string, category: string, title: string, content: string }) => Promise<boolean>;
   plans: AdminPlan[];
   setPlans: React.Dispatch<React.SetStateAction<AdminPlan[]>>;
   reports: AdminReport[];
@@ -672,7 +672,7 @@ interface AppContextValue {
   registerWithApplication: (name: string, email: string, password: string, university: string, major: string, year: string, phone: string, motivation: string) => Promise<{ ok: boolean; error?: string; requiresEmailConfirmation?: boolean; emailWarning?: string }>;
   scheduleInterview: (applicationId: string, interview: InterviewInfo) => Promise<{ ok: boolean; error?: string; emailWarning?: string }>;
   decideApplication: (applicationId: string, status: 'accepted' | 'rejected', rejectionReason?: string) => Promise<{ ok: boolean; error?: string; emailWarning?: string }>;
-  respondToSuggestion: (id: string, reply: string, status: SuggestionStatus) => boolean;
+  respondToSuggestion: (id: string, reply: string, status: SuggestionStatus) => Promise<boolean>;
   getVisibleSuggestions: () => Suggestion[];
   canRespondToSuggestion: (suggestion: Suggestion) => boolean;
   pendingProfileEdits: PendingProfileEdit[];
@@ -926,13 +926,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ? stored.map(normalizeStudent)
       : mockStudents;
   });
-  const [suggestions, setSuggestions] = useState<Suggestion[]>(() => {
-    const stored = safeParse<Suggestion[]>(LS_SUGGESTIONS_KEY);
-    if (stored && Array.isArray(stored) && stored.length > 0) {
-      return stored.map(normalizeSuggestion);
-    }
-    return mockSuggestions.map(normalizeSuggestion);
-  });
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
 
   
   const [editRequestRows, setEditRequestRows] = useState<EditRequest[]>([]);
@@ -2642,20 +2636,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // RBAC visibility: PRESIDENT sees everything, each committee head sees only the
   // suggestions targeted to their own role, and students see only their own.
-  const getVisibleSuggestions: AppContextValue['getVisibleSuggestions'] = () => {
-    if (!currentUser) return [];
-    if (currentUser.role === 'PRESIDENT') return suggestions;
-    if (isLeadershipRole(currentUser.role)) {
-      return suggestions.filter((s) => s.targetRole === currentUser.role);
-    }
-    const ownId = currentStudent?.id;
-    const ownEmail = emailKey(currentUser.email);
-    return suggestions.filter(
-      (s) => (ownId && s.studentId === ownId) || (s.studentEmail && emailKey(s.studentEmail) === ownEmail)
-    );
+  
+  const submitSuggestion: AppContextValue['submitSuggestion'] = async (params: { targetRole: string, category: string, title: string, content: string }) => {
+    if (!currentUser) return false;
+    const auth = { epoch: latestAuthEventRef.current?.epoch ?? 0, userId: currentUser.userId, role: currentUser.role };
+    const res = await suggestionsIntegration.submit(auth, params);
+    return res.ok;
   };
 
-  // Reply rights: the targeted official OR the president (as direct supervisor).
+  const getVisibleSuggestions: AppContextValue['getVisibleSuggestions'] = () => {
+    return suggestions;
+  };
+
   const canRespondToSuggestion: AppContextValue['canRespondToSuggestion'] = (suggestion) => {
     if (!currentUser || !isLeadershipRole(currentUser.role)) return false;
     if (currentUser.role === 'PRESIDENT') return true;
@@ -2664,20 +2656,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Respond to a suggestion + update its status. Returns false when the caller has
   // no permission (targeted to another committee) so the UI can stay read-only.
-  const respondToSuggestion: AppContextValue['respondToSuggestion'] = (id, reply, status) => {
+  const respondToSuggestion: AppContextValue['respondToSuggestion'] = async (id, reply, status) => {
     const target = suggestions.find((s) => s.id === id);
-    if (!target || !canRespondToSuggestion(target)) return false;
-    const response: SuggestionResponse = {
-      id: 'r' + Date.now() + Math.random().toString(36).slice(2, 6),
-      by: currentUser?.name ?? 'الإدارة',
-      byRole: currentUser ? ROLE_LABEL[currentUser.role] : 'الإدارة',
-      text: reply,
-      at: todayStr(),
-    };
-    setSuggestions((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, status, responses: [...s.responses, response] } : s))
-    );
-    return true;
+    if (!target || !canRespondToSuggestion(target) || !currentUser) return false;
+    const auth = { epoch: latestAuthEventRef.current?.epoch ?? 0, userId: currentUser.userId, role: currentUser.role };
+    const res = await suggestionsIntegration.respond(auth, { suggestionId: id, responseText: reply, newStatus: status });
+    return res.ok;
   };
 
   const upsertEditRequestRow = (request: EditRequest) => {
@@ -4034,7 +4018,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setNews,
       students,
       suggestions,
-      setSuggestions,
+      submitSuggestion,
       plans: effectivePlans,
       setPlans,
       reports: effectiveReports,

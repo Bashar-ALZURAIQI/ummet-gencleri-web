@@ -34,7 +34,7 @@ export default function StudentDashboard() {
     currentStudent,
     currentUser,
     suggestions,
-    setSuggestions,
+    submitSuggestion,
     logout,
     setView,
     myApplication,
@@ -138,25 +138,16 @@ export default function StudentDashboard() {
     icon: STUDENT_TAB_ICONS[item.id],
   }));
 
-  const submitSuggestion = (e: React.FormEvent) => {
+  const submitSuggestionLocal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateRequired(form, ['title', 'targetRole', 'category', 'body'], setInvalid)) return;
-    const ns: Suggestion = {
-      id: 'sg' + Date.now() + Math.random().toString(36).slice(2, 6),
-      studentId: currentStudent.id,
-      studentName: currentStudent.name,
-      studentEmail: currentStudent.email,
-      studentUniversity: currentStudent.university,
-      studentMajor: currentStudent.major,
-      targetRole: form.targetRole as SuggestionTargetRole,
+    const ok = await submitSuggestion({
+      targetRole: form.targetRole,
       category: form.category,
-      title: form.title.trim(),
-      content: form.body.trim(),
-      createdAt: new Date().toISOString().slice(0, 10),
-      status: 'new',
-      responses: [],
-    };
-    setSuggestions((prev) => [ns, ...prev]);
+      title: form.title,
+      content: form.body.trim()
+    });
+    if (!ok) return;
     setForm({ title: '', body: '', category: '', targetRole: '' });
     setSent(true);
     setTimeout(() => setSent(false), 4000);
@@ -310,7 +301,7 @@ export default function StudentDashboard() {
                   {t('student.suggestions.success', 'تم إرسال اقتراحك بنجاح!')}
                 </div>
               )}
-              <form onSubmit={submitSuggestion} className="mt-4 space-y-3">
+              <form onSubmit={submitSuggestionLocal} className="mt-4 space-y-3">
                 <div>
                   <label className="label-field">{t('student.suggestions.titleLabel', 'العنوان')} <RequiredMark /></label>
                   <input
