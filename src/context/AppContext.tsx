@@ -4109,6 +4109,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       registerWithApplication,
       scheduleInterview,
       decideApplication,
+      suggestionsLoading,
+      suggestionsError,
       respondToSuggestion,
       getVisibleSuggestions,
       canRespondToSuggestion,

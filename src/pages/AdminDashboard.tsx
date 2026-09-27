@@ -4,7 +4,7 @@ import {
   Plus, Search, Trash2, Edit3, Mail, GraduationCap, CheckCircle2, Clock, FileText, Target, ChevronLeft, User,
   Video, UserCheck, UserX, CalendarClock, Link2, Inbox, Info, Crown, Save, Image, MessageSquareReply, Send,
   Download, Eye, EyeOff, Lightbulb, MessageCircle, ClipboardCheck, RefreshCw,
-  Images, Camera, Film, MapPin, Globe2, AlertCircle, Loader2,
+  Images, Camera, Film, MapPin, Globe2, AlertCircle, Loader2, XCircle
 } from 'lucide-react';
 import TranslationMonitoringTab from '../components/cmsLocalization/TranslationMonitoringTab';
 import { useApp } from '../context/AppContext';
@@ -636,6 +636,7 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
         setStatus={setStatus}
         replyText={replyText}
         setReplyText={setReplyText}
+        invalid={invalid}
         setInvalid={setInvalid}
         onSubmit={submitReply}
         replySubmitting={replySubmitting}
@@ -808,6 +809,7 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
         setStatus={setStatus}
         replyText={replyText}
         setReplyText={setReplyText}
+        invalid={invalid}
         setInvalid={setInvalid}
         onSubmit={submitReply}
         replySubmitting={replySubmitting}

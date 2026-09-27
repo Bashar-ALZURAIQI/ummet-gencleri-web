@@ -49,7 +49,7 @@ test('i18n keys for suggestions exist', () => {
   // Arabic
   assert.ok(ar.includes(`suggestionsLoading: 'جارٍ تحميل الاقتراحات...'`), 'AR suggestionsLoading');
   assert.ok(ar.includes(`suggestionsLoadFailure: 'تعذر تحميل الاقتراحات.'`), 'AR suggestionsLoadFailure');
-  
+
   // English
   assert.ok(en.includes(`suggestionsLoading: 'Loading suggestions...'`), 'EN suggestionsLoading');
   assert.ok(en.includes(`suggestionSubmitting: 'Submitting suggestion...'`), 'EN suggestionSubmitting');
