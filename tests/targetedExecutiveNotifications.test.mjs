@@ -12,6 +12,11 @@ test('migration drops and recreates push_notifications destination constraint', 
   assert.match(sql, /push_notifications_destination_check/i);
 
   // Verify new destinations
+  assert.match(sql, /\/\?push=news/i);
+  assert.match(sql, /\/\?push=programs/i);
+  assert.match(sql, /\/\?push=gallery/i);
+  assert.match(sql, /\/\?push=student-dashboard/i);
+  assert.match(sql, /\/\?push=admin-applications/i);
   assert.match(sql, /\/\?push=contact-inbox/i);
   assert.match(sql, /\/\?push=guide-suggestions/i);
   assert.match(sql, /\/\?push=student-suggestions/i);
@@ -55,16 +60,16 @@ test('migration creates authorized get_current_user_workload_counts RPC', async 
   assert.match(sql, /CREATE OR REPLACE FUNCTION public\.get_current_user_workload_counts\(\)/i);
   assert.match(sql, /SECURITY DEFINER/i);
   assert.match(sql, /SET search_path = ''/i);
-  
+
   // Actor resolution and denial
   assert.match(sql, /auth\.uid\(\)/i);
-  
+
   // Guide suggestions
   assert.match(sql, /SELECT count\(\*\).+FROM public\.guide_suggestions WHERE status = 'PENDING'/i);
-  
+
   // Contact messages
   assert.match(sql, /SELECT count\(\*\).+FROM public\.contact_messages WHERE status = 'UNREAD'/i);
-  
+
   // Student suggestions
   assert.match(sql, /SELECT count\(\*\).+FROM public\.student_suggestions WHERE target_role = v_role AND status = 'new'/i);
 
