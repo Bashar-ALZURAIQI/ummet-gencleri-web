@@ -3,6 +3,18 @@ type DeepStringify<T> = {
 };
 
 const ar = {
+  suggestionsV2: {
+    suggestionsLoading: 'Loading suggestions...',
+    suggestionsLoadFailure: 'Failed to load suggestions.',
+    suggestionSubmitting: 'Submitting...',
+    suggestionSubmitFailure: 'Failed to submit suggestion.',
+    suggestionSaved: 'Suggestion saved successfully.',
+    suggestionSavedRefreshDelayed: 'Suggestion saved. Refreshing list...',
+    responseSending: 'Sending response...',
+    responseFailure: 'Failed to send response.',
+    responseSaved: 'Response saved successfully.',
+    responseSavedRefreshDelayed: 'Response saved. Refreshing list...',
+  },
   common: {
     save: 'حفظ',
     cancel: 'إلغاء',

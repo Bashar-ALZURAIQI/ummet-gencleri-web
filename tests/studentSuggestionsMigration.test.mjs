@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
@@ -102,5 +102,3 @@ test('student suggestions v2 exposes strictly secured RPCs', async () => {
   assert.match(sql, /auth\.users/i);
   assert.match(sql, /banned_until/i);
 });
-
-

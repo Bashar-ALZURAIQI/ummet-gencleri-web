@@ -670,10 +670,10 @@ interface AppContextValue {
   registerWithApplication: (name: string, email: string, password: string, university: string, major: string, year: string, phone: string, motivation: string) => Promise<{ ok: boolean; error?: string; requiresEmailConfirmation?: boolean; emailWarning?: string }>;
   scheduleInterview: (applicationId: string, interview: InterviewInfo) => Promise<{ ok: boolean; error?: string; emailWarning?: string }>;
   decideApplication: (applicationId: string, status: 'accepted' | 'rejected', rejectionReason?: string) => Promise<{ ok: boolean; error?: string; emailWarning?: string }>;
-  submitSuggestion: (params: { targetRole: string, category: string, title: string, content: string }) => Promise<SuggestionMutationResult>;
+  submitSuggestion: (params: { targetRole: string, category: string, title: string, content: string }) => Promise<{ ok: boolean; error?: string; refreshPending?: boolean }>;
   suggestionsLoading: boolean;
   suggestionsError: string | null;
-  respondToSuggestion: (id: string, reply: string, status: SuggestionStatus) => Promise<SuggestionMutationResult>;
+  respondToSuggestion: (id: string, reply: string, status: SuggestionStatus) => Promise<{ ok: boolean; error?: string; refreshPending?: boolean }>;
   getVisibleSuggestions: () => Suggestion[];
   canRespondToSuggestion: (suggestion: Suggestion) => boolean;
   pendingProfileEdits: PendingProfileEdit[];

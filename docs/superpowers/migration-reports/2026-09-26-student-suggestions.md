@@ -1,4 +1,4 @@
-﻿# Migration Readiness Report: Student Suggestions V2
+# Migration Readiness Report: Student Suggestions V2
 
 ## Legacy Retirement Strategy
 
@@ -10,7 +10,7 @@
 - **Anonymization Handling:** studentName is hardcoded to 'Anonymous', and missing fields like studentUniversity safely pass undefined to the UI, allowing AdminDashboard.tsx (and other dependent UI panels) to seamlessly fall back to their translation strings (e.g., 	('common.unspecified')).
 
 ## Architectural Constraints & Realtime
-- **No Optimistic Authoritative Mutation:** The submit and espond flows inside the gateway immediately hit the server endpoints via pc.
+- **No Optimistic Authoritative Mutation:** The submit andespond flows inside the gateway immediately hit the server endpoints viapc.
 - **Polling over Realtime:** Realtime subscriptions are deliberately excluded in favor of isibilityRefreshPolling with the SuggestionRefreshGate. Due to the low-frequency nature of suggestion updates and the need to strictly isolate roles (e.g. Committee Heads seeing only targeted feedback), we rely exclusively on the epoch and active polling visibility mechanics to gate data fetching rather than establishing high-cost persistent PostgreSQL logical replication streams.
 
 ## Readiness Sign-off

@@ -1,4 +1,4 @@
-﻿import { supabase } from '../lib/supabase.js';
+import { supabase } from '../lib/supabase.js';
 import {
   submitStudentSuggestion as gatewaySubmit,
   respondToStudentSuggestion as gatewayRespond,
@@ -20,4 +20,3 @@ export const studentSuggestionService = {
     return gatewayLoad(supabase);
   }
 };
-
