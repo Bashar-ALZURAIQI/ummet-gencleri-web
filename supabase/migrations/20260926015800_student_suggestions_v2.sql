@@ -44,7 +44,7 @@ CREATE POLICY "suggestions_exec_select"
   FOR SELECT
   TO authenticated
   USING (
-    private.is_current_president(auth.uid())
+    private.is_current_president()
     OR
     EXISTS (
       SELECT 1 FROM public.executive_assignments ea
@@ -68,7 +68,7 @@ CREATE POLICY "suggestion_responses_exec_select"
   FOR SELECT
   TO authenticated
   USING (
-    private.is_current_president(auth.uid())
+    private.is_current_president()
     OR
     EXISTS (
       SELECT 1 FROM public.executive_assignments ea
@@ -157,7 +157,7 @@ BEGIN
   END IF;
 
   IF NOT (
-    private.is_current_president(v_user_id)
+    private.is_current_president()
     OR EXISTS (
       SELECT 1 FROM public.executive_assignments
       WHERE user_id = v_user_id AND position_key = v_target_role
@@ -211,8 +211,7 @@ BEGIN
   ) THEN
     RETURN;
   END IF;
-
-  v_is_president := private.is_current_president(v_user_id);
+  v_is_president := private.is_current_president();
 
   SELECT array_agg(position_key) INTO v_exec_roles
   FROM public.executive_assignments

@@ -101,4 +101,8 @@ test('student suggestions v2 exposes strictly secured RPCs', async () => {
   assert.match(sql, /status\s*=\s*'accepted'/i);
   assert.match(sql, /auth\.users/i);
   assert.match(sql, /banned_until/i);
+
+  // private.is_current_president should be called with ZERO arguments
+  assert.match(sql, /private\.is_current_president\(\)/i);
+  assert.doesNotMatch(sql, /private\.is_current_president\([^)]+\)/i);
 });
