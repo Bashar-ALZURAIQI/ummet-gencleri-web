@@ -1,4 +1,4 @@
-export type PushContentKind = 'NEWS' | 'EVENT' | 'GALLERY_ALBUM' | 'PERSONAL';
+export type PushContentKind = 'NEWS' | 'EVENT' | 'GALLERY_ALBUM' | 'PERSONAL' | 'NEW_APPLICATION';
 
 export interface PushNotificationLike {
   id: string;
@@ -23,8 +23,8 @@ export type PushFailure =
   | { kind: 'permanent'; statusCode: number }
   | { kind: 'retryable'; statusCode: number | null };
 
-const VALID_KINDS = new Set(['NEWS', 'EVENT', 'GALLERY_ALBUM', 'PERSONAL']);
-const VALID_DESTINATIONS = new Set(['/?push=news', '/?push=programs', '/?push=gallery', '/?push=student-dashboard']);
+const VALID_KINDS = new Set(['NEWS', 'EVENT', 'GALLERY_ALBUM', 'PERSONAL', 'NEW_APPLICATION']);
+const VALID_DESTINATIONS = new Set(['/?push=news', '/?push=programs', '/?push=gallery', '/?push=student-dashboard', '/?push=admin-applications']);
 
 export function buildPushPayload(notification: PushNotificationLike): PushPayload {
   if (!notification.id

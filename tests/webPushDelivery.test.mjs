@@ -47,9 +47,28 @@ test('builds a safe personal economy notification for the accepted student porta
   });
 });
 
+test('builds a safe notification for NEW_APPLICATION', () => {
+  assert.deepEqual(buildPushPayload({
+    ...notification,
+    kind: 'NEW_APPLICATION',
+    source_event_key: 'app:new:1',
+    title: 'New application',
+    body: 'Someone applied',
+    destination: '/?push=admin-applications',
+  }), {
+    title: 'New application',
+    body: 'Someone applied',
+    tag: 'app:new:1',
+    url: '/?push=admin-applications',
+    icon: '/icons/union-push-icon.svg',
+    badge: '/icons/union-push-badge.svg',
+  });
+});
+
 test('refuses invalid destinations and oversized notification text', () => {
   assert.throws(() => buildPushPayload({ ...notification, destination: 'https://evil.test' }), /PUSH_NOTIFICATION_INVALID/);
   assert.throws(() => buildPushPayload({ ...notification, title: 'x'.repeat(241) }), /PUSH_NOTIFICATION_INVALID/);
+  assert.throws(() => buildPushPayload({ ...notification, kind: 'UNKNOWN_KIND' }), /PUSH_NOTIFICATION_INVALID/);
 });
 
 test('compares webhook secrets without accepting prefix or length variants', () => {
