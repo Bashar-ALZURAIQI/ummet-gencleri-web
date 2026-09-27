@@ -54,6 +54,7 @@ export default function StudentDashboard() {
   const [invalid, setInvalid] = useState<string[]>([]);
   const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const { suggestionsLoading, suggestionsError } = useApp();
   const [refreshPending, setRefreshPending] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -144,13 +145,19 @@ export default function StudentDashboard() {
   const submitSuggestionLocal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateRequired(form, ['title', 'targetRole', 'category', 'body'], setInvalid)) return;
+    setSubmitting(true);
+    setSubmitError(null);
     const ok = await submitSuggestion({
       targetRole: form.targetRole,
       category: form.category,
       title: form.title,
       content: form.body.trim()
     });
-    if (!ok) return;
+    setSubmitting(false);
+    if (!ok) {
+      setSubmitError(t('suggestionsV2.suggestionSubmitFailure', 'Failed to submit suggestion.'));
+      return;
+    }
     setForm({ title: '', body: '', category: '', targetRole: '' });
     setSent(true);
     setTimeout(() => setSent(false), 4000);
@@ -302,6 +309,12 @@ export default function StudentDashboard() {
                 <div className="mt-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-700 animate-fade-in-fast">
                   <CheckCircle2 className="h-4 w-4" />
                   {t('student.suggestions.success', 'تم إرسال اقتراحك بنجاح!')}
+                </div>
+              )}
+              {submitError && (
+                <div className="mt-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700 animate-fade-in-fast">
+                  <XCircle className="h-4 w-4" />
+                  {submitError}
                 </div>
               )}
               <form onSubmit={submitSuggestionLocal} className="mt-4 space-y-3">

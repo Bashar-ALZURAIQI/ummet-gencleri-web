@@ -1,4 +1,4 @@
-﻿CREATE TABLE IF NOT EXISTS public.student_suggestions (
+CREATE TABLE IF NOT EXISTS public.student_suggestions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   student_user_id uuid NOT NULL REFERENCES public.profiles(id),
   target_role text NOT NULL,
@@ -225,7 +225,7 @@ BEGIN
   RETURN QUERY
   SELECT
     ss.id,
-    COALESCE(p.display_name, 'Unknown'),
+    COALESCE(p.name, 'Unknown'),
     ss.target_role,
     ss.category,
     ss.title,
@@ -239,20 +239,20 @@ BEGIN
           json_build_object(
             'id', sr.id,
             'responder_user_id', sr.responder_user_id,
-            'by', COALESCE(rp.display_name, 'Exec'),
+            'by', COALESCE(rp.name, 'Exec'),
             'byRole', COALESCE((SELECT ea.position_key FROM public.executive_assignments ea WHERE ea.user_id = sr.responder_user_id LIMIT 1), 'PRESIDENT'),
             'response_text', sr.response_text,
             'created_at', sr.created_at
           ) ORDER BY sr.created_at ASC
         )
         FROM public.suggestion_responses sr
-        LEFT JOIN public.profiles rp ON rp.user_id = sr.responder_user_id
+        LEFT JOIN public.profiles rp ON rp.id = sr.responder_user_id
         WHERE sr.suggestion_id = ss.id
       ),
       '[]'::json
     ) AS responses
   FROM public.student_suggestions ss
-  LEFT JOIN public.profiles p ON p.user_id = ss.student_user_id
+  LEFT JOIN public.profiles p ON p.id = ss.student_user_id
   WHERE ss.student_user_id = v_user_id
      OR v_is_president
      OR ss.target_role = ANY(v_exec_roles)

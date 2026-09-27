@@ -4,14 +4,14 @@ const en: TranslationSchema = {
   suggestionsV2: {
     suggestionsLoading: 'Loading suggestions...',
     suggestionsLoadFailure: 'Failed to load suggestions.',
-    suggestionSubmitting: 'Submitting...',
+    suggestionSubmitting: 'Submitting suggestion...',
     suggestionSubmitFailure: 'Failed to submit suggestion.',
     suggestionSaved: 'Suggestion saved successfully.',
-    suggestionSavedRefreshDelayed: 'Suggestion saved. Refreshing list...',
+    suggestionSavedRefreshDelayed: 'Suggestion saved. The list will refresh shortly.',
     responseSending: 'Sending response...',
     responseFailure: 'Failed to send response.',
     responseSaved: 'Response saved successfully.',
-    responseSavedRefreshDelayed: 'Response saved. Refreshing list...',
+    responseSavedRefreshDelayed: 'Response saved. The list will refresh shortly.',
   },
   common: {
     save: 'Save',

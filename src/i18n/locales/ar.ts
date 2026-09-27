@@ -4,16 +4,16 @@ type DeepStringify<T> = {
 
 const ar = {
   suggestionsV2: {
-    suggestionsLoading: 'Loading suggestions...',
-    suggestionsLoadFailure: 'Failed to load suggestions.',
-    suggestionSubmitting: 'Submitting...',
-    suggestionSubmitFailure: 'Failed to submit suggestion.',
-    suggestionSaved: 'Suggestion saved successfully.',
-    suggestionSavedRefreshDelayed: 'Suggestion saved. Refreshing list...',
-    responseSending: 'Sending response...',
-    responseFailure: 'Failed to send response.',
-    responseSaved: 'Response saved successfully.',
-    responseSavedRefreshDelayed: 'Response saved. Refreshing list...',
+    suggestionsLoading: 'جارٍ تحميل الاقتراحات...',
+    suggestionsLoadFailure: 'تعذر تحميل الاقتراحات.',
+    suggestionSubmitting: 'جارٍ إرسال الاقتراح...',
+    suggestionSubmitFailure: 'تعذر إرسال الاقتراح.',
+    suggestionSaved: 'تم حفظ الاقتراح بنجاح.',
+    suggestionSavedRefreshDelayed: 'تم حفظ الاقتراح، وسيتم تحديث القائمة قريبًا.',
+    responseSending: 'جارٍ إرسال الرد...',
+    responseFailure: 'تعذر إرسال الرد.',
+    responseSaved: 'تم حفظ الرد بنجاح.',
+    responseSavedRefreshDelayed: 'تم حفظ الرد، وسيتم تحديث القائمة قريبًا.',
   },
   common: {
     save: 'حفظ',

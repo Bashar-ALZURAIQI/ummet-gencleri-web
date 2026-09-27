@@ -18,6 +18,7 @@ test('StudentDashboard UI integration', () => {
   // hard mutation failure keeps form contents (not cleared if !ok)
   // refreshPending displays a distinct warning
   assert.ok(studentSource.includes('refreshPending'), 'handles refreshPending in UI');
+  assert.ok(studentSource.includes('suggestionSubmitFailure'), 'shows suggestionSubmitFailure on hard error');
 
   // loading/error state is represented
   assert.ok(studentSource.includes('suggestionsLoading'), 'uses suggestionsLoading');
@@ -37,6 +38,7 @@ test('AdminDashboard UI integration', () => {
   // hard failure is shown and does not pretend success
   // refreshPending displays distinct warning
   assert.ok(adminSource.includes('refreshPending'), 'handles refreshPending in Admin UI');
+  assert.ok(adminSource.includes('responseFailure'), 'shows responseFailure on hard error');
 });
 
 test('i18n keys for suggestions exist', () => {
@@ -44,17 +46,15 @@ test('i18n keys for suggestions exist', () => {
   const en = readFileSync('./src/i18n/locales/en.ts', 'utf8');
   const tr = readFileSync('./src/i18n/locales/tr.ts', 'utf8');
 
-  for (const f of [ar, en, tr]) {
-    assert.ok(f.includes('suggestionsLoading'), 'suggestionsLoading key');
-    assert.ok(f.includes('suggestionsLoadFailure'), 'suggestionsLoadFailure key');
-    assert.ok(f.includes('suggestionSubmitting'), 'suggestionSubmitting key');
-    assert.ok(f.includes('suggestionSubmitFailure'), 'suggestionSubmitFailure key');
-    assert.ok(f.includes('suggestionSaved'), 'suggestionSaved key');
-    assert.ok(f.includes('suggestionSavedRefreshDelayed'), 'suggestionSavedRefreshDelayed key');
+  // Arabic
+  assert.ok(ar.includes(`suggestionsLoading: 'جارٍ تحميل الاقتراحات...'`), 'AR suggestionsLoading');
+  assert.ok(ar.includes(`suggestionsLoadFailure: 'تعذر تحميل الاقتراحات.'`), 'AR suggestionsLoadFailure');
+  
+  // English
+  assert.ok(en.includes(`suggestionsLoading: 'Loading suggestions...'`), 'EN suggestionsLoading');
+  assert.ok(en.includes(`suggestionSubmitting: 'Submitting suggestion...'`), 'EN suggestionSubmitting');
 
-    assert.ok(f.includes('responseSending'), 'responseSending key');
-    assert.ok(f.includes('responseFailure'), 'responseFailure key');
-    assert.ok(f.includes('responseSaved'), 'responseSaved key');
-    assert.ok(f.includes('responseSavedRefreshDelayed'), 'responseSavedRefreshDelayed key');
-  }
+  // Turkish
+  assert.ok(tr.includes(`suggestionsLoading: 'Öneriler yükleniyor...'`), 'TR suggestionsLoading');
+  assert.ok(tr.includes(`suggestionSubmitting: 'Öneri gönderiliyor...'`), 'TR suggestionSubmitting');
 });

@@ -2,16 +2,16 @@ import type { TranslationSchema } from './ar.ts';
 
 const tr: TranslationSchema = {
   suggestionsV2: {
-    suggestionsLoading: 'Loading suggestions...',
-    suggestionsLoadFailure: 'Failed to load suggestions.',
-    suggestionSubmitting: 'Submitting...',
-    suggestionSubmitFailure: 'Failed to submit suggestion.',
-    suggestionSaved: 'Suggestion saved successfully.',
-    suggestionSavedRefreshDelayed: 'Suggestion saved. Refreshing list...',
-    responseSending: 'Sending response...',
-    responseFailure: 'Failed to send response.',
-    responseSaved: 'Response saved successfully.',
-    responseSavedRefreshDelayed: 'Response saved. Refreshing list...',
+    suggestionsLoading: 'Öneriler yükleniyor...',
+    suggestionsLoadFailure: 'Öneriler yüklenemedi.',
+    suggestionSubmitting: 'Öneri gönderiliyor...',
+    suggestionSubmitFailure: 'Öneri gönderilemedi.',
+    suggestionSaved: 'Öneri başarıyla kaydedildi.',
+    suggestionSavedRefreshDelayed: 'Öneri kaydedildi. Liste kısa süre içinde yenilenecek.',
+    responseSending: 'Yanıt gönderiliyor...',
+    responseFailure: 'Yanıt gönderilemedi.',
+    responseSaved: 'Yanıt başarıyla kaydedildi.',
+    responseSavedRefreshDelayed: 'Yanıt kaydedildi. Liste kısa süre içinde yenilenecek.',
   },
   common: {
     save: 'Kaydet',
