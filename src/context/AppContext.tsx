@@ -32,6 +32,7 @@ import {
   uploadOwnAvatar as uploadOwnAvatarService,
   removeOwnAvatar as deleteOwnAvatarService,
 } from '../services/avatarService';
+import { fetchWorkloadCounts, type WorkloadCounts } from '../services/workloadService.ts';
 import {
   bindPresidentManagedMemberAvatar,
   registerManagedAsset,
@@ -614,6 +615,8 @@ interface AppContextValue {
   contentLoading: boolean;
   contentError: string | null;
   contentVersion: number;
+  workloadCounts: WorkloadCounts | null;
+  refreshWorkloadCounts: () => Promise<void>;
   clearAuthError: () => void;
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
@@ -950,6 +953,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [contentLoading, setContentLoading] = useState(true);
   const [contentError, setContentError] = useState<string | null>(null);
   const [contentVersion, setContentVersion] = useState(0);
+  const [workloadCounts, setWorkloadCounts] = useState<WorkloadCounts | null>(null);
   const contentVersionRef = useRef(0);
   const [, setGuideVersion] = useState(0);
   const guideVersionRef = useRef(0);
@@ -1678,6 +1682,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     setApplications([]);
+    setWorkloadCounts(null);
+    setWorkloadCounts(null);
     setApplicationsLoading(Boolean(currentUser?.userId));
     if (!currentUser?.userId) return () => { active = false; };
 
@@ -1713,6 +1719,46 @@ export function AppProvider({ children }: { children: ReactNode }) {
       stopPresidentRefresh();
     };
   }, [currentUser?.userId, currentUser?.role]);
+
+  const refreshWorkloadCounts = useCallback(async () => {
+    if (!currentUser?.userId || !isLeadershipRole(currentUser?.role)) return;
+    const ownerBefore = captureConfirmedAuthOwner();
+    try {
+      const counts = await fetchWorkloadCounts();
+      const ownerAfter = captureConfirmedAuthOwner();
+      if (
+        ownerBefore &&
+        ownerAfter &&
+        ownerBefore.userId === ownerAfter.userId &&
+        ownerBefore.epoch === ownerAfter.epoch
+      ) {
+        setWorkloadCounts(counts);
+      }
+    } catch {
+      // Silently fail workload fetch, let other systems proceed, keeping the old counts.
+    }
+  }, [currentUser?.userId, currentUser?.role]);
+
+  useEffect(() => {
+    let active = true;
+    if (!currentUser?.userId || !isLeadershipRole(currentUser?.role)) {
+      setWorkloadCounts(null);
+      return () => { active = false; };
+    }
+
+    void refreshWorkloadCounts();
+    const stopPolling = createVisibilityRefreshPolling({
+      requestRefresh: () => {
+        if (active) void refreshWorkloadCounts();
+      },
+    });
+
+    return () => {
+      active = false;
+      stopPolling();
+    };
+  }, [currentUser?.userId, currentUser?.role, refreshWorkloadCounts]);
+
 
   const refreshApplicationEmailNotifications = useCallback(async () => {
     if (currentUser?.role !== 'PRESIDENT' || !currentUser.userId) {
@@ -2664,7 +2710,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const target = suggestions.find((s) => s.id === id);
     if (!target || !canRespondToSuggestion(target) || !currentUser) return { ok: false, error: 'FORBIDDEN' };
     const auth = { epoch: latestAuthEventRef.current?.epoch ?? 0, userId: currentUser.userId, role: currentUser.role };
-    return await suggestionsIntegration.respond(auth, { suggestionId: id, responseText: reply, newStatus: status });
+    const result = await suggestionsIntegration.respond(auth, { suggestionId: id, responseText: reply, newStatus: status });
+    if (result.ok) void refreshWorkloadCounts();
+    return result;
   };
 
   const upsertEditRequestRow = (request: EditRequest) => {
@@ -3114,6 +3162,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setContactMessages((rows) => rows.map((row) => row.id === messageId
       ? { ...row, status: result.data.status, readAt: result.data.readAt, readBy: result.data.readBy }
       : row));
+    void refreshWorkloadCounts();
     return { ok: true };
   };
 
@@ -3136,6 +3185,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setContactMessages((rows) => rows.map((row) => row.id === messageId
       ? { ...row, status: 'REPLIED', reply: result.data }
       : row));
+    void refreshWorkloadCounts();
     if (result.data.deliveryChannel === 'EMAIL') {
       const delivery = await sendPendingContactReplyEmail(result.data.id);
       await refreshVisibleContactMessages();
@@ -4036,6 +4086,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       contentLoading,
       contentError,
       contentVersion,
+      workloadCounts,
+      refreshWorkloadCounts,
       clearAuthError,
       login,
       logout,

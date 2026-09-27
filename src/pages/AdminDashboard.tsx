@@ -26,7 +26,7 @@ import MemberPointsAdminPanel from '../components/MemberPointsAdminPanel';
 import TaskManagementDashboard from '../components/TaskManagementDashboard';
 import { SidebarLayout } from '../components/SidebarLayout';
 import SiteBrandingPanel from '../components/SiteBrandingPanel';
-import AdminPushNotificationControl from '../components/AdminPushNotificationControl';
+import ExecutivePushControl from '../components/ExecutivePushControl';
 import TransientToast, { type ToastMessage } from '../components/TransientToast';
 import { validateRequired, clearInvalid, isInvalid, fieldId } from '../utils/formValidation';
 import { normalizeMeetingUrl } from '../utils/meetingUrlNormalizer';
@@ -87,6 +87,7 @@ export default function AdminDashboard() {
     news, submitSiteEdit,
     galleryAlbums, galleryCategories,
     authInitializing, identityRefreshing,
+    workloadCounts,
   } = useApp();
 
   const pendingApplicationBadge = getPendingApplicationBadge(currentUser?.role, applications);
@@ -104,10 +105,10 @@ export default function AdminDashboard() {
       { id: 'news', label: 'إدارة الأخبار', icon: FileText, show: canEditSection('news') },
       { id: 'members', label: 'إدارة الأعضاء', icon: Users, show: currentUser?.role === 'PRESIDENT' },
       { id: 'applications', label: 'طلبات الانضمام', icon: Inbox, show: currentUser?.role === 'PRESIDENT', badge: pendingApplicationBadge },
-      { id: 'inbox', label: 'رسائل الزوار / البريد الوارد', icon: Mail, show: canAccessContactInbox(currentUser?.role) },
+      { id: 'inbox', label: 'رسائل الزوار / البريد الوارد', icon: Mail, show: canAccessContactInbox(currentUser?.role), badge: workloadCounts?.unreadContactMessages },
       { id: 'plans', label: 'الخطط والتقارير', icon: ClipboardList, show: canEditSection('plans') },
-      { id: 'suggestions', label: 'الاقتراحات والشكاوى', icon: Lightbulb, show: !!currentUser && isLeadershipRole(currentUser.role) },
-      { id: 'guide-suggestions', label: 'اقتراحات الدليل', icon: GraduationCap, show: canManageGuideSuggestions(currentUser?.role) },
+      { id: 'suggestions', label: 'الاقتراحات والشكاوى', icon: Lightbulb, show: !!currentUser && isLeadershipRole(currentUser.role), badge: workloadCounts?.newStudentSuggestions },
+      { id: 'guide-suggestions', label: 'اقتراحات الدليل', icon: GraduationCap, show: canManageGuideSuggestions(currentUser?.role), badge: workloadCounts?.pendingGuideSuggestions },
       { id: 'excuses', label: 'إدارة الأعذار', icon: ClipboardCheck, show: canManageExcuses(currentUser?.role) },
       { id: 'oversight', label: 'الرقابة والتحضير', icon: UserCheck, show: canManageOversight(currentUser?.role) },
       { id: 'task-management', label: 'إدارة المهام', icon: ClipboardList, show: canManageTasks(currentUser?.role) },
@@ -146,7 +147,7 @@ export default function AdminDashboard() {
         ...tabItem,
         label: adminTabLabels[tabItem.id] ?? tabItem.label,
       }));
-  }, [currentUser, canEditSection, pendingApplicationBadge, t]);
+  }, [currentUser, canEditSection, pendingApplicationBadge, workloadCounts, t]);
 
   const permittedTabIds = useMemo(() => visibleTabs.map((item) => item.id), [visibleTabs]);
   const requestedTab = view.kind === 'admin' ? view.tab : undefined;
@@ -3381,7 +3382,7 @@ function ApplicationsTab({
 
   return (
     <div>
-      <AdminPushNotificationControl isPresident={currentUser?.role === 'PRESIDENT'} />
+      <ExecutivePushControl role={currentUser?.role ?? null} />
       {applicationNotice && (
         <div className={`mb-4 flex items-center gap-2 rounded-xl border p-3 text-sm font-semibold ${applicationNotice.kind === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
           {applicationNotice.kind === 'success' ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <Info className="h-4 w-4 shrink-0" />}

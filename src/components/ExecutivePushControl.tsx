@@ -1,12 +1,14 @@
 import { Bell, BellOff, CheckCircle2, Loader2, RefreshCw, Smartphone } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { usePresidentPush } from '../hooks/usePresidentPush.ts';
+import { useExecutivePush } from '../hooks/useExecutivePush.ts';
 
-export default function AdminPushNotificationControl({ isPresident }: { isPresident: boolean }) {
+export default function ExecutivePushControl({ role }: { role: string | null }) {
   const { t } = useTranslation();
-  const { state, enable, disable } = usePresidentPush(isPresident);
+  const isExecutive = Boolean(role);
+  const isPresident = role === 'PRESIDENT';
+  const { state, enable, disable } = useExecutivePush(isExecutive, isPresident);
 
-  if (state.kind === 'hidden' || !isPresident) return null;
+  if (state.kind === 'hidden' || !isExecutive) return null;
 
   const busy = state.kind === 'checking' || state.kind === 'enabling' || state.kind === 'disabling';
   const message = state.kind === 'unsupported'
@@ -16,10 +18,10 @@ export default function AdminPushNotificationControl({ isPresident }: { isPresid
     : state.kind === 'error'
       ? state.message
       : state.kind === 'enabled'
-        ? t('admin.notifications.enabledMessage', 'ستصلك إشعارات عند وصول طلب انضمام جديد حتى عندما يكون الموقع مغلقًا.')
+        ? t('admin.notifications.enabledMessage', 'ستصلك إشعارات إدارية وشخصية كأحد أعضاء الهيئة الإدارية إضافة لإشعارات الاتحاد العامة.')
         : state.kind === 'checking'
           ? t('admin.notifications.checkingMessage', 'جارٍ التحقق من إعدادات الإشعارات...')
-          : t('admin.notifications.promoMessage', 'فعّل الإشعارات لتصلك طلبات الانضمام الجديدة فور وصولها.');
+          : t('admin.notifications.promoMessage', 'فعّل الإشعارات لتصلك التنبيهات الإدارية وطلبات الانضمام الجديدة فور وصولها.');
 
   return (
     <section className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 p-5" aria-live="polite">
@@ -33,7 +35,7 @@ export default function AdminPushNotificationControl({ isPresident }: { isPresid
                 : <Bell className="h-6 w-6" />}
           </div>
           <div>
-            <h2 className="font-extrabold text-navy-900">{t('admin.notifications.title', 'إشعارات طلبات الانضمام')}</h2>
+            <h2 className="font-extrabold text-navy-900">{t('admin.notifications.title', 'إشعارات لوحة الإدارة')}</h2>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600">{message}</p>
           </div>
         </div>

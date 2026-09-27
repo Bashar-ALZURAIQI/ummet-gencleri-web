@@ -9,7 +9,7 @@ import {
   initialAcceptedStudentPushState,
   reduceAcceptedStudentPushState,
 } from '../domain/acceptedStudentPushState.ts';
-import { registerPresidentPushSubscription, disablePushSubscription } from '../services/pushSubscriptionService.ts';
+import { registerExecutivePushSubscription, disablePushSubscription } from '../services/pushSubscriptionService.ts';
 
 const currentCapability = (): PushCapability => {
   const standaloneNavigator = navigator as Navigator & { standalone?: boolean };
@@ -29,7 +29,7 @@ const currentCapability = (): PushCapability => {
 
 const registerWorker = () => navigator.serviceWorker.register('/push-sw.js', { scope: '/' });
 
-export function usePresidentPush(eligible: boolean) {
+export function useExecutivePush(eligible: boolean, isPresident: boolean) {
   const [state, dispatch] = useReducer(
     reduceAcceptedStudentPushState,
     eligible
@@ -63,9 +63,10 @@ export function usePresidentPush(eligible: boolean) {
           dispatch({ type: 'CAPABILITY_RESOLVED', capability, hasSubscription: false });
           return;
         }
-        const saved = await registerPresidentPushSubscription(
+        const saved = await registerExecutivePushSubscription(
           serializePushSubscription(subscription),
           navigator.userAgent,
+          isPresident
         );
         if (!active) return;
         if (saved.ok) {
@@ -111,9 +112,10 @@ export function usePresidentPush(eligible: boolean) {
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
       });
-      const saved = await registerPresidentPushSubscription(
+      const saved = await registerExecutivePushSubscription(
         serializePushSubscription(subscription),
         navigator.userAgent,
+        isPresident
       );
       if (!saved.ok) {
         dispatch({ type: 'FAILED', message: saved.error.message });

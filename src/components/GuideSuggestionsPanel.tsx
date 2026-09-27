@@ -8,6 +8,7 @@ import {
   updateGuideSuggestionStatus,
   type GuideSuggestion,
 } from '../services/guideSuggestionService.ts';
+import { useApp } from '../context/AppContext.tsx';
 
 type Filter = 'ALL' | GuideSuggestionStatus;
 
@@ -22,6 +23,7 @@ const ALL_STATUSES: GuideSuggestionStatus[] = ['PENDING', 'REVIEWING', 'IMPLEMEN
 
 export default function GuideSuggestionsPanel({ role }: { role: string | null | undefined }) {
   const { t } = useTranslation();
+  const { refreshWorkloadCounts } = useApp();
   const authorized = canManageGuideSuggestions(role);
   const [suggestions, setSuggestions] = useState<GuideSuggestion[]>([]);
   const [filter, setFilter] = useState<Filter>('ALL');
@@ -92,6 +94,7 @@ export default function GuideSuggestionsPanel({ role }: { role: string | null | 
     }
     setSuggestions((rows) => rows.map((row) => row.id === suggestion.id ? { ...row, status } : row));
     setFeedback(t('admin.guideSuggestions.statusUpdated', 'تم تحديث حالة الاقتراح إلى «{{status}}».', { status: statusLabels[status] }));
+    void refreshWorkloadCounts();
   };
 
   const remove = async (suggestion: GuideSuggestion) => {
@@ -109,6 +112,7 @@ export default function GuideSuggestionsPanel({ role }: { role: string | null | 
     }
     setSuggestions((rows) => rows.filter((row) => row.id !== suggestion.id));
     setFeedback(t('admin.guideSuggestions.deletedSuccess', 'تم حذف الاقتراح.'));
+    void refreshWorkloadCounts();
   };
 
   if (!authorized) {
