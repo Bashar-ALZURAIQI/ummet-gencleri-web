@@ -34,7 +34,7 @@ export default function StudentDashboard() {
     currentStudent,
     currentUser,
     suggestions,
-    setSuggestions,
+    submitSuggestion,
     logout,
     setView,
     myApplication,
@@ -53,6 +53,10 @@ export default function StudentDashboard() {
   const [form, setForm] = useState({ title: '', body: '', category: '', targetRole: '' });
   const [invalid, setInvalid] = useState<string[]>([]);
   const [sent, setSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const { suggestionsLoading, suggestionsError } = useApp();
+  const [refreshPending, setRefreshPending] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [joiningActivityCount, setJoiningActivityCount] = useState(0);
 
@@ -138,25 +142,22 @@ export default function StudentDashboard() {
     icon: STUDENT_TAB_ICONS[item.id],
   }));
 
-  const submitSuggestion = (e: React.FormEvent) => {
+  const submitSuggestionLocal = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateRequired(form, ['title', 'targetRole', 'category', 'body'], setInvalid)) return;
-    const ns: Suggestion = {
-      id: 'sg' + Date.now() + Math.random().toString(36).slice(2, 6),
-      studentId: currentStudent.id,
-      studentName: currentStudent.name,
-      studentEmail: currentStudent.email,
-      studentUniversity: currentStudent.university,
-      studentMajor: currentStudent.major,
-      targetRole: form.targetRole as SuggestionTargetRole,
+    setSubmitting(true);
+    setSubmitError(null);
+    const ok = await submitSuggestion({
+      targetRole: form.targetRole,
       category: form.category,
-      title: form.title.trim(),
-      content: form.body.trim(),
-      createdAt: new Date().toISOString().slice(0, 10),
-      status: 'new',
-      responses: [],
-    };
-    setSuggestions((prev) => [ns, ...prev]);
+      title: form.title,
+      content: form.body.trim()
+    });
+    setSubmitting(false);
+    if (!ok) {
+      setSubmitError(t('suggestionsV2.suggestionSubmitFailure', 'Failed to submit suggestion.'));
+      return;
+    }
     setForm({ title: '', body: '', category: '', targetRole: '' });
     setSent(true);
     setTimeout(() => setSent(false), 4000);
@@ -310,7 +311,13 @@ export default function StudentDashboard() {
                   {t('student.suggestions.success', 'تم إرسال اقتراحك بنجاح!')}
                 </div>
               )}
-              <form onSubmit={submitSuggestion} className="mt-4 space-y-3">
+              {submitError && (
+                <div className="mt-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700 animate-fade-in-fast">
+                  <XCircle className="h-4 w-4" />
+                  {submitError}
+                </div>
+              )}
+              <form onSubmit={submitSuggestionLocal} className="mt-4 space-y-3">
                 <div>
                   <label className="label-field">{t('student.suggestions.titleLabel', 'العنوان')} <RequiredMark /></label>
                   <input
@@ -367,7 +374,7 @@ export default function StudentDashboard() {
                     placeholder={t('student.suggestions.detailsPlaceholder', 'اشرح فكرتك بالتفصيل...')}
                   />
                 </div>
-                <button type="submit" className="btn-primary w-full">
+                <button type="submit" className="btn-primary w-full" disabled={submitting}>
                   <Send className="h-4 w-4" />
                   {t('common.send', 'إرسال')}
                 </button>

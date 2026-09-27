@@ -4,7 +4,7 @@ import {
   Plus, Search, Trash2, Edit3, Mail, GraduationCap, CheckCircle2, Clock, FileText, Target, ChevronLeft, User,
   Video, UserCheck, UserX, CalendarClock, Link2, Inbox, Info, Crown, Save, Image, MessageSquareReply, Send,
   Download, Eye, EyeOff, Lightbulb, MessageCircle, ClipboardCheck, RefreshCw,
-  Images, Camera, Film, MapPin, Globe2, AlertCircle, Loader2,
+  Images, Camera, Film, MapPin, Globe2, AlertCircle, Loader2, XCircle
 } from 'lucide-react';
 import TranslationMonitoringTab from '../components/cmsLocalization/TranslationMonitoringTab';
 import { useApp } from '../context/AppContext';
@@ -391,7 +391,10 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
   const [replyOpen, setReplyOpen] = useState(false);
   const [activeSuggestion, setActiveSuggestion] = useState<Suggestion | null>(null);
   const [status, setStatus] = useState<SuggestionStatus>('reviewing');
+  const [replySubmitting, setReplySubmitting] = useState(false);
+  const [refreshPending, setRefreshPending] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [replyError, setReplyError] = useState<string | null>(null);
   const [toast, setToast] = useState(false);
   const [invalid, setInvalid] = useState<string[]>([]);
 
@@ -433,14 +436,22 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
     setActiveSuggestion(s);
     setStatus(s.status === 'new' ? 'reviewing' : s.status === 'reviewing' ? 'reviewing' : s.status);
     setReplyText('');
+    setReplyError(null);
     setReplyOpen(true);
   };
 
-  const submitReply = (e: React.FormEvent) => {
+  const submitReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeSuggestion) return;
     if (!validateRequired({ replyText }, ['replyText'], setInvalid)) return;
-    const ok = respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
+    setReplySubmitting(true);
+    setReplyError(null);
+    const { ok, refreshPending } = await respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
+    setReplySubmitting(false);
+    if (!ok) {
+      setReplyError(t('suggestionsV2.responseFailure', 'Failed to send response.'));
+      return;
+    }
     setReplyOpen(false);
     if (ok) {
       setToast(true);
@@ -628,12 +639,20 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
         invalid={invalid}
         setInvalid={setInvalid}
         onSubmit={submitReply}
+        replySubmitting={replySubmitting}
+        replyError={replyError}
       />
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-[200] -translate-x-1/2 animate-slide-up rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-2xl">
           <CheckCircle2 className="ml-2 inline h-4 w-4" />
           {t('admin.stats.replyToast', 'تم إرسال الرد وتحديث حالة الاقتراح')}
+        </div>
+      )}
+      {refreshPending && (
+        <div className="fixed bottom-6 left-1/2 z-[200] -translate-x-1/2 animate-slide-up rounded-2xl bg-amber-600 px-5 py-3 text-sm font-bold text-white shadow-2xl">
+          <CheckCircle2 className="ml-2 inline h-4 w-4" />
+          {t('suggestionsV2.responseSavedRefreshDelayed')}
         </div>
       )}
     </div>
@@ -651,7 +670,10 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
   const [activeSuggestion, setActiveSuggestion] = useState<Suggestion | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
   const [status, setStatus] = useState<SuggestionStatus>('reviewing');
+  const [replySubmitting, setReplySubmitting] = useState(false);
+  const [refreshPending, setRefreshPending] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [replyError, setReplyError] = useState<string | null>(null);
   const [toast, setToast] = useState(false);
   const [invalid, setInvalid] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | SuggestionStatus>('all');
@@ -671,19 +693,25 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
     setActiveSuggestion(s);
     setStatus(s.status === 'new' ? 'reviewing' : s.status);
     setReplyText('');
+    setReplyError(null);
     setReplyOpen(true);
   };
 
-  const submitReply = (e: React.FormEvent) => {
+  const submitReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeSuggestion) return;
     if (!validateRequired({ replyText }, ['replyText'], setInvalid)) return;
-    const ok = respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
-    if (ok) {
-      setReplyOpen(false);
-      setToast(true);
-      setTimeout(() => setToast(false), 3000);
+    setReplySubmitting(true);
+    setReplyError(null);
+    const { ok, refreshPending } = await respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
+    setReplySubmitting(false);
+    if (!ok) {
+      setReplyError(t('suggestionsV2.responseFailure', 'Failed to send response.'));
+      return;
     }
+    setReplyOpen(false);
+    setToast(true);
+    setTimeout(() => setToast(false), 3000);
   };
 
   return (
@@ -784,12 +812,20 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
         invalid={invalid}
         setInvalid={setInvalid}
         onSubmit={submitReply}
+        replySubmitting={replySubmitting}
+        replyError={replyError}
       />
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-[200] -translate-x-1/2 animate-slide-up rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-2xl">
           <CheckCircle2 className="ml-2 inline h-4 w-4" />
           {t('admin.suggestions.replyToast', 'تم إرسال الرد وتحديث حالة الاقتراح')}
+        </div>
+      )}
+      {refreshPending && (
+        <div className="fixed bottom-6 left-1/2 z-[200] -translate-x-1/2 animate-slide-up rounded-2xl bg-amber-600 px-5 py-3 text-sm font-bold text-white shadow-2xl">
+          <CheckCircle2 className="ml-2 inline h-4 w-4" />
+          {t('suggestionsV2.responseSavedRefreshDelayed')}
         </div>
       )}
     </div>
@@ -818,7 +854,7 @@ function StatusPill({ status }: { status: SuggestionStatus }) {
 }
 
 function SuggestionReplyModal({
-  open, onClose, suggestion, currentUser, canReply, status, setStatus, replyText, setReplyText, invalid, setInvalid, onSubmit,
+  open, onClose, suggestion, currentUser, canReply, status, setStatus, replyText, setReplyText, invalid, setInvalid, onSubmit, replySubmitting, replyError
 }: {
   open: boolean;
   onClose: () => void;
@@ -832,6 +868,8 @@ function SuggestionReplyModal({
   invalid: string[];
   setInvalid: React.Dispatch<React.SetStateAction<string[]>>;
   onSubmit: (e: React.FormEvent) => void;
+  replySubmitting?: boolean;
+  replyError?: string | null;
 }) {
   const { t } = useTranslation();
   const statusOptions: { value: SuggestionStatus; label: string; color: string }[] = [
@@ -959,11 +997,17 @@ function SuggestionReplyModal({
                   placeholder={t('admin.suggestions.modal.replyPlaceholder', 'اكتب ردك الموجه للطالب هنا...')}
                 />
               </div>
+              {replyError && (
+                <div className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700 animate-fade-in-fast">
+                  <XCircle className="h-4 w-4 shrink-0" />
+                  {replyError}
+                </div>
+              )}
               <div className="flex items-center justify-end gap-3 pt-1">
                 <button type="button" onClick={onClose} className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50">
                   {t('common.cancel', 'إلغاء')}
                 </button>
-                <button type="submit" className="btn-primary">
+                <button type="submit" className="btn-primary" disabled={replySubmitting}>
                   <Send className="h-4 w-4" />
                   {t('admin.suggestions.modal.submitButton', 'إرسال الرد وتحديث الحالة')}
                 </button>

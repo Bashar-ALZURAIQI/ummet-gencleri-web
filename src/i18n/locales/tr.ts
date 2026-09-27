@@ -1,6 +1,18 @@
 import type { TranslationSchema } from './ar.ts';
 
 const tr: TranslationSchema = {
+  suggestionsV2: {
+    suggestionsLoading: 'Öneriler yükleniyor...',
+    suggestionsLoadFailure: 'Öneriler yüklenemedi.',
+    suggestionSubmitting: 'Öneri gönderiliyor...',
+    suggestionSubmitFailure: 'Öneri gönderilemedi.',
+    suggestionSaved: 'Öneri başarıyla kaydedildi.',
+    suggestionSavedRefreshDelayed: 'Öneri kaydedildi. Liste kısa süre içinde yenilenecek.',
+    responseSending: 'Yanıt gönderiliyor...',
+    responseFailure: 'Yanıt gönderilemedi.',
+    responseSaved: 'Yanıt başarıyla kaydedildi.',
+    responseSavedRefreshDelayed: 'Yanıt kaydedildi. Liste kısa süre içinde yenilenecek.',
+  },
   common: {
     save: 'Kaydet',
     cancel: 'İptal',
