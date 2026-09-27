@@ -100,12 +100,12 @@ export function serializePushSubscription(
   };
 }
 
-export type PushDestination = 'news' | 'programs' | 'gallery' | 'student-dashboard' | 'admin-applications';
+export type PushDestination = 'news' | 'programs' | 'gallery' | 'student-dashboard' | 'admin-applications' | 'contact-inbox' | 'guide-suggestions' | 'student-suggestions';
 
 export function pushDestinationFromUrl(value: string): PushDestination | null {
   try {
     const destination = new URL(value).searchParams.get('push');
-    return destination === 'news' || destination === 'programs' || destination === 'gallery' || destination === 'student-dashboard' || destination === 'admin-applications'
+    return destination === 'news' || destination === 'programs' || destination === 'gallery' || destination === 'student-dashboard' || destination === 'admin-applications' || destination === 'contact-inbox' || destination === 'guide-suggestions' || destination === 'student-suggestions'
       ? destination
       : null;
   } catch {

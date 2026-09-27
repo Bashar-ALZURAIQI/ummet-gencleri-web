@@ -208,8 +208,8 @@ export function urlToView(urlOrPath: string): ParsedAppRoute {
     // 2. Web push destination
     const pushParam = url.searchParams.get('push');
     let pushDestination: PushDestination | undefined;
-    if (pushParam === 'news' || pushParam === 'programs' || pushParam === 'gallery' || pushParam === 'admin-applications') {
-      pushDestination = pushParam;
+    if (pushParam === 'news' || pushParam === 'programs' || pushParam === 'gallery' || pushParam === 'admin-applications' || pushParam === 'contact-inbox' || pushParam === 'guide-suggestions' || pushParam === 'student-suggestions') {
+      pushDestination = pushParam as PushDestination;
     }
 
     // Normalize pathname
@@ -220,6 +220,24 @@ export function urlToView(urlOrPath: string): ParsedAppRoute {
       if (pushDestination === 'admin-applications') {
         return {
           view: { kind: 'admin', tab: 'applications' },
+          pushDestination,
+        };
+      }
+      if (pushDestination === 'contact-inbox') {
+        return {
+          view: { kind: 'admin', tab: 'inbox' },
+          pushDestination,
+        };
+      }
+      if (pushDestination === 'guide-suggestions') {
+        return {
+          view: { kind: 'admin', tab: 'guide-suggestions' },
+          pushDestination,
+        };
+      }
+      if (pushDestination === 'student-suggestions') {
+        return {
+          view: { kind: 'admin', tab: 'suggestions' },
           pushDestination,
         };
       }

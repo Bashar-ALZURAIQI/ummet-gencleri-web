@@ -58,6 +58,12 @@ function Router() {
     if (!destination) return;
     if (destination === 'admin-applications') {
       navigate({ kind: 'admin', tab: 'applications' }, { replace: true });
+    } else if (destination === 'contact-inbox') {
+      navigate({ kind: 'admin', tab: 'inbox' }, { replace: true });
+    } else if (destination === 'guide-suggestions') {
+      navigate({ kind: 'admin', tab: 'guide-suggestions' }, { replace: true });
+    } else if (destination === 'student-suggestions') {
+      navigate({ kind: 'admin', tab: 'suggestions' }, { replace: true });
     } else {
       navigate({ kind: destination }, { replace: true });
     }
