@@ -8,7 +8,7 @@
   | 'NETWORK_ERROR'
   | 'UNKNOWN_ERROR';
 
-export type ServiceResult<T> = 
+export type ServiceResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: StudentSuggestionErrorCode };
 

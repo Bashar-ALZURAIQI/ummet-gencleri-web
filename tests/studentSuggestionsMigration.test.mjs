@@ -26,7 +26,7 @@ test('student suggestions v2 migration creates authoritative schema', async () =
   assert.match(sql, /char_length\(btrim\(category\)\)\s+BETWEEN\s+1\s+AND\s+100/i);
   assert.match(sql, /char_length\(btrim\(title\)\)\s+BETWEEN\s+3\s+AND\s+200/i);
   assert.match(sql, /char_length\(btrim\(content\)\)\s+BETWEEN\s+5\s+AND\s+5000/i);
-  
+
   // Check fields and relations for suggestion_responses
   assert.match(sql, /suggestion_id\s+uuid\s+(NOT NULL\s+)?REFERENCES\s+public\.student_suggestions\s*\(id\)/i);
   assert.match(sql, /responder_user_id\s+uuid\s+(NOT NULL\s+)?REFERENCES\s+public\.profiles\s*\(id\)/i);
@@ -53,16 +53,16 @@ test('student suggestions v2 secures the tables with RLS and no direct mutation'
   // RLS for reads
   assert.match(sql, /CREATE POLICY/i);
   assert.match(sql, /student_user_id\s*=\s*auth\.uid\(\)/i);
-  
+
   // Block manual unauthorized RPC/direct-table attempts
   // There should be NO policy granting INSERT/UPDATE/DELETE to authenticated directly
   assert.doesNotMatch(sql, /GRANT\s+INSERT[\s\S]{0,100}\bTO\s+(authenticated|public|anon)\b/i);
   assert.doesNotMatch(sql, /GRANT\s+UPDATE[\s\S]{0,100}\bTO\s+(authenticated|public|anon)\b/i);
   assert.doesNotMatch(sql, /GRANT\s+DELETE[\s\S]{0,100}\bTO\s+(authenticated|public|anon)\b/i);
-  
+
   assert.match(sql, /REVOKE ALL ON TABLE public\.student_suggestions FROM PUBLIC, anon, authenticated/i);
   assert.match(sql, /REVOKE ALL ON TABLE public\.suggestion_responses FROM PUBLIC, anon, authenticated/i);
-  
+
   // They only get SELECT via grant
   assert.match(sql, /GRANT SELECT ON TABLE public\.student_suggestions TO authenticated/i);
   assert.match(sql, /GRANT SELECT ON TABLE public\.suggestion_responses TO authenticated/i);
@@ -88,7 +88,7 @@ test('student suggestions v2 exposes strictly secured RPCs', async () => {
   assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.submit_student_suggestion[\s\S]*TO authenticated/i);
   assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.respond_to_student_suggestion[\s\S]*TO authenticated/i);
   assert.match(sql, /GRANT EXECUTE ON FUNCTION public\.list_visible_student_suggestions[\s\S]*TO authenticated/i);
-  
+
   // derive actor from auth.uid()
   assert.match(sql, /auth\.uid\(\)/i);
   assert.doesNotMatch(sql, /p_student_user_id/i);

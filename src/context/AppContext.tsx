@@ -201,7 +201,6 @@ import {
   mockEvents,
   mockNews,
   mockStudents,
-  mockSuggestions,
   mockPlans,
   mockReports,
   mockCommittees,
@@ -601,7 +600,6 @@ interface AppContextValue {
   setNews: React.Dispatch<React.SetStateAction<NewsItem[]>>;
   students: Student[];
   suggestions: Suggestion[];
-  submitSuggestion: (params: { targetRole: string, category: string, title: string, content: string }) => Promise<boolean>;
   plans: AdminPlan[];
   setPlans: React.Dispatch<React.SetStateAction<AdminPlan[]>>;
   reports: AdminReport[];
@@ -672,7 +670,10 @@ interface AppContextValue {
   registerWithApplication: (name: string, email: string, password: string, university: string, major: string, year: string, phone: string, motivation: string) => Promise<{ ok: boolean; error?: string; requiresEmailConfirmation?: boolean; emailWarning?: string }>;
   scheduleInterview: (applicationId: string, interview: InterviewInfo) => Promise<{ ok: boolean; error?: string; emailWarning?: string }>;
   decideApplication: (applicationId: string, status: 'accepted' | 'rejected', rejectionReason?: string) => Promise<{ ok: boolean; error?: string; emailWarning?: string }>;
-  respondToSuggestion: (id: string, reply: string, status: SuggestionStatus) => Promise<boolean>;
+  submitSuggestion: (params: { targetRole: string, category: string, title: string, content: string }) => Promise<SuggestionMutationResult>;
+  suggestionsLoading: boolean;
+  suggestionsError: string | null;
+  respondToSuggestion: (id: string, reply: string, status: SuggestionStatus) => Promise<SuggestionMutationResult>;
   getVisibleSuggestions: () => Suggestion[];
   canRespondToSuggestion: (suggestion: Suggestion) => boolean;
   pendingProfileEdits: PendingProfileEdit[];
@@ -927,8 +928,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       : mockStudents;
   });
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
 
-  
+
   const [editRequestRows, setEditRequestRows] = useState<EditRequest[]>([]);
   const [legacyEditsHistory] = useState<EditsHistoryEntry[]>(loadLegacyHistoryOnce);
   const [editRequestsLoading, setEditRequestsLoading] = useState(false);
@@ -939,7 +942,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [authInitializing, setAuthInitializing] = useState(true);
 
-  
+
   const [identityRefreshing, setIdentityRefreshing] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [passwordRecoveryGate, setPasswordRecoveryGateState] = useState<PasswordRecoveryGate>('IDLE');
@@ -958,7 +961,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const ownProfileOperationOwnerRef = useRef<string | null>(null);
   const authEpoch = useRef(new AuthEpochController(browserAuthTimerScheduler)).current;
 
-  
+
   const confirmedAuthOwner = useRef(new ConfirmedAuthOwnerStore()).current;
   const backgroundProfileRefresh = useRef(createBackgroundProfileRefreshCoordinator()).current;
   const identitySubscriptionGeneration = useRef(createIdentitySubscriptionGeneration()).current;
@@ -999,7 +1002,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return studentSuggestionService.respondToStudentSuggestion(params);
       },
       onUpdate: (data) => setSuggestions(data),
-      onStorageRetire: () => localStorage.removeItem(LS_SUGGESTIONS_KEY)
+      onStorageRetire: () => localStorage.removeItem(LS_SUGGESTIONS_KEY),
+      onLoading: setSuggestionsLoading,
+      onError: setSuggestionsError
     });
   }, []);
 
@@ -1009,7 +1014,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const auth = { epoch: latestAuthEventRef.current?.epoch ?? 0, userId: currentUser.userId, role: currentUser.role };
     const cancel = createVisibilityRefreshPolling({
       requestRefresh: () => suggestionsIntegration.performRefresh(auth),
-      
+
     });
     suggestionsIntegration.performRefresh(auth);
     return () => {
@@ -2636,12 +2641,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // RBAC visibility: PRESIDENT sees everything, each committee head sees only the
   // suggestions targeted to their own role, and students see only their own.
-  
+
   const submitSuggestion: AppContextValue['submitSuggestion'] = async (params: { targetRole: string, category: string, title: string, content: string }) => {
-    if (!currentUser) return false;
+    if (!currentUser) return { ok: false, error: 'UNAUTHENTICATED' };
     const auth = { epoch: latestAuthEventRef.current?.epoch ?? 0, userId: currentUser.userId, role: currentUser.role };
-    const res = await suggestionsIntegration.submit(auth, params);
-    return res.ok;
+    return await suggestionsIntegration.submit(auth, params);
   };
 
   const getVisibleSuggestions: AppContextValue['getVisibleSuggestions'] = () => {
@@ -2658,10 +2662,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // no permission (targeted to another committee) so the UI can stay read-only.
   const respondToSuggestion: AppContextValue['respondToSuggestion'] = async (id, reply, status) => {
     const target = suggestions.find((s) => s.id === id);
-    if (!target || !canRespondToSuggestion(target) || !currentUser) return false;
+    if (!target || !canRespondToSuggestion(target) || !currentUser) return { ok: false, error: 'FORBIDDEN' };
     const auth = { epoch: latestAuthEventRef.current?.epoch ?? 0, userId: currentUser.userId, role: currentUser.role };
-    const res = await suggestionsIntegration.respond(auth, { suggestionId: id, responseText: reply, newStatus: status });
-    return res.ok;
+    return await suggestionsIntegration.respond(auth, { suggestionId: id, responseText: reply, newStatus: status });
   };
 
   const upsertEditRequestRow = (request: EditRequest) => {

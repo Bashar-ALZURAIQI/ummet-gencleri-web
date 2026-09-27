@@ -1,5 +1,5 @@
 ﻿import { supabase } from '../lib/supabase.js';
-import { 
+import {
   submitStudentSuggestion as gatewaySubmit,
   respondToStudentSuggestion as gatewayRespond,
   loadVisibleStudentSuggestions as gatewayLoad,
@@ -11,11 +11,11 @@ export const studentSuggestionService = {
   async submitStudentSuggestion(params: SubmitStudentSuggestionParams) {
     return gatewaySubmit(supabase, params);
   },
-  
+
   async respondToStudentSuggestion(params: RespondToStudentSuggestionParams) {
     return gatewayRespond(supabase, params);
   },
-  
+
   async loadVisibleStudentSuggestions() {
     return gatewayLoad(supabase);
   }

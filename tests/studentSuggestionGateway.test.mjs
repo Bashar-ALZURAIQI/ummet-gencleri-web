@@ -1,10 +1,10 @@
 ﻿import assert from 'node:assert/strict';
 import test from 'node:test';
 
-const { 
-  submitStudentSuggestion, 
-  respondToStudentSuggestion, 
-  loadVisibleStudentSuggestions 
+const {
+  submitStudentSuggestion,
+  respondToStudentSuggestion,
+  loadVisibleStudentSuggestions
 } = await import('../src/domain/studentSuggestionGateway.ts');
 
 test('submitStudentSuggestion calls submit_student_suggestion RPC with trimmed arguments', async () => {
@@ -81,8 +81,8 @@ test('loadVisibleStudentSuggestions maps database format and prevents realtime',
     rpc: async (name) => {
       rpcCalled = true;
       assert.equal(name, 'list_visible_student_suggestions');
-      return { 
-        error: null, 
+      return {
+        error: null,
         data: [{
           id: 's-123',
           target_role: 'PRESIDENT',
@@ -98,7 +98,7 @@ test('loadVisibleStudentSuggestions maps database format and prevents realtime',
             response_text: 'Hello',
             created_at: '2026-09-26T01:00:00Z'
           }]
-        }] 
+        }]
       };
     }
   };

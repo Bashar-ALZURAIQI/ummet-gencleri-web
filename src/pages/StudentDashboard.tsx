@@ -53,6 +53,9 @@ export default function StudentDashboard() {
   const [form, setForm] = useState({ title: '', body: '', category: '', targetRole: '' });
   const [invalid, setInvalid] = useState<string[]>([]);
   const [sent, setSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const { suggestionsLoading, suggestionsError } = useApp();
+  const [refreshPending, setRefreshPending] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [joiningActivityCount, setJoiningActivityCount] = useState(0);
 
@@ -358,7 +361,7 @@ export default function StudentDashboard() {
                     placeholder={t('student.suggestions.detailsPlaceholder', 'اشرح فكرتك بالتفصيل...')}
                   />
                 </div>
-                <button type="submit" className="btn-primary w-full">
+                <button type="submit" className="btn-primary w-full" disabled={submitting}>
                   <Send className="h-4 w-4" />
                   {t('common.send', 'إرسال')}
                 </button>

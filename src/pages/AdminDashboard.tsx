@@ -391,6 +391,8 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
   const [replyOpen, setReplyOpen] = useState(false);
   const [activeSuggestion, setActiveSuggestion] = useState<Suggestion | null>(null);
   const [status, setStatus] = useState<SuggestionStatus>('reviewing');
+  const [replySubmitting, setReplySubmitting] = useState(false);
+  const [refreshPending, setRefreshPending] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [toast, setToast] = useState(false);
   const [invalid, setInvalid] = useState<string[]>([]);
@@ -440,7 +442,9 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
     e.preventDefault();
     if (!activeSuggestion) return;
     if (!validateRequired({ replyText }, ['replyText'], setInvalid)) return;
-    const ok = await respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
+    setReplySubmitting(true);
+    const { ok, refreshPending } = await respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
+    setReplySubmitting(false);
     setReplyOpen(false);
     if (ok) {
       setToast(true);
@@ -636,6 +640,12 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
           {t('admin.stats.replyToast', 'تم إرسال الرد وتحديث حالة الاقتراح')}
         </div>
       )}
+      {refreshPending && (
+        <div className="fixed bottom-6 left-1/2 z-[200] -translate-x-1/2 animate-slide-up rounded-2xl bg-amber-600 px-5 py-3 text-sm font-bold text-white shadow-2xl">
+          <CheckCircle2 className="ml-2 inline h-4 w-4" />
+          {t('suggestionsV2.responseSavedRefreshDelayed')}
+        </div>
+      )}
     </div>
   );
 }
@@ -651,6 +661,8 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
   const [activeSuggestion, setActiveSuggestion] = useState<Suggestion | null>(null);
   const [replyOpen, setReplyOpen] = useState(false);
   const [status, setStatus] = useState<SuggestionStatus>('reviewing');
+  const [replySubmitting, setReplySubmitting] = useState(false);
+  const [refreshPending, setRefreshPending] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [toast, setToast] = useState(false);
   const [invalid, setInvalid] = useState<string[]>([]);
@@ -678,7 +690,9 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
     e.preventDefault();
     if (!activeSuggestion) return;
     if (!validateRequired({ replyText }, ['replyText'], setInvalid)) return;
-    const ok = await respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
+    setReplySubmitting(true);
+    const { ok, refreshPending } = await respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
+    setReplySubmitting(false);
     if (ok) {
       setReplyOpen(false);
       setToast(true);
@@ -792,6 +806,12 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
           {t('admin.suggestions.replyToast', 'تم إرسال الرد وتحديث حالة الاقتراح')}
         </div>
       )}
+      {refreshPending && (
+        <div className="fixed bottom-6 left-1/2 z-[200] -translate-x-1/2 animate-slide-up rounded-2xl bg-amber-600 px-5 py-3 text-sm font-bold text-white shadow-2xl">
+          <CheckCircle2 className="ml-2 inline h-4 w-4" />
+          {t('suggestionsV2.responseSavedRefreshDelayed')}
+        </div>
+      )}
     </div>
   );
 }
@@ -818,7 +838,7 @@ function StatusPill({ status }: { status: SuggestionStatus }) {
 }
 
 function SuggestionReplyModal({
-  open, onClose, suggestion, currentUser, canReply, status, setStatus, replyText, setReplyText, invalid, setInvalid, onSubmit,
+  open, onClose, suggestion, currentUser, canReply, status, setStatus, replyText, setReplyText, invalid, setInvalid, onSubmit, replySubmitting,
 }: {
   open: boolean;
   onClose: () => void;
@@ -963,7 +983,7 @@ function SuggestionReplyModal({
                 <button type="button" onClick={onClose} className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50">
                   {t('common.cancel', 'إلغاء')}
                 </button>
-                <button type="submit" className="btn-primary">
+                <button type="submit" className="btn-primary" disabled={replySubmitting}>
                   <Send className="h-4 w-4" />
                   {t('admin.suggestions.modal.submitButton', 'إرسال الرد وتحديث الحالة')}
                 </button>

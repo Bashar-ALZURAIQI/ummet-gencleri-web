@@ -33,10 +33,10 @@ REVOKE ALL ON TABLE public.suggestion_responses FROM PUBLIC, anon, authenticated
 GRANT SELECT ON TABLE public.student_suggestions TO authenticated;
 GRANT SELECT ON TABLE public.suggestion_responses TO authenticated;
 
-CREATE POLICY "suggestions_student_select" 
-  ON public.student_suggestions 
-  FOR SELECT 
-  TO authenticated 
+CREATE POLICY "suggestions_student_select"
+  ON public.student_suggestions
+  FOR SELECT
+  TO authenticated
   USING (student_user_id = auth.uid());
 
 CREATE POLICY "suggestions_exec_select"
@@ -44,8 +44,8 @@ CREATE POLICY "suggestions_exec_select"
   FOR SELECT
   TO authenticated
   USING (
-    private.is_current_president(auth.uid()) 
-    OR 
+    private.is_current_president(auth.uid())
+    OR
     EXISTS (
       SELECT 1 FROM public.executive_assignments ea
       WHERE ea.user_id = auth.uid() AND ea.position_key = student_suggestions.target_role
@@ -102,7 +102,7 @@ BEGIN
     SELECT 1 FROM auth.users u
     JOIN public.profiles p ON p.id = u.id
     JOIN public.student_applications sa ON sa.user_id = p.id
-    WHERE u.id = v_user_id 
+    WHERE u.id = v_user_id
       AND u.deleted_at IS NULL
       AND (u.banned_until IS NULL OR u.banned_until <= now())
       AND p.status = 'active'
@@ -138,8 +138,8 @@ BEGIN
     RAISE EXCEPTION 'Unauthenticated';
   END IF;
 
-  SELECT target_role INTO v_target_role 
-  FROM public.student_suggestions 
+  SELECT target_role INTO v_target_role
+  FROM public.student_suggestions
   WHERE id = p_suggestion_id;
 
   IF NOT FOUND THEN
@@ -157,9 +157,9 @@ BEGIN
   END IF;
 
   IF NOT (
-    private.is_current_president(v_user_id) 
+    private.is_current_president(v_user_id)
     OR EXISTS (
-      SELECT 1 FROM public.executive_assignments 
+      SELECT 1 FROM public.executive_assignments
       WHERE user_id = v_user_id AND position_key = v_target_role
     )
   ) THEN
@@ -169,7 +169,7 @@ BEGIN
   INSERT INTO public.suggestion_responses (suggestion_id, responder_user_id, response_text)
   VALUES (p_suggestion_id, v_user_id, btrim(p_response_text));
 
-  UPDATE public.student_suggestions 
+  UPDATE public.student_suggestions
   SET status = p_new_status, updated_at = now()
   WHERE id = p_suggestion_id;
 
@@ -179,6 +179,7 @@ $$;
 CREATE OR REPLACE FUNCTION public.list_visible_student_suggestions()
 RETURNS TABLE (
   id uuid,
+  student_name text,
   target_role text,
   category text,
   title text,
@@ -202,7 +203,6 @@ BEGIN
     RETURN;
   END IF;
 
-  -- Ensure caller is not banned
   IF NOT EXISTS (
     SELECT 1 FROM auth.users u
     WHERE u.id = v_user_id
@@ -213,7 +213,7 @@ BEGIN
   END IF;
 
   v_is_president := private.is_current_president(v_user_id);
-  
+
   SELECT array_agg(position_key) INTO v_exec_roles
   FROM public.executive_assignments
   WHERE user_id = v_user_id;
@@ -223,14 +223,15 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  SELECT 
-    ss.id, 
-    ss.target_role, 
-    ss.category, 
-    ss.title, 
-    ss.content, 
-    ss.status, 
-    ss.created_at, 
+  SELECT
+    ss.id,
+    COALESCE(p.display_name, 'Unknown'),
+    ss.target_role,
+    ss.category,
+    ss.title,
+    ss.content,
+    ss.status,
+    ss.created_at,
     ss.updated_at,
     COALESCE(
       (
@@ -238,18 +239,22 @@ BEGIN
           json_build_object(
             'id', sr.id,
             'responder_user_id', sr.responder_user_id,
+            'by', COALESCE(rp.display_name, 'Exec'),
+            'byRole', COALESCE((SELECT ea.position_key FROM public.executive_assignments ea WHERE ea.user_id = sr.responder_user_id LIMIT 1), 'PRESIDENT'),
             'response_text', sr.response_text,
             'created_at', sr.created_at
           ) ORDER BY sr.created_at ASC
         )
         FROM public.suggestion_responses sr
+        LEFT JOIN public.profiles rp ON rp.user_id = sr.responder_user_id
         WHERE sr.suggestion_id = ss.id
-      ), 
+      ),
       '[]'::json
     ) AS responses
   FROM public.student_suggestions ss
-  WHERE ss.student_user_id = v_user_id 
-     OR v_is_president 
+  LEFT JOIN public.profiles p ON p.user_id = ss.student_user_id
+  WHERE ss.student_user_id = v_user_id
+     OR v_is_president
      OR ss.target_role = ANY(v_exec_roles)
   ORDER BY ss.created_at DESC;
 END;
