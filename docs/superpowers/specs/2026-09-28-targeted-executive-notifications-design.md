@@ -24,9 +24,9 @@ Safety invariants:
 A single secured Remote Procedure Call (RPC) (`get_current_user_workload_counts()`) exposes exact notification unread states efficiently in one roundtrip:
 - Uses `SECURITY DEFINER` logic and `auth.uid()` pinning.
 - Scoped dynamically per active role:
-  - `PRESIDENT`: All pending guide suggestions, all unread contact messages, targeted student suggestions.
-  - `ACADEMIC_HEAD`: All pending guide suggestions, 0 contact messages, targeted student suggestions.
-  - `OTHER EXECUTIVES`: 0 guide suggestions, 0 contact messages, targeted student suggestions.
+  - `PRESIDENT`: All pending guide suggestions, all unread contact messages, ALL student suggestions where `status = 'new'`, regardless of `target_role`.
+  - `ACADEMIC_HEAD`: All pending guide suggestions, zero contact-message workload, only new student suggestions targeted to `ACADEMIC_HEAD`.
+  - `OTHER EXECUTIVES`: Zero guide workload, zero contact workload, only new student suggestions targeted to their own executive role.
 
 ## 4. Out of Scope
 

@@ -6,6 +6,7 @@ import { pushDestinationFromUrl } from '../src/domain/webPushClient.ts';
 import { isLeadershipRole } from '../src/data/mockData.ts';
 import { isSameAuthOwner } from '../src/domain/confirmedAuthOwner.ts';
 import { mapWorkloadCounts } from '../src/domain/workloadValidation.ts';
+import { resolveEffectiveAdminTab } from '../src/domain/appNavigation.ts';
 
 test('Targeted Executive Notifications Frontend (Phase 2)', async (t) => {
   await t.test('1-5. Executive notification UI eligibility helper', () => {
@@ -82,10 +83,38 @@ test('Targeted Executive Notifications Frontend (Phase 2)', async (t) => {
     assert.equal(pushDestinationFromUrl('https://site.test/?push=student-suggestions'), 'student-suggestions');
   });
 
+  await t.test('25a. resolveEffectiveAdminTab enforces deep-link authorization', () => {
+    const mockStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+
+    // authorized for inbox
+    const authInbox = resolveEffectiveAdminTab({ urlTab: 'inbox', permittedTabs: ['stats', 'inbox'], userId: 'u1', storage: mockStorage });
+    assert.strictEqual(authInbox, 'inbox');
+
+    // unauthorized for inbox
+    const unauthInbox = resolveEffectiveAdminTab({ urlTab: 'inbox', permittedTabs: ['stats'], userId: 'u1', storage: mockStorage });
+    assert.strictEqual(unauthInbox, 'stats');
+
+    // authorized for guide-suggestions
+    const authGuide = resolveEffectiveAdminTab({ urlTab: 'guide-suggestions', permittedTabs: ['stats', 'guide-suggestions'], userId: 'u1', storage: mockStorage });
+    assert.strictEqual(authGuide, 'guide-suggestions');
+
+    // unauthorized for guide-suggestions
+    const unauthGuide = resolveEffectiveAdminTab({ urlTab: 'guide-suggestions', permittedTabs: ['stats', 'inbox'], userId: 'u1', storage: mockStorage });
+    assert.strictEqual(unauthGuide, 'stats');
+
+    // authorized for suggestions
+    const authSuggestions = resolveEffectiveAdminTab({ urlTab: 'suggestions', permittedTabs: ['stats', 'suggestions'], userId: 'u1', storage: mockStorage });
+    assert.strictEqual(authSuggestions, 'suggestions');
+
+    // current permissions win if role changed
+    const roleChanged = resolveEffectiveAdminTab({ urlTab: 'suggestions', permittedTabs: ['stats'], userId: 'u1', storage: mockStorage });
+    assert.strictEqual(roleChanged, 'stats');
+  });
+
   await t.test('26-27. SQL queries in migration', () => {
     const sqlPath = join(process.cwd(), 'supabase/migrations/20260927230446_targeted_executive_notifications.sql');
     const sqlContent = readFileSync(sqlPath, 'utf8');
-    
+
     // 26. President workload SQL counts ALL new suggestions
     assert.ok(
       sqlContent.includes(`IF v_role = 'PRESIDENT' THEN\n    SELECT count(*) INTO v_new_student_suggestions FROM public.student_suggestions WHERE status = 'new';`),
@@ -102,7 +131,7 @@ test('Targeted Executive Notifications Frontend (Phase 2)', async (t) => {
   await t.test('28. ExecutivePushControl is no longer mounted only inside ApplicationsTab', () => {
     const dashboardPath = join(process.cwd(), 'src/pages/AdminDashboard.tsx');
     const dashboardContent = readFileSync(dashboardPath, 'utf8');
-    
+
     assert.ok(
       dashboardContent.includes('<ExecutivePushControl role={currentUser.role} />'),
       'ExecutivePushControl must be present'
@@ -116,6 +145,18 @@ test('Targeted Executive Notifications Frontend (Phase 2)', async (t) => {
   await t.test('29. mutations trigger workload refresh (statically verified)', () => {
     const contextPath = join(process.cwd(), 'src/context/AppContext.tsx');
     const contextContent = readFileSync(contextPath, 'utf8');
-    assert.ok(contextContent.includes('void refreshWorkloadCounts()'), 'refreshWorkloadCounts must be called in mutations');
+    const panelPath = join(process.cwd(), 'src/components/GuideSuggestionsPanel.tsx');
+    const panelContent = readFileSync(panelPath, 'utf8');
+
+    // Verify each mutation calls refreshWorkloadCounts
+    assert.match(contextContent, /const respondToSuggestion[\s\S]*?refreshWorkloadCounts\(\)/, 'respondToSuggestion must refresh workload');
+    assert.match(contextContent, /const markContactMessageRead[\s\S]*?refreshWorkloadCounts\(\)/, 'markContactMessageRead must refresh workload');
+    assert.match(contextContent, /const replyToContactMessage[\s\S]*?refreshWorkloadCounts\(\)/, 'replyToContactMessage must refresh workload');
+
+    assert.match(panelContent, /const updateStatus[\s\S]*?refreshWorkloadCounts\(\)/, 'updateGuideSuggestionStatus must refresh workload');
+    assert.match(panelContent, /const remove[\s\S]*?refreshWorkloadCounts\(\)/, 'deleteGuideSuggestion must refresh workload');
+
+    // Regression check: no independent createVisibilityRefreshPolling loop for workload counts
+    assert.doesNotMatch(contextContent, /const (workloadPolling|workloadRefresh) = createVisibilityRefreshPolling/, 'Must NOT introduce another independent polling loop');
   });
 });
