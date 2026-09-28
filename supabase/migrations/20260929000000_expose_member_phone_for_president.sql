@@ -1,5 +1,7 @@
 -- Expose student phone numbers strictly for President-authorized member management.
 -- Preserves existing authorization gates and doesn't expose it to ordinary students.
+DROP FUNCTION public.list_president_assignable_members();
+
 CREATE OR REPLACE FUNCTION public.list_president_assignable_members()
 RETURNS TABLE (
   user_id uuid,

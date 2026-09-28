@@ -3075,7 +3075,7 @@ function MembersTab({ members, currentUser, transferMemberRole, revokeExecutiveA
                 <th className="px-4 py-3 font-bold">{t('admin.members.table.currentRole', 'المنصب الحالي')}</th>
                 <th className="px-4 py-3 font-bold">{t('admin.members.table.university', 'الجامعة')}</th>
                 <th className="px-4 py-3 font-bold">{t('admin.members.table.major', 'التخصص')}</th>
-                <th className="px-4 py-3 font-bold">{t('admin.members.table.phone', 'رقم الهاتف')}</th>
+                <th className="px-4 py-3 font-bold">{t('auth.phone')}</th>
                 <th className="px-4 py-3 font-bold">{t('admin.members.table.action', 'إجراء')}</th>
               </tr>
             </thead>

@@ -229,7 +229,7 @@ test('maps the president-only account directory with read-only login email and o
       committee_key: 'media',
       assignment_updated_at: '2026-08-22T01:00:00Z',
       contact_email: 'must-not-be-returned@example.org',
-      phone: 'must-not-be-returned',
+      phone: '05375922478',
     }),
     {
       userId: authUser.id,
@@ -238,7 +238,7 @@ test('maps the president-only account directory with read-only login email and o
       university: 'Example University',
       major: 'Engineering',
       year: '3',
-      phone: 'must-not-be-returned',
+      phone: '05375922478',
       bio: 'Short profile',
       avatarPath: `${authUser.id}/avatar.webp`,
       profileUpdatedAt: '2026-08-22T00:00:00Z',
