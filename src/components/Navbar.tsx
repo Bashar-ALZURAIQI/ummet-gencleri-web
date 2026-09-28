@@ -298,9 +298,9 @@ export default function Navbar() {
           ) : (
             <button
               onClick={() => go({ kind: 'login' })}
-              className="hidden items-center gap-1.5 rounded-xl bg-navy-800 px-4 py-2 text-sm font-semibold whitespace-nowrap text-white shadow-md shadow-navy-900/20 transition-all hover:bg-navy-700 sm:flex"
+              className="flex items-center gap-1 sm:gap-1.5 rounded-xl bg-navy-800 px-2.5 py-2 sm:px-4 sm:py-2 text-[11px] sm:text-sm font-bold sm:font-semibold whitespace-nowrap text-white shadow-md shadow-navy-900/20 transition-all hover:bg-navy-700 sm:flex"
             >
-              <LogIn className="h-4 w-4 shrink-0" />
+              <LogIn className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
               {t('auth.login')}
             </button>
           )}
