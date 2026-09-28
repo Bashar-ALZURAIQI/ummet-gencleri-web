@@ -15,6 +15,7 @@ interface AssignableDirectoryMember {
   bio: string;
   avatarPath: string;
   updatedAt: string;
+  phone?: string;
 }
 
 interface ExecutiveDirectoryMember {
@@ -65,7 +66,7 @@ export function buildAccountDirectoryDisplay(
       university: member.university,
       major: member.major,
       year: member.year,
-      phone: '',
+      phone: member.phone ?? '',
       photo: member.avatarPath,
       updatedAt: member.updatedAt,
       role: assignment?.position ?? 'STUDENT',

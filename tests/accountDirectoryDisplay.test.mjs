@@ -16,8 +16,8 @@ const otherId = '33333333-3333-4333-8333-333333333333';
 test('builds UUID-backed members and executive heads from confirmed safe projections', () => {
   const result = buildAccountDirectoryDisplay(
     [
-      { userId: viceId, name: 'خير الله', university: 'جامعة أ', major: 'طب', year: '4', bio: 'نبذة', avatarPath: 'vice.webp', updatedAt: '2026-08-22' },
-      { userId: studentId, name: 'أحمد', university: 'جامعة ب', major: 'هندسة', year: '2', bio: '', avatarPath: '', updatedAt: '2026-08-21' },
+      { userId: viceId, name: 'خير الله', university: 'جامعة أ', major: 'طب', year: '4', phone: '0512345678', bio: 'نبذة', avatarPath: 'vice.webp', updatedAt: '2026-08-22' },
+      { userId: studentId, name: 'أحمد', university: 'جامعة ب', major: 'هندسة', year: '2', phone: undefined, bio: '', avatarPath: '', updatedAt: '2026-08-21' },
     ],
     [
       { userId: viceId, position: 'VICE_PRESIDENT', committee: 'vice-presidency', name: 'خير الله', contactEmail: 'contact@example.org', university: 'جامعة أ', major: 'طب', year: '4', bio: 'نبذة', avatarPath: 'vice.webp', profileUpdatedAt: '2026-08-22', assignmentUpdatedAt: '2026-08-22' },
@@ -25,7 +25,7 @@ test('builds UUID-backed members and executive heads from confirmed safe project
   );
 
   assert.deepEqual(result.members, [
-    { id: viceId, name: 'خير الله', email: '', university: 'جامعة أ', major: 'طب', year: '4', phone: '', photo: 'vice.webp', updatedAt: '2026-08-22', role: 'VICE_PRESIDENT', committee: 'vice-presidency', joinedAt: '2026-08-22', status: 'active' },
+    { id: viceId, name: 'خير الله', email: '', university: 'جامعة أ', major: 'طب', year: '4', phone: '0512345678', photo: 'vice.webp', updatedAt: '2026-08-22', role: 'VICE_PRESIDENT', committee: 'vice-presidency', joinedAt: '2026-08-22', status: 'active' },
     { id: studentId, name: 'أحمد', email: '', university: 'جامعة ب', major: 'هندسة', year: '2', phone: '', photo: '', updatedAt: '2026-08-21', role: 'STUDENT', joinedAt: '2026-08-21', status: 'active' },
   ]);
   assert.deepEqual(result.heads['vice-presidency'], {

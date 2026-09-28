@@ -1814,6 +1814,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           university: member.university,
           major: member.major,
           year: member.year,
+          phone: member.phone,
           bio: member.bio,
           avatarPath: member.avatarPath,
           updatedAt: member.profileUpdatedAt,

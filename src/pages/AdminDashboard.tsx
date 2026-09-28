@@ -3075,6 +3075,7 @@ function MembersTab({ members, currentUser, transferMemberRole, revokeExecutiveA
                 <th className="px-4 py-3 font-bold">{t('admin.members.table.currentRole', 'المنصب الحالي')}</th>
                 <th className="px-4 py-3 font-bold">{t('admin.members.table.university', 'الجامعة')}</th>
                 <th className="px-4 py-3 font-bold">{t('admin.members.table.major', 'التخصص')}</th>
+                <th className="px-4 py-3 font-bold">{t('admin.members.table.phone', 'رقم الهاتف')}</th>
                 <th className="px-4 py-3 font-bold">{t('admin.members.table.action', 'إجراء')}</th>
               </tr>
             </thead>
@@ -3095,6 +3096,15 @@ function MembersTab({ members, currentUser, transferMemberRole, revokeExecutiveA
                   </td>
                   <td className="px-4 py-3 text-gray-600">{member.university || '—'}</td>
                   <td className="px-4 py-3 text-gray-600">{member.major || '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {member.phone ? (
+                      <a href={`tel:${member.phone}`} className="inline-block hover:text-navy-600 hover:underline" dir="ltr">
+                        {member.phone}
+                      </a>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <button disabled={busy} onClick={() => openRoleModal(member)} className="flex h-8 w-8 items-center justify-center rounded-lg text-gold-600 transition-colors hover:bg-gold-50 disabled:cursor-not-allowed disabled:opacity-50" title={t('admin.members.actions.transferRole', 'نقل منصب تنفيذي')}>

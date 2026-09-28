@@ -68,6 +68,7 @@ export interface PresidentAssignableMemberRow {
   university?: unknown;
   major?: unknown;
   year?: unknown;
+  phone?: unknown;
   bio?: unknown;
   avatar_path?: unknown;
   profile_updated_at?: unknown;
@@ -83,6 +84,7 @@ export interface PresidentAssignableMember {
   university: string;
   major: string;
   year: string;
+  phone?: string;
   bio: string;
   avatarPath: string;
   profileUpdatedAt: string;
@@ -260,6 +262,7 @@ export function mapPresidentAssignableMemberRow(
     university: safeText(row.university),
     major: safeText(row.major),
     year: safeText(row.year),
+    phone: safeText(row.phone),
     bio: safeText(row.bio),
     avatarPath: safeText(row.avatar_path),
     profileUpdatedAt: safeText(row.profile_updated_at),

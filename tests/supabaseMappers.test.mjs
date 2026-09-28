@@ -238,6 +238,7 @@ test('maps the president-only account directory with read-only login email and o
       university: 'Example University',
       major: 'Engineering',
       year: '3',
+      phone: 'must-not-be-returned',
       bio: 'Short profile',
       avatarPath: `${authUser.id}/avatar.webp`,
       profileUpdatedAt: '2026-08-22T00:00:00Z',
