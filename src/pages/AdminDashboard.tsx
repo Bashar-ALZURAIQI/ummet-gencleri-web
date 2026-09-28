@@ -179,6 +179,12 @@ export default function AdminDashboard() {
         title={t('admin.sidebarTitle', 'أقسام الإدارة')}
       >
         <div className="container-app py-8">
+          {currentUser && isLeadershipRole(currentUser.role) && (
+            <div className="mb-6">
+              <ExecutivePushControl role={currentUser.role} />
+            </div>
+          )}
+
           {tab === 'stats' && <StatsTab events={events} students={students} suggestions={getVisibleSuggestions()} contactMessages={contactMessages} applications={applications} currentUser={currentUser} respondToSuggestion={respondToSuggestion} canRespondToSuggestion={canRespondToSuggestion} />}
           {tab === 'board' && canEditSection('board') && <BoardTab committees={committees} setCommittees={setCommittees} students={students} currentUser={currentUser} updateBoardHead={updateBoardHead} setMembers={setMembers} />}
           {tab === 'pending-edits' && currentUser?.role === 'PRESIDENT' && (
@@ -3382,7 +3388,6 @@ function ApplicationsTab({
 
   return (
     <div>
-      <ExecutivePushControl role={currentUser?.role ?? null} />
       {applicationNotice && (
         <div className={`mb-4 flex items-center gap-2 rounded-xl border p-3 text-sm font-semibold ${applicationNotice.kind === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
           {applicationNotice.kind === 'success' ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <Info className="h-4 w-4 shrink-0" />}

@@ -192,8 +192,12 @@ BEGIN
     SELECT count(*) INTO v_unread_contact FROM public.contact_messages WHERE status = 'UNREAD';
   END IF;
 
-  -- Evaluate new student suggestions for CURRENT role
-  SELECT count(*) INTO v_new_student_suggestions FROM public.student_suggestions WHERE target_role = v_role AND status = 'new';
+  -- Evaluate new student suggestions
+  IF v_role = 'PRESIDENT' THEN
+    SELECT count(*) INTO v_new_student_suggestions FROM public.student_suggestions WHERE status = 'new';
+  ELSE
+    SELECT count(*) INTO v_new_student_suggestions FROM public.student_suggestions WHERE target_role = v_role AND status = 'new';
+  END IF;
 
   RETURN jsonb_build_object(
     'pendingGuideSuggestions', v_pending_guide,

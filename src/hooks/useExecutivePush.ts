@@ -82,7 +82,7 @@ export function useExecutivePush(eligible: boolean, isPresident: boolean) {
 
     void synchronize();
     return () => { active = false; };
-  }, [eligible, vapidPublicKey]);
+  }, [eligible, isPresident, vapidPublicKey]);
 
   const enable = useCallback(async () => {
     if (!eligible) return;
@@ -126,7 +126,7 @@ export function useExecutivePush(eligible: boolean, isPresident: boolean) {
       console.error('Push notification enable failed.', error);
       dispatch({ type: 'FAILED', message: 'تعذر تفعيل الإشعارات على هذا الجهاز. حاول مرة أخرى.' });
     }
-  }, [eligible, vapidPublicKey]);
+  }, [eligible, isPresident, vapidPublicKey]);
 
   const disable = useCallback(async () => {
     dispatch({ type: 'DISABLE_STARTED' });

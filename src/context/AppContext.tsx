@@ -152,6 +152,7 @@ import {
 import {
   ConfirmedAuthOwnerStore,
   type ConfirmedAuthOwner,
+  isSameAuthOwner,
 } from '../domain/confirmedAuthOwner';
 import {
   AuthEpochController,
@@ -1683,7 +1684,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let active = true;
     setApplications([]);
     setWorkloadCounts(null);
-    setWorkloadCounts(null);
     setApplicationsLoading(Boolean(currentUser?.userId));
     if (!currentUser?.userId) return () => { active = false; };
 
@@ -1726,12 +1726,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const counts = await fetchWorkloadCounts();
       const ownerAfter = captureConfirmedAuthOwner();
-      if (
-        ownerBefore &&
-        ownerAfter &&
-        ownerBefore.userId === ownerAfter.userId &&
-        ownerBefore.epoch === ownerAfter.epoch
-      ) {
+      if (isSameAuthOwner(ownerBefore, ownerAfter)) {
         setWorkloadCounts(counts);
       }
     } catch {
@@ -3179,7 +3174,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { ok: false, error };
     }
     const currentOwner = captureConfirmedAuthOwner();
-    if (!currentOwner || currentOwner.userId !== owner.userId || currentOwner.epoch !== owner.epoch) {
+    if (!isSameAuthOwner(owner, currentOwner)) {
       return { ok: false, error: 'تغيرت الجلسة أثناء إرسال الرد؛ حدّث الصفحة لعرض السجل الرسمي.' };
     }
     setContactMessages((rows) => rows.map((row) => row.id === messageId
