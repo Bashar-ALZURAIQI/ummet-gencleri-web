@@ -14,8 +14,29 @@ Executives require actionable awareness of unresolved administrative work includ
 - [x] Extend Edge Function validation in `send-web-push/delivery.ts` for these destinations.
 - [x] Verify routing capability via frontend tests.
 
-## 3. Phase 2: Frontend Implementation (Pending)
+## 3. Phase 2: Frontend Implementation (Completed)
 
-- [ ] Connect `get_current_user_workload_counts()` to the main client architecture to render visible badges for pending items without requiring realtime.
-- [ ] Render indicators inside the executive portal based on these counts.
-- [ ] Connect any relevant notification permission request lifecycle appropriately.
+- [x] Connect `get_current_user_workload_counts()` to the main client architecture to render visible badges for pending items without requiring realtime.
+- [x] Render indicators inside the executive portal based on these counts.
+- [x] Connect any relevant notification permission request lifecycle appropriately (manual permission request only via `ExecutivePushControl`).
+- [x] Ensure `ExecutivePushControl` is accessible to all leadership roles (PRESIDENT, VICE_PRESIDENT, MEDIA_HEAD, FINANCE_HEAD, AUDIT_HEAD, ACADEMIC_HEAD, ACTIVITIES_HEAD) in the shared `AdminDashboard` shell.
+
+## 4. Architecture & Routing Rules
+
+### Push Notification Routing:
+- **Contact Us**: Pushed only to `PRESIDENT` -> `/?push=contact-inbox`.
+- **Guide Suggestion**: Pushed to `PRESIDENT` and `ACADEMIC_HEAD` -> `/?push=guide-suggestions`.
+- **Student Suggestion**: Pushed to the specific executive assigned to `target_role` -> `/?push=student-suggestions`.
+
+### Workload Badge Rules:
+- **PRESIDENT**: Counts all unread Contact Us messages, pending Guide suggestions, and **all** new student suggestions.
+- **ACADEMIC_HEAD**: Counts pending Guide suggestions and student suggestions targeted to `ACADEMIC_HEAD`.
+- **Other Executives**: Counts only student suggestions targeted to their own `target_role`.
+- Zero counts do not render badges.
+- Existing Applications badge behavior remains unchanged.
+
+### Data Fetching Constraints:
+- **No Realtime**: No `postgres_changes` or Supabase Realtime for these tables.
+- **No Independent Polling Loop**: Workload counts fetch integrates directly into the existing visibility-aware 5-minute refresh polling loop in `AppContext.tsx` (edit requests loop).
+- **Mutation-Driven Refresh**: Workload counts automatically refresh when mutations like marking messages as read or responding to suggestions occur.
+- **Role Staleness Check**: Workload updates strictly compare `userId`, `epoch`, and `role` to reject stale data after role changes.

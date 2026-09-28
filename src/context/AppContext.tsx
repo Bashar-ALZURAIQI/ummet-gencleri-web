@@ -32,7 +32,8 @@ import {
   uploadOwnAvatar as uploadOwnAvatarService,
   removeOwnAvatar as deleteOwnAvatarService,
 } from '../services/avatarService';
-import { fetchWorkloadCounts, type WorkloadCounts } from '../services/workloadService.ts';
+import { fetchWorkloadCounts } from '../services/workloadService.ts';
+import { type WorkloadCounts } from '../domain/workloadValidation.ts';
 import {
   bindPresidentManagedMemberAvatar,
   registerManagedAsset,
@@ -1266,11 +1267,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   }, [captureConfirmedAuthOwner]);
 
+  const refreshWorkloadCounts = useCallback(async () => {
+    if (!currentUser?.userId || !isLeadershipRole(currentUser?.role)) return;
+    const ownerBefore = captureConfirmedAuthOwner();
+    try {
+      const counts = await fetchWorkloadCounts();
+      const ownerAfter = captureConfirmedAuthOwner();
+      if (isSameAuthOwner(ownerBefore, ownerAfter)) {
+        setWorkloadCounts(counts);
+      }
+    } catch {
+      // Silently fail workload fetch, let other systems proceed, keeping the old counts.
+    }
+  }, [currentUser?.userId, currentUser?.role, captureConfirmedAuthOwner]);
+
   useEffect(() => {
     if (!currentUser || !isLeadershipRole(currentUser.role)) {
       setEditRequestRows([]);
       setEditRequestsLoading(false);
       setEditRequestsError(null);
+      setWorkloadCounts(null);
       return;
     }
 
@@ -1278,6 +1294,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const reload = () => {
       if (!active) return;
       void refreshEditRequests();
+      void refreshWorkloadCounts();
     };
     reload();
 
@@ -1289,7 +1306,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       active = false;
       stopPolling();
     };
-  }, [currentUser, refreshEditRequests]);
+  }, [currentUser, refreshEditRequests, refreshWorkloadCounts]);
 
   // Persist students to localStorage for live cross-page sync
   useEffect(() => {
@@ -1719,41 +1736,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       stopPresidentRefresh();
     };
   }, [currentUser?.userId, currentUser?.role]);
-
-  const refreshWorkloadCounts = useCallback(async () => {
-    if (!currentUser?.userId || !isLeadershipRole(currentUser?.role)) return;
-    const ownerBefore = captureConfirmedAuthOwner();
-    try {
-      const counts = await fetchWorkloadCounts();
-      const ownerAfter = captureConfirmedAuthOwner();
-      if (isSameAuthOwner(ownerBefore, ownerAfter)) {
-        setWorkloadCounts(counts);
-      }
-    } catch {
-      // Silently fail workload fetch, let other systems proceed, keeping the old counts.
-    }
-  }, [currentUser?.userId, currentUser?.role]);
-
-  useEffect(() => {
-    let active = true;
-    if (!currentUser?.userId || !isLeadershipRole(currentUser?.role)) {
-      setWorkloadCounts(null);
-      return () => { active = false; };
-    }
-
-    void refreshWorkloadCounts();
-    const stopPolling = createVisibilityRefreshPolling({
-      requestRefresh: () => {
-        if (active) void refreshWorkloadCounts();
-      },
-    });
-
-    return () => {
-      active = false;
-      stopPolling();
-    };
-  }, [currentUser?.userId, currentUser?.role, refreshWorkloadCounts]);
-
 
   const refreshApplicationEmailNotifications = useCallback(async () => {
     if (currentUser?.role !== 'PRESIDENT' || !currentUser.userId) {

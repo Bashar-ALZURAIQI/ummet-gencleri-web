@@ -32,5 +32,5 @@ export class ConfirmedAuthOwnerStore {
 
 export function isSameAuthOwner(a: ConfirmedAuthOwner | null | undefined, b: ConfirmedAuthOwner | null | undefined): boolean {
   if (!a || !b) return false;
-  return a.userId === b.userId && a.epoch === b.epoch;
+  return a.userId === b.userId && a.epoch === b.epoch && a.role === b.role;
 }

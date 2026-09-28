@@ -66,11 +66,13 @@ test('Targeted Executive Notifications Frontend (Phase 2)', async (t) => {
   await t.test('20-22. Auth-owner equality/staleness helper', () => {
     const ownerA = { userId: 'user1', epoch: 1, loginEmail: 'a@b.com', role: 'PRESIDENT' };
     const ownerA_changedEpoch = { userId: 'user1', epoch: 2, loginEmail: 'a@b.com', role: 'PRESIDENT' };
+    const ownerA_changedRole = { userId: 'user1', epoch: 1, loginEmail: 'a@b.com', role: 'ACADEMIC_HEAD' };
     const ownerB = { userId: 'user2', epoch: 1, loginEmail: 'b@b.com', role: 'ACADEMIC_HEAD' };
 
-    assert.strictEqual(isSameAuthOwner(ownerA, ownerA), true, '20. same auth owner/epoch accepted');
-    assert.strictEqual(isSameAuthOwner(ownerA, ownerA_changedEpoch), false, '21. changed epoch rejected');
-    assert.strictEqual(isSameAuthOwner(ownerA, ownerB), false, '22. changed user rejected');
+    assert.strictEqual(isSameAuthOwner(ownerA, ownerA), true, 'same auth owner/epoch/role accepted');
+    assert.strictEqual(isSameAuthOwner(ownerA, ownerA_changedEpoch), false, 'changed epoch rejected');
+    assert.strictEqual(isSameAuthOwner(ownerA, ownerA_changedRole), false, 'changed role rejected');
+    assert.strictEqual(isSameAuthOwner(ownerA, ownerB), false, 'changed user rejected');
     assert.strictEqual(isSameAuthOwner(ownerA, null), false, 'missing owner -> false');
   });
 
