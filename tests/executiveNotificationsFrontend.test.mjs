@@ -114,16 +114,17 @@ test('Targeted Executive Notifications Frontend (Phase 2)', async (t) => {
   await t.test('26-27. SQL queries in migration', () => {
     const sqlPath = join(process.cwd(), 'supabase/migrations/20260927230446_targeted_executive_notifications.sql');
     const sqlContent = readFileSync(sqlPath, 'utf8');
+    const normalizedSql = sqlContent.replace(/\r\n/g, '\n');
 
     // 26. President workload SQL counts ALL new suggestions
     assert.ok(
-      sqlContent.includes(`IF v_role = 'PRESIDENT' THEN\n    SELECT count(*) INTO v_new_student_suggestions FROM public.student_suggestions WHERE status = 'new';`),
+      normalizedSql.includes(`IF v_role = 'PRESIDENT' THEN\n    SELECT count(*) INTO v_new_student_suggestions FROM public.student_suggestions WHERE status = 'new';`),
       'Migration must count ALL student suggestions for PRESIDENT'
     );
 
     // 27. non-President workload SQL filters target_role
     assert.ok(
-      sqlContent.includes(`ELSE\n    SELECT count(*) INTO v_new_student_suggestions FROM public.student_suggestions WHERE target_role = v_role AND status = 'new';`),
+      normalizedSql.includes(`ELSE\n    SELECT count(*) INTO v_new_student_suggestions FROM public.student_suggestions WHERE target_role = v_role AND status = 'new';`),
       'Migration must count targeted student suggestions for non-PRESIDENT'
     );
   });
