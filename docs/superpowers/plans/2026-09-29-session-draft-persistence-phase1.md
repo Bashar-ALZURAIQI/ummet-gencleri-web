@@ -24,7 +24,7 @@
 
 The five highest-risk implementation failure classes mapped to concrete tests:
 1. **Data Leakage (Cross-User Restoration):** A new user logging in could accidentally restore a draft belonging to a previous session.
-   - *Test:* `tests/sessionDraftService.test.mjs` - `test_clearAllForUser_deletes_only_matched_user_prefix`
+   - *Test:* `tests/sessionDraftService.test.mjs` - `test_clearSessionDraftsForUser_deletes_only_matched_user_prefix`
 2. **Stale Closure Bugs (Data Loss):** Navigating away fast might capture a stale React state closure, causing the last keystrokes to disappear.
    - *Test:* Manual Check - Verify `pagehide` always flush latest React state ref accurately.
 3. **Escape/Focus Trapping Conflicts:** Adding a decision overlay could cause an Escape press to accidentally dismiss both the decision state and the outer editor entirely.
@@ -36,43 +36,96 @@ The five highest-risk implementation failure classes mapped to concrete tests:
 
 ---
 
+## Core API Interfaces
+
+### Session Draft Service API
+```typescript
+type LocatedSessionDraft<T> = {
+  key: string;
+  mode: 'create' | 'edit';
+  entityId?: string;
+  envelope: SessionDraftEnvelope<T>;
+};
+
+// Core storage operations
+export function buildSessionDraftKey(userId: string, feature: string, mode: 'create' | 'edit', entityId?: string): string;
+export function saveSessionDraft<T>(key: string, data: SessionDraftEnvelope<T>): void;
+export function loadSessionDraft<T>(key: string): SessionDraftEnvelope<T> | null;
+export function removeSessionDraft(key: string): void;
+export function clearSessionDraftsForUser(userId: string): void;
+
+// Open Draft Discovery
+export function findOpenSessionDraft<T>(userId: string, feature: string): LocatedSessionDraft<T> | null;
+```
+*Note on `findOpenSessionDraft`: Must return the newest by timestamp if multiple open drafts exist. Closed drafts are ignored.*
+
+### Hook API
+```typescript
+type DraftEntityValidation = 'unknown' | 'valid' | 'invalid';
+
+type SessionDraftUiState = {
+  activeLocale?: 'ar' | 'tr' | 'en';
+  activeTab?: string;
+  fileReselectionRequired?: boolean;
+};
+
+type UseSessionDraftOptions<T> = {
+  key: string | null; // null disables hook operations temporarily
+  userId: string | null;
+  defaultData: T;
+  defaultOpen?: boolean;
+  initialUi?: SessionDraftUiState;
+  validation?: DraftEntityValidation;
+  baselineFingerprint?: string;
+  isDirty: (value: T) => boolean;
+};
+
+type UseSessionDraftResult<T> = {
+  data: T;
+  setData: (data: T | ((prev: T) => T)) => void;
+  open: boolean;
+  ui: SessionDraftUiState;
+  setUi: (ui: SessionDraftUiState | ((prev: SessionDraftUiState) => SessionDraftUiState)) => void;
+  dirty: boolean;
+  isDecisionOpen: boolean;
+  requestClose: () => void;
+  continueEditing: () => void;
+  keepDraftAndClose: () => void;
+  discardDraftAndClose: () => void;
+  clearDraft: () => void; // Used heavily after successful submission
+};
+```
+
+---
+
 ## Task 1 — SessionDraftService domain foundation
 
-Create the storage abstraction that handles keys, envelopes, and safely falls back on failure without touching React.
+Create the storage abstraction that handles keys, envelopes, discovery, and safely falls back on failure without touching React.
 
 **Files Created:**
 - `src/domain/sessionDraft.ts`
 - `tests/sessionDraftService.test.mjs`
 
-**Responsibilities & API:**
-- Implement `buildSessionDraftKey(userId, feature, mode, entityId?)`
-- Implement `SessionDraftEnvelope<T>` type definition.
-- Implement `saveSessionDraft(key, data)`, `loadSessionDraft(key)`, `removeSessionDraft(key)` with robust try/catch around `sessionStorage`.
-- Implement `clearSessionDraftsForUser(userId)` string-prefix matching.
+**Responsibilities:**
+- Implement `buildSessionDraftKey`, `saveSessionDraft`, `loadSessionDraft`, `removeSessionDraft`, `clearSessionDraftsForUser`.
+- Implement `findOpenSessionDraft` that parses the prefix, finds `open=true` drafts, and selects the newest timestamp if multiple collide. Normalizes older ones to `open=false`.
 - Prevent serialization of `File`, `Blob`, and functions (enforce JSON safety).
 
 **TDD Steps:**
 - [ ] Write failing test `test_buildSessionDraftKey_outputs_exact_grammar` in `tests/sessionDraftService.test.mjs`
 - [ ] Run `node --test tests/sessionDraftService.test.mjs`
-- [ ] Expected: FAIL because `buildSessionDraftKey` is not implemented
+- [ ] Expected: FAIL because it doesn't exist
 - [ ] Implement `buildSessionDraftKey`
 - [ ] Run same test -> Expected: PASS
-- [ ] Write failing test `test_save_load_roundtrips_JSON_and_strips_invalid_data`
-- [ ] Run command
-- [ ] Expected: FAIL
-- [ ] Implement `saveSessionDraft` / `loadSessionDraft`
-- [ ] Run same test -> Expected: PASS
-- [ ] Write failing test `test_clearSessionDraftsForUser_deletes_only_matched_user_prefix`
-- [ ] Run command
-- [ ] Expected: FAIL
-- [ ] Implement `clearSessionDraftsForUser`
-- [ ] Run same test -> Expected: PASS
-- [ ] Write failing test `test_save_fails_gracefully_when_sessionStorage_throws`
-- [ ] Run command
-- [ ] Expected: FAIL
-- [ ] Implement robust try-catch
-- [ ] Run same test -> Expected: PASS
-- [ ] Run related regression tests
+- [ ] Write failing tests for `saveSessionDraft`, `loadSessionDraft`, `removeSessionDraft`, isolating user JSON payload.
+- [ ] Run command -> Expected: FAIL
+- [ ] Implement storage adapters with `try/catch`.
+- [ ] Run test -> Expected: PASS
+- [ ] Write failing tests for `findOpenSessionDraft` ensuring it finds open create drafts, extracts entity IDs from edit drafts, isolates users, and resolves timestamp conflicts deterministically.
+- [ ] Run command -> Expected: FAIL
+- [ ] Implement `findOpenSessionDraft`
+- [ ] Run test -> Expected: PASS
+- [ ] Run all regression tests
 - [ ] Commit `feat: add session draft storage foundation`
 
 ---
@@ -86,57 +139,62 @@ Extract the business logic into a pure module and create the reusable React hook
 - `tests/sessionDraftState.test.mjs`
 - `src/hooks/useSessionDraft.ts` (React glue)
 
-**Responsibilities & API:**
-- Define `DraftEntityValidation = 'unknown' | 'valid' | 'invalid';`
-- Extract pure functions like `computeDraftValidationState(...)` into `sessionDraftState.ts`.
-- Expose `[data, setData]` via `useState(() => loadSessionDraft(key))` for zero-flash lazy restoration.
-- Maintain a stable `latestRef` of the envelope for reliable unmount flushing.
+**Responsibilities:**
+- Define `DraftEntityValidation` and `SessionDraftUiState`.
+- Extract pure functions (like validation checking and dirty state computation) into `sessionDraftState.ts`.
+- Expose `useSessionDraft` hook matching the locked API interface.
 - Implement synchronous write-through (on `setData`, immediately invoke `saveSessionDraft`).
 - Wire `visibilitychange` (only when `document.visibilityState === 'hidden'`) and `pagehide` to force a final flush.
-- Manage the decision state (`isDecisionOpen`), ensuring it triggers only if `dirty`.
 
 **TDD Steps:**
 - [ ] Write failing test `test_validation_remains_unknown_if_missing_but_loading` in `tests/sessionDraftState.test.mjs`
 - [ ] Run `node --test tests/sessionDraftState.test.mjs`
 - [ ] Expected: FAIL
-- [ ] Implement `computeDraftValidationState`
+- [ ] Implement `computeDraftValidationState` in `sessionDraftState.ts`
 - [ ] Run same test -> Expected: PASS
 - [ ] Write failing test `test_validation_invalid_triggers_removal`
-- [ ] Run command
-- [ ] Expected: FAIL
+- [ ] Run command -> Expected: FAIL
 - [ ] Implement removal logic
 - [ ] Run same test -> Expected: PASS
-- [ ] Implement React glue (`useSessionDraft.ts`)
+- [ ] Implement `useSessionDraft.ts` React bindings according to locked API
+- [ ] Write integration test `test_hook_wiring_and_stale_validation` in `tests/sessionDraftIntegration.test.mjs`
+- [ ] Run `node --test tests/sessionDraftIntegration.test.mjs`
 - [ ] Commit `feat: add persistent session draft hook and state logic`
 
 ---
 
 ## Task 3 — UnsavedDraftDecision UI & Localization
 
-Add the internal decision overlay and the required AR/TR/EN translation keys.
+Add the internal decision overlay, update `CmsEntityTranslationTabs` to accept controlled properties, and add the required AR/TR/EN translation keys.
 
 **Files Created:**
 - `src/components/UnsavedDraftDecision.tsx`
 
 **Files Modified:**
+- `src/components/cmsLocalization/CmsEntityTranslationTabs.tsx`
 - `src/i18n/locales/ar.ts`
 - `src/i18n/locales/en.ts`
 - `src/i18n/locales/tr.ts`
 
 **Responsibilities:**
-- [ ] Add the 8 required localization strings (`drafts.unsavedTitle`, `drafts.keepDraft`, etc.) to `ar.ts`, `en.ts`, `tr.ts`.
-- [ ] Build `UnsavedDraftDecision` inside a basic HTML container, accepting `onContinue`, `onKeep`, `onDiscard` props.
-- [ ] Ensure buttons are fully localized.
-- [ ] Implement initial focus to the safest action ("Continue Editing").
+- Add the 8 required localization strings (`drafts.unsavedTitle`, `drafts.keepDraft`, etc.) to the 3 locale files.
+- Build `UnsavedDraftDecision` inside a basic HTML container, accepting `onContinue`, `onKeep`, `onDiscard` props.
+- Update `CmsEntityTranslationTabs` to support a controlled API: `activeTab?: 'ar' | LocalizedCmsLocale`, `onActiveTabChange?: (tab) => void`, and `preserveProvidedTranslations?: boolean`.
+- Ensure restored translations explicitly win over async CMS loads when `preserveProvidedTranslations` is active.
 
-**Commit:**
-`feat: add unsaved draft decision UI and locales`
+**TDD Steps:**
+- [ ] Write failing test `test_cms_translation_tabs_preserves_empty_string_over_async_load` in `tests/sessionDraftIntegration.test.mjs`
+- [ ] Run `node --test tests/sessionDraftIntegration.test.mjs` -> Expected: FAIL
+- [ ] Implement `CmsEntityTranslationTabs` controlled changes and precedence logic.
+- [ ] Run test -> Expected: PASS
+- [ ] Verify AR/TR/EN values render correctly in the browser manually.
+- [ ] Commit `feat: add unsaved draft decision UI, locales, and controlled tabs`
 
 ---
 
 ## Task 4 — Event editor integration
 
-Wire the Admin Events forms to the new draft architecture. Note: `modalOpen` and `editId` are explicitly EXCLUDED from `EventDraftData` because they are intrinsic to `SessionDraftEnvelope` and the hook keys.
+Wire the Admin Events forms to the new draft architecture and implement open draft discovery. Note: `modalOpen` and `editId` are explicitly EXCLUDED from `EventDraftData` because they are intrinsic to `SessionDraftEnvelope` and the hook keys.
 
 **Exact `EventDraftData` Shape:**
 ```typescript
@@ -151,21 +209,26 @@ Wire the Admin Events forms to the new draft architecture. Note: `modalOpen` and
 
 **Stale Validation Provider:**
 - President: Event ID exists in global `events` array => `valid`.
-- Non-President: Implement asynchronous loading state (`ownedEventIdsLoaded`). Before `listOwnEventIds()` resolves, validation = `unknown`. If loaded and event exists but not owned => `invalid`. If loaded and owned => `valid`.
+- Non-President: Relies on `ownedEventIdsLoaded` (or equivalent async state). Before `listOwnEventIds()` resolves, validation = `unknown`. If loaded and event exists but not owned => `invalid`. If loaded and owned => `valid`.
 
 **Files Modified:**
 - `src/pages/AdminDashboard.tsx`
 
 **Responsibilities:**
-- [ ] Connect `useSessionDraft` using `draft:v1:<userId>:admin:events:create` and `draft:v1:<userId>:admin:events:edit:<eventId>`.
-- [ ] Ensure `onClose` of the Event `<Modal>` is context-aware:
-  - If `decisionState` active: `Escape` or `backdrop` -> triggers "Continue Editing" (does not close modal).
-  - If `decisionState` inactive: `Escape` or `backdrop` -> triggers explicit close handler.
-- [ ] Render `<UnsavedDraftDecision>` inside the Modal body if decision active.
-- [ ] Successful submit clears the draft. Failed submit retains the draft.
+- On mount, invoke `findOpenSessionDraft(currentUser.userId, 'admin:events')` to discover if a previous draft was left open. Rehydrate the runtime `editId` directly from the discovered key.
+- Connect `useSessionDraft` with the appropriate key (create or edit).
+- Pass `ui.activeLocale` to `CmsEntityTranslationTabs` using the new controlled API.
+- Render `<UnsavedDraftDecision>` inside the Modal body if decision active.
+- Escape/backdrop trigger "Continue Editing" when decision active.
+- Successful submit clears the draft.
 
-**Commit:**
-`feat: persist event editor drafts`
+**TDD Steps:**
+- [ ] Write integration test `test_event_editor_uses_correct_feature_keys_and_validation` in `tests/sessionDraftIntegration.test.mjs`
+- [ ] Run `node --test tests/sessionDraftIntegration.test.mjs` -> Expected: FAIL
+- [ ] Implement `findOpenSessionDraft` lookup and hook integration in `EventsManagement`.
+- [ ] Run test -> Expected: PASS
+- [ ] Manually verify focus trapping and DOM interaction (Escape/Backdrop).
+- [ ] Commit `feat: persist event editor drafts`
 
 ---
 
@@ -185,25 +248,31 @@ Wire the Admin News forms to the new draft architecture.
 ```
 
 **Stale Validation Provider:**
-- Current user must still have access to `NewsTab`.
-- Restored entity must still exist in authoritative `news` data for edit mode. While `news` data is not confirmed loaded, validation = `unknown`.
+- Relies on `!contentLoading` from `AppContext` as the true readiness signal.
+- While `contentLoading === true`, validation = `unknown`.
+- When `contentLoading === false`: if entity exists in authoritative `news` => `valid`, otherwise => `invalid`.
 
 **Files Modified:**
 - `src/pages/AdminDashboard.tsx`
 
 **Responsibilities:**
-- [ ] Connect `useSessionDraft`.
-- [ ] Implement identical context-aware `onClose` behavior for the News `<Modal>`.
-- [ ] Successful submit explicitly invokes `clearDraft()`.
+- On mount, invoke `findOpenSessionDraft(currentUser.userId, 'admin:news')` to discover if a previous draft was left open.
+- Connect `useSessionDraft` and pass `ui.activeLocale` to `CmsEntityTranslationTabs`.
+- Successful submit explicitly invokes `clearDraft()`.
 
-**Commit:**
-`feat: persist news editor drafts`
+**TDD Steps:**
+- [ ] Write integration test `test_news_editor_uses_correct_readiness_signal` in `tests/sessionDraftIntegration.test.mjs`
+- [ ] Run `node --test tests/sessionDraftIntegration.test.mjs` -> Expected: FAIL
+- [ ] Implement News integration in `NewsManagement`.
+- [ ] Run test -> Expected: PASS
+- [ ] Manually verify AR/TR/EN translation restoration logic in browser.
+- [ ] Commit `feat: persist news editor drafts`
 
 ---
 
 ## Task 6 — Student Suggestion integration
 
-Wire the Student Suggestion composer to the draft architecture.
+Wire the Student Suggestion composer to the draft architecture without visible tab jumping.
 
 **Exact `StudentSuggestionDraftData` Shape:**
 ```typescript
@@ -211,19 +280,27 @@ Wire the Student Suggestion composer to the draft architecture.
   title, body, category, targetRole
 }
 ```
-*Note: The selected tab is tracked via `ui: { activeTab: 'suggestions' }` in the envelope, NOT in the data.*
 
 **Files Modified:**
 - `src/pages/StudentDashboard.tsx`
 
 **Responsibilities:**
-- [ ] Connect `useSessionDraft` using `draft:v1:<userId>:student:suggestion:create`.
-- [ ] Explicitly track `tab === 'suggestions'` as lightweight UI state inside the draft payload so returning to `StudentDashboard` forces the tab back.
-- [ ] Navigating away seamlessly triggers the `unmount` flush, saving the data.
-- [ ] Successful submit clears the suggestion draft.
+- Define `useSessionDraft` *before* the `tab` state initializer.
+- Read `ui.activeTab` from the hook synchronously on first render to initialize the React `tab` state cleanly:
+  ```typescript
+  const suggestionDraft = useSessionDraft<StudentSuggestionDraftData>(...);
+  const [tab, setTab] = useState<StudentPortalTabId>(() => (suggestionDraft.ui.activeTab as StudentPortalTabId) || 'activities');
+  ```
+- Navigating away seamlessly triggers the `unmount` flush, saving the data.
+- Successful submit clears the suggestion draft.
 
-**Commit:**
-`feat: persist student suggestion drafts`
+**TDD Steps:**
+- [ ] Write integration test `test_student_suggestion_uses_correct_key` in `tests/sessionDraftIntegration.test.mjs`
+- [ ] Run `node --test tests/sessionDraftIntegration.test.mjs` -> Expected: FAIL
+- [ ] Implement Student Suggestion integration.
+- [ ] Run test -> Expected: PASS
+- [ ] Manually verify Student selected suggestions tab restoration after real dashboard unmount (navigate to Home and back).
+- [ ] Commit `feat: persist student suggestion drafts`
 
 ---
 
@@ -235,58 +312,58 @@ Intercept the logout flow to defensively clear owned drafts.
 - `src/context/AppContext.tsx`
 
 **Responsibilities:**
-- [ ] Locate `const logout = async () => { ... }` in `AppContext.tsx`.
-- [ ] Retrieve `const currentUserId = currentUser?.userId;`.
-- [ ] If `currentUserId` is defined, strictly before/alongside `supabase.auth.signOut()`, invoke `SessionDraftService.clearSessionDraftsForUser(currentUserId)`.
-- [ ] Ensure this is highly defensive and does not crash the logout process if it fails.
+- Locate `const logout = async () => { ... }` in `AppContext.tsx`.
+- Retrieve `const currentUserId = currentUser?.userId;`.
+- Strictly before/alongside `supabase.auth.signOut()`, invoke `clearSessionDraftsForUser(currentUserId)` safely.
 
 **TDD Steps:**
-- [ ] Since `AppContext` involves React Context and Supabase integration, test manually by logging in, creating a draft, logging out, and checking `sessionStorage` in DevTools.
-- [ ] Commit: `fix: clear owned session drafts on logout`
+- [ ] Write integration test `test_logout_calls_clearSessionDraftsForUser_with_currentUserId` in `tests/sessionDraftIntegration.test.mjs`
+- [ ] Run `node --test tests/sessionDraftIntegration.test.mjs` -> Expected: FAIL
+- [ ] Implement cleanup logic.
+- [ ] Run test -> Expected: PASS
+- [ ] Commit `fix: clear owned session drafts on logout`
 
 ---
 
 ## Task 8 — Phase 1 integration/regression verification
 
-Execute final verification against the 33-point testing matrix.
+Execute final verification against the testing matrix.
 
 | # | Requirement | Task | Automated Test File/Test Name | Manual? |
 |---|---|---|---|---|
-| 1 | Draft survives component unmount/remount. | T4/T6 | N/A | Yes (DOM unmount testing) |
-| 2 | Draft survives internal page navigation. | T4/T6 | N/A | Yes (React Router testing) |
-| 3 | `open=true` draft auto-reopens correctly upon returning. | T2 | `tests/sessionDraftState.test.mjs` - `test_open_true_restoration` | No |
+| 1 | Draft survives component unmount/remount. | T4/T6 | N/A | Yes |
+| 2 | Draft survives internal page navigation. | T4/T6 | N/A | Yes |
+| 3 | `open=true` draft auto-reopens correctly upon returning. | T1 | `tests/sessionDraftService.test.mjs` - `test_findOpenSessionDraft_discovers_open_create` | No |
 | 4 | Exact form string/boolean values restore correctly. | T1 | `tests/sessionDraftService.test.mjs` - `test_save_load_roundtrips_JSON` | No |
 | 5 | AR/TR/EN translation payloads restore accurately. | T1 | `tests/sessionDraftService.test.mjs` - `test_save_load_roundtrips_JSON` | No |
-| 6 | Active translation locale tab restores seamlessly. | T4/T5 | N/A | Yes (UI check) |
+| 6 | Active translation locale tab restores seamlessly. | T4/T5 | N/A | Yes |
 | 7 | Create and Edit keys categorically cannot collide. | T1 | `tests/sessionDraftService.test.mjs` - `test_key_builder_separates_create_edit` | No |
 | 8 | Edit Entity A and Edit Entity B keys cannot collide. | T1 | `tests/sessionDraftService.test.mjs` - `test_key_builder_separates_entities` | No |
-| 9 | User A cannot read, restore, or access User B's draft. | T1 | `tests/sessionDraftService.test.mjs` - `test_key_builder_isolates_users` | No |
-| 10 | Successful form submission automatically clears the draft. | T4/T6 | N/A | Yes (Submit flow integration) |
-| 11 | Failed form submission safely keeps the draft. | T4/T6 | N/A | Yes (Submit flow integration) |
+| 9 | User A cannot read, restore, or access User B's draft. | T1 | `tests/sessionDraftService.test.mjs` - `test_findOpenSessionDraft_isolates_users` | No |
+| 10 | Successful form submission automatically clears the draft. | T4/T6 | N/A | Yes |
+| 11 | Failed form submission safely keeps the draft. | T4/T6 | N/A | Yes |
 | 12 | Dirty explicit close transitions accurately to decision state. | T2 | `tests/sessionDraftState.test.mjs` - `test_dirty_close_enters_decision` | No |
 | 13 | "Continue Editing" successfully keeps the editor open. | T2 | `tests/sessionDraftState.test.mjs` - `test_continue_action_keeps_open` | No |
 | 14 | "Keep Draft" closes the editor + retains data + saves `open=false`. | T2 | `tests/sessionDraftState.test.mjs` - `test_keep_action_closes_and_saves` | No |
-| 15 | Manually invoking Add/Edit for a saved closed draft rehydrates. | T4/T6 | N/A | Yes (Manual UI check) |
+| 15 | Manually invoking Add/Edit for a saved closed draft rehydrates. | T4/T6 | N/A | Yes |
 | 16 | "Discard Draft" clears the data and closes the editor. | T2 | `tests/sessionDraftState.test.mjs` - `test_discard_action_clears_data` | No |
 | 17 | Pristine close bypasses the decision prompt entirely. | T2 | `tests/sessionDraftState.test.mjs` - `test_pristine_close_bypasses_decision` | No |
-| 18 | Explicit logout successfully clears owned drafts. | T7 | N/A | Yes (Logout flow integration) |
+| 18 | Explicit logout successfully clears owned drafts. | T7 | `tests/sessionDraftIntegration.test.mjs` - `test_logout_calls_clearSessionDraftsForUser_with_currentUserId` | No |
 | 19 | Malformed JSON handles safely and does not crash the UI. | T1 | `tests/sessionDraftService.test.mjs` - `test_load_handles_malformed_JSON` | No |
-| 20 | `sessionStorage` unavailable/throws degrades gracefully. | T1 | `tests/sessionDraftService.test.mjs` - `test_save_fails_gracefully` | No |
+| 20 | `sessionStorage` unavailable/throws degrades gracefully. | T1 | `tests/sessionDraftService.test.mjs` - `test_save_fails_gracefully_when_sessionStorage_throws` | No |
 | 21 | Confirmation/read-only modals are proven to bypass persistence. | N/A | N/A (Excluded by design) | Yes |
 | 22 | Passwords/tokens/security data are proven to bypass persistence. | N/A | N/A (Excluded by design) | Yes |
 | 23 | `File`, `Blob`, and runtime objects are never serialized. | T1 | `tests/sessionDraftService.test.mjs` - `test_strips_invalid_data` | No |
-| 24 | Stale edit draft patiently waits while validation is `unknown`. | T2 | `tests/sessionDraftState.test.mjs` - `test_validation_remains_unknown` | No |
+| 24 | Stale edit draft patiently waits while validation is `unknown`. | T2 | `tests/sessionDraftState.test.mjs` - `test_validation_remains_unknown_if_missing_but_loading` | No |
 | 25 | Stale deleted/unauthorized edit draft is removed strictly only after `invalid` is confirmed. | T2 | `tests/sessionDraftState.test.mjs` - `test_validation_invalid_triggers_removal` | No |
-| 26 | Visibility/pagehide flush always uses the latest value. | T2 | N/A | Yes (Browser event integration) |
-| 27 | Restored modal does not flash an empty state before hydration. | T2 | N/A | Yes (Lazy init visual check) |
+| 26 | Visibility/pagehide flush always uses the latest value. | T2 | N/A | Yes |
+| 27 | Restored modal does not flash an empty state before hydration. | T2 | N/A | Yes |
 | 28 | Separate browser tabs naturally maintain isolated `sessionStorage`. | T1 | N/A (Native browser feature) | Yes |
-| 29 | Current push/notification behavior remains entirely unaffected. | T8 | N/A | Yes (Regression check) |
-| 30 | Current structural submit and validation behavior remains intact. | T8 | N/A | Yes (Regression check) |
-| 31 | Escape key press while decision state is active safely returns to the editor. | T4/T5 | N/A | Yes (DOM Event check) |
-| 32 | Backdrop click while decision state is active safely returns to the editor. | T4/T5 | N/A | Yes (DOM Event check) |
-| 33 | Neither Escape nor backdrop actions while in decision state clear the draft. | T4/T5 | N/A | Yes (DOM Event check) |
-
-*(Also explicitly test managed asset references vs. local File objects to guarantee integrity manually).*
+| 29 | Current push/notification behavior remains entirely unaffected. | T8 | N/A | Yes |
+| 30 | Current structural submit and validation behavior remains intact. | T8 | N/A | Yes |
+| 31 | Escape key press while decision state is active safely returns to the editor. | T4/T5 | N/A | Yes |
+| 32 | Backdrop click while decision state is active safely returns to the editor. | T4/T5 | N/A | Yes |
+| 33 | Neither Escape nor backdrop actions while in decision state clear the draft. | T4/T5 | N/A | Yes |
 
 Execute required scripts:
 ```bash
