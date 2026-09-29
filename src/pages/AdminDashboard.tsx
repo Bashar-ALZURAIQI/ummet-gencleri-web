@@ -52,6 +52,10 @@ import { getPendingApplicationBadge } from '../domain/applicationEmailWorkflow';
 import type { ActivityType } from '../domain/internalEconomyTypes.ts';
 import { toDateTimeLocalValue } from '../domain/internalEconomyInteraction.ts';
 import { canCreateExecutiveContent, canManageExcuses, canManageMemberPoints, canManageOversight, canManageTasks } from '../domain/phaseThreeEconomy.ts';
+import { useSessionDraft } from '../hooks/useSessionDraft.ts';
+import { findOpenSessionDraft, buildSessionDraftKey } from '../domain/sessionDraft.ts';
+import type { DraftEntityValidation } from '../domain/sessionDraftState.ts';
+import { UnsavedDraftDecision } from '../components/UnsavedDraftDecision.tsx';
 
 import {
   categoryLabels, categoryColors, applicationStatusLabels, applicationStatusColors,
@@ -2200,6 +2204,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
             <button type="submit" className="btn-primary"><Save className="h-4 w-4" /> {editingMedia ? t('admin.gallery.mediaModal.saveChanges', 'حفظ التعديلات') : t('admin.gallery.mediaModal.add', 'إضافة')}</button>
           </div>
         </form>
+        )}
       </Modal>
     </div>
   );
@@ -2211,42 +2216,123 @@ function EventsTab({ events, currentUser }: {
   currentUser: ReturnType<typeof useApp>['currentUser'];
 }) {
   const { t } = useTranslation();
-  const { uploadManagedFile, savePublishedSiteTarget, createPublishedEvent, updateOwnedEvent, deleteOwnedEvent, listOwnEventIds, refreshPublishedLocalizations } = useApp();
+  const { contentLoading, uploadManagedFile, savePublishedSiteTarget, createPublishedEvent, updateOwnedEvent, deleteOwnedEvent, listOwnEventIds, refreshPublishedLocalizations } = useApp();
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [ownedEventIds, setOwnedEventIds] = useState<Set<string>>(new Set());
+  const [ownedEventIdsLoaded, setOwnedEventIdsLoaded] = useState(false);
   const [search, setSearch] = useState('');
   const [invalid, setInvalid] = useState<string[]>([]);
   const [toast, setToast] = useState<ToastMessage | null>(null);
-  const [form, setForm] = useState({
-    title: '', category: '' as EventCategory, date: '', time: '16:00',
-    location: '', description: '', capacity: 50, status: '' as 'upcoming' | 'past',
-    image: '', eventUrl: '', activityType: 'OPTIONAL' as ActivityType,
-    pointsValue: 0, registrationDeadline: '',
-  });
 
-  const repository = useCmsLocalizationRepository();
-  const [translations, setTranslations] = useState<Record<LocalizedCmsLocale, Record<string, string>>>({
-    tr: { title: '', description: '', location: '' },
-    en: { title: '', description: '', location: '' },
-  });
-
-  // Scoped access: the president manages all events; every other executive
-  // member sees, edits and deletes only the events their role created
-  // (`createdByRole == currentUser.role`). Other committees' events stay
-  // invisible inside the member's personal dashboard.
   const isPresident = currentUser?.role === 'PRESIDENT';
   const canCreate = canCreateExecutiveContent(currentUser?.role);
+
+  const repository = useCmsLocalizationRepository();
+
+  useEffect(() => {
+    if (currentUser?.userId) {
+      const openDraft = findOpenSessionDraft(currentUser.userId, 'admin:events');
+      if (openDraft) {
+        if (openDraft.mode === 'edit') {
+          setEditId(openDraft.entityId ?? null);
+        } else {
+          setEditId(null);
+        }
+        setModalOpen(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (canCreate && !isPresident) {
       listOwnEventIds().then(res => {
         if (res.ok && res.data) {
           setOwnedEventIds(new Set(res.data));
+          setOwnedEventIdsLoaded(true);
         }
       });
+    } else if (isPresident) {
+      setOwnedEventIdsLoaded(true);
     }
   }, [canCreate, isPresident, listOwnEventIds]);
+
+  let validation: DraftEntityValidation = 'unknown';
+  if (contentLoading) {
+    validation = 'unknown';
+  } else if (editId) {
+    if (isPresident) {
+      validation = events.some(e => e.id === editId) ? 'valid' : 'invalid';
+    } else {
+      if (!ownedEventIdsLoaded) {
+        validation = 'unknown';
+      } else {
+        const exists = events.some(e => e.id === editId);
+        validation = exists && ownedEventIds.has(editId) ? 'valid' : 'invalid';
+      }
+    }
+  } else {
+    validation = 'valid';
+  }
+
+  const draftKey = modalOpen && currentUser?.userId
+    ? buildSessionDraftKey(currentUser.userId, 'admin:events', editId ? 'edit' : 'create', editId ?? undefined)
+    : null;
+
+  type EventDraftData = {
+    form: { title: string; category: EventCategory | ''; date: string; time: string; location: string; description: string; capacity: number; status: 'upcoming' | 'past' | ''; image: string; eventUrl: string; activityType: ActivityType | string; pointsValue: number; registrationDeadline: string; };
+    translations: Record<LocalizedCmsLocale, Record<string, string>>;
+  };
+
+  const defaultDraftData: EventDraftData = useMemo(() => {
+    if (editId) {
+      const e = events.find(ev => ev.id === editId);
+      if (e) {
+        const d = new Date(e.date);
+        return {
+          form: {
+            title: e.title, category: e.category, date: e.date.slice(0, 10), time: d.toTimeString().slice(0, 5),
+            location: e.location, description: e.description, capacity: e.capacity, status: e.status, image: e.image,
+            eventUrl: e.eventUrl ?? '',
+            activityType: e.activityType ?? 'OPTIONAL', pointsValue: e.pointsValue ?? 0,
+            registrationDeadline: toDateTimeLocalValue(e.registrationDeadline ?? e.date),
+          },
+          translations: {
+            tr: { title: '', description: '', location: '' },
+            en: { title: '', description: '', location: '' },
+          }
+        };
+      }
+    }
+    return {
+      form: { title: '', category: '', date: '', time: '16:00', location: '', description: '', capacity: 50, status: '', image: '', eventUrl: '', activityType: 'OPTIONAL', pointsValue: 0, registrationDeadline: '' },
+      translations: {
+        tr: { title: '', description: '', location: '' },
+        en: { title: '', description: '', location: '' },
+      }
+    };
+  }, [editId, events]);
+
+  const draft = useSessionDraft<EventDraftData>({
+    key: draftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: defaultDraftData,
+    validation,
+    baselineFingerprint: editId ? `${editId}-${events.find(e => e.id === editId)?.date}` : 'create',
+    isDirty: (d) => JSON.stringify(d) !== JSON.stringify(defaultDraftData),
+  });
+
+  const form = draft.data.form;
+  const setForm = (updater: any) => draft.setData(prev => ({ ...prev, form: typeof updater === 'function' ? updater(prev.form) : updater }));
+  const translations = draft.data.translations;
+  const setTranslations = (updater: any) => draft.setData(prev => ({ ...prev, translations: typeof updater === 'function' ? updater(prev.translations) : updater }));
+
+  useEffect(() => {
+    if (modalOpen && !draft.open) {
+      setModalOpen(false);
+    }
+  }, [modalOpen, draft.open]);
 
   const visibleEvents =
     isPresident || !currentUser
@@ -2255,28 +2341,11 @@ function EventsTab({ events, currentUser }: {
 
   const openAdd = () => {
     setEditId(null);
-    setForm({ title: '', category: '' as EventCategory, date: '', time: '16:00', location: '', description: '', capacity: 50, status: '' as 'upcoming' | 'past', image: '', eventUrl: '', activityType: 'OPTIONAL', pointsValue: 0, registrationDeadline: '' });
-    setTranslations({
-      tr: { title: '', description: '', location: '' },
-      en: { title: '', description: '', location: '' },
-    });
     setModalOpen(true);
   };
 
   const openEdit = (e: UEvent) => {
     setEditId(e.id);
-    const d = new Date(e.date);
-    setForm({
-      title: e.title, category: e.category, date: e.date.slice(0, 10), time: d.toTimeString().slice(0, 5),
-      location: e.location, description: e.description, capacity: e.capacity, status: e.status, image: e.image,
-      eventUrl: e.eventUrl ?? '',
-      activityType: e.activityType ?? 'OPTIONAL', pointsValue: e.pointsValue ?? 0,
-      registrationDeadline: toDateTimeLocalValue(e.registrationDeadline ?? e.date),
-    });
-    setTranslations({
-      tr: { title: '', description: '', location: '' },
-      en: { title: '', description: '', location: '' },
-    });
     setModalOpen(true);
   };
 
@@ -2335,7 +2404,7 @@ function EventsTab({ events, currentUser }: {
       }
       await refreshPublishedLocalizations();
     }
-    setModalOpen(false);
+    draft.clearDraft();
     setToast({ id: Date.now(), type: 'success', text: t('admin.events.savedSuccess', 'تم حفظ الفعالية وإعدادات التسجيل الدائم.') });
   };
 
@@ -2429,7 +2498,14 @@ function EventsTab({ events, currentUser }: {
         <InternalTaskCreationPanel />
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editId ? t('admin.events.modal.editTitle', 'تعديل الفعالية') : t('admin.events.modal.addTitle', 'إضافة فعالية جديدة')} maxWidth="max-w-xl">
+      <Modal open={modalOpen} onClose={draft.requestClose} title={editId ? t('admin.events.modal.editTitle', 'تعديل الفعالية') : t('admin.events.modal.addTitle', 'إضافة فعالية جديدة')} maxWidth="max-w-xl">
+        {draft.isDecisionOpen ? (
+          <UnsavedDraftDecision
+            onContinue={draft.continueEditing}
+            onKeep={draft.keepDraftAndClose}
+            onDiscard={draft.discardDraftAndClose}
+          />
+        ) : (
         <form onSubmit={save} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -2504,6 +2580,8 @@ function EventsTab({ events, currentUser }: {
           <CmsEntityTranslationTabs
             target="events"
             recordId={editId}
+            activeTab={draft.ui.activeLocale as any}
+            onActiveTabChange={(t) => draft.setUi(prev => ({...prev, activeLocale: t as 'ar' | 'tr' | 'en'}))}
             onPublishOverride={async (loc, fields) => {
               if (!editId) return;
               await repository.publishOwnedEventLocalization(editId, loc, fields);

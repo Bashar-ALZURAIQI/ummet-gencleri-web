@@ -20,3 +20,15 @@ test('test_cms_translation_tabs_preserves_empty_string_over_async_load', () => {
     'Should guard CMS field loading with if (!preserveProvidedTranslations)'
   );
 });
+
+// Task 4: Event editor uses correct feature keys and validation with contentLoading
+test('test_event_editor_uses_correct_feature_keys_and_validation_with_contentLoading', () => {
+  const adminDashboardPath = path.resolve('src/pages/AdminDashboard.tsx');
+  const source = fs.readFileSync(adminDashboardPath, 'utf8');
+
+  assert.ok(source.includes("findOpenSessionDraft(currentUser.userId, 'admin:events')"));
+  assert.ok(source.includes("buildSessionDraftKey(currentUser.userId, 'admin:events'"));
+  assert.ok(source.includes("validation = 'unknown'"));
+  assert.ok(source.includes("ownedEventIdsLoaded"));
+  assert.ok(source.includes("if (contentLoading) {"));
+});
