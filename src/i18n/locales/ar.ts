@@ -1502,6 +1502,16 @@ const ar = {
     nameRequired: 'يرجى إدخال الاسم الكامل.',
     confirmDeleteAvatar: 'هل تريد حذف الصورة الشخصية الحالية؟',
   },
+  drafts: {
+    unsavedTitle: 'توجد مسودة غير محفوظة',
+    unsavedDescription: 'هل ترغب في متابعة التعديل أو حفظ المسودة للعودة إليها لاحقاً؟',
+    continueEditing: 'متابعة التعديل',
+    keepDraft: 'حفظ كمسودة وإغلاق',
+    discardDraft: 'تجاهل التعديلات وإغلاق',
+    restored: 'تم استعادة المسودة بنجاح.',
+    staleDiscarded: 'تم إزالة المسودة لعدم صلاحيتها.',
+    fileReselectionRequired: 'يرجى إعادة اختيار الملفات.',
+  },
   cmsLocalization: {
     status: {
       fresh: 'طازجة ✓',

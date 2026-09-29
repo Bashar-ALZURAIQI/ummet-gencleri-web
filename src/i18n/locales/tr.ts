@@ -1500,6 +1500,16 @@ const tr: TranslationSchema = {
     nameRequired: 'Lütfen tam adınızı girin.',
     confirmDeleteAvatar: 'Mevcut profil fotoğrafını silmek istiyor musunuz?',
   },
+  drafts: {
+    unsavedTitle: 'Kaydedilmemiş Taslak Var',
+    unsavedDescription: 'Düzenlemeye devam etmek mi yoksa daha sonra geri dönmek üzere taslağı saklamak mı istersiniz?',
+    continueEditing: 'Düzenlemeye Devam Et',
+    keepDraft: 'Taslağı Sakla ve Kapat',
+    discardDraft: 'Değişiklikleri Sil ve Kapat',
+    restored: 'Taslak başarıyla geri yüklendi.',
+    staleDiscarded: 'Geçersiz taslak silindi.',
+    fileReselectionRequired: 'Lütfen dosyaları yeniden seçin.',
+  },
   cmsLocalization: {
     status: {
       fresh: 'Güncel ✓',

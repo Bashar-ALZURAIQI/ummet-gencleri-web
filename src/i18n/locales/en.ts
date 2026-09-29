@@ -1500,6 +1500,16 @@ const en: TranslationSchema = {
     nameRequired: 'Please enter your full name.',
     confirmDeleteAvatar: 'Do you want to delete the current profile photo?',
   },
+  drafts: {
+    unsavedTitle: 'Unsaved Draft Exists',
+    unsavedDescription: 'Would you like to continue editing or keep the draft to return to it later?',
+    continueEditing: 'Continue Editing',
+    keepDraft: 'Keep Draft & Close',
+    discardDraft: 'Discard Changes & Close',
+    restored: 'Draft restored successfully.',
+    staleDiscarded: 'Stale draft discarded.',
+    fileReselectionRequired: 'Please reselect files.',
+  },
   cmsLocalization: {
     status: {
       fresh: 'Up to date ✓',

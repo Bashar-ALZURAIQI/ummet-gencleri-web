@@ -41,6 +41,9 @@ export interface CmsEntityTranslationTabsProps {
   onDraftSaved?: (locale: LocalizedCmsLocale) => void;
   onPublishOverride?: (locale: LocalizedCmsLocale, fields: Record<string, string>) => Promise<void>;
   onPublished?: (locale: LocalizedCmsLocale) => void;
+  activeTab?: 'ar' | LocalizedCmsLocale;
+  onActiveTabChange?: (tab: 'ar' | LocalizedCmsLocale) => void;
+  preserveProvidedTranslations?: boolean;
   children: ReactNode;
 }
 
@@ -94,6 +97,9 @@ export function CmsEntityTranslationTabs({
   onDraftSaved,
   onPublishOverride,
   onPublished,
+  activeTab: controlledActiveTab,
+  onActiveTabChange,
+  preserveProvidedTranslations,
   children,
 }: CmsEntityTranslationTabsProps) {
   const { t } = useTranslation();
@@ -103,7 +109,13 @@ export function CmsEntityTranslationTabs({
     ? canPublish
     : Boolean(canEdit);
 
-  const [activeTab, setActiveTab] = useState<'ar' | LocalizedCmsLocale>('ar');
+  const [internalActiveTab, setInternalActiveTab] = useState<'ar' | LocalizedCmsLocale>('ar');
+  const activeTab = controlledActiveTab !== undefined ? controlledActiveTab : internalActiveTab;
+  
+  const handleTabChange = (tab: 'ar' | LocalizedCmsLocale) => {
+    setInternalActiveTab(tab);
+    onActiveTabChange?.(tab);
+  };
   const [trStatus, setTrStatus] = useState<LocaleStatusState>(createInitialStatusState);
   const [enStatus, setEnStatus] = useState<LocaleStatusState>(createInitialStatusState);
 
@@ -147,14 +159,16 @@ export function CmsEntityTranslationTabs({
       setEnStatus(enLoaded.statusState);
 
       // Populate translations for existing record if not already modified
-      for (const [k, v] of Object.entries(trLoaded.loadedFields)) {
-        if (!translations.tr[k]) {
-          onTranslationChange('tr', k, v);
+      if (!preserveProvidedTranslations) {
+        for (const [k, v] of Object.entries(trLoaded.loadedFields)) {
+          if (!translations.tr[k]) {
+            onTranslationChange('tr', k, v);
+          }
         }
-      }
-      for (const [k, v] of Object.entries(enLoaded.loadedFields)) {
-        if (!translations.en[k]) {
-          onTranslationChange('en', k, v);
+        for (const [k, v] of Object.entries(enLoaded.loadedFields)) {
+          if (!translations.en[k]) {
+            onTranslationChange('en', k, v);
+          }
         }
       }
     }
@@ -271,7 +285,7 @@ const saved = await saveCmsEntityDraft({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setActiveTab('ar')}
+            onClick={() => handleTabChange('ar')}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
               activeTab === 'ar'
                 ? 'bg-white text-navy-900 shadow-sm'
@@ -284,7 +298,7 @@ const saved = await saveCmsEntityDraft({
 
           <button
             type="button"
-            onClick={() => setActiveTab('tr')}
+            onClick={() => handleTabChange('tr')}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
               activeTab === 'tr'
                 ? 'bg-white text-navy-900 shadow-sm'
@@ -297,7 +311,7 @@ const saved = await saveCmsEntityDraft({
 
           <button
             type="button"
-            onClick={() => setActiveTab('en')}
+            onClick={() => handleTabChange('en')}
             className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
               activeTab === 'en'
                 ? 'bg-white text-navy-900 shadow-sm'
