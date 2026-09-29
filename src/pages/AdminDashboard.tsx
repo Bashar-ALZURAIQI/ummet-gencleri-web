@@ -2062,7 +2062,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
             }}
             translations={translations}
             onTranslationChange={(loc, name, val) => {
-              setTranslations((prev) => ({
+              setTranslations((prev: any) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
               }));
@@ -2204,7 +2204,6 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
             <button type="submit" className="btn-primary"><Save className="h-4 w-4" /> {editingMedia ? t('admin.gallery.mediaModal.saveChanges', 'حفظ التعديلات') : t('admin.gallery.mediaModal.add', 'إضافة')}</button>
           </div>
         </form>
-        )}
       </Modal>
     </div>
   );
@@ -2281,7 +2280,7 @@ function EventsTab({ events, currentUser }: {
     : null;
 
   type EventDraftData = {
-    form: { title: string; category: EventCategory | ''; date: string; time: string; location: string; description: string; capacity: number; status: 'upcoming' | 'past' | ''; image: string; eventUrl: string; activityType: ActivityType | string; pointsValue: number; registrationDeadline: string; };
+    form: { title: string; category: EventCategory; date: string; time: string; location: string; description: string; capacity: number; status: 'upcoming' | 'past'; image: string; eventUrl: string; activityType: ActivityType; pointsValue: number; registrationDeadline: string; };
     translations: Record<LocalizedCmsLocale, Record<string, string>>;
   };
 
@@ -2306,7 +2305,7 @@ function EventsTab({ events, currentUser }: {
       }
     }
     return {
-      form: { title: '', category: '', date: '', time: '16:00', location: '', description: '', capacity: 50, status: '', image: '', eventUrl: '', activityType: 'OPTIONAL', pointsValue: 0, registrationDeadline: '' },
+      form: { title: '', category: '' as EventCategory, date: '', time: '16:00', location: '', description: '', capacity: 50, status: '' as 'upcoming' | 'past', image: '', eventUrl: '', activityType: 'OPTIONAL' as ActivityType, pointsValue: 0, registrationDeadline: '' },
       translations: {
         tr: { title: '', description: '', location: '' },
         en: { title: '', description: '', location: '' },
@@ -2556,7 +2555,7 @@ function EventsTab({ events, currentUser }: {
             error={isInvalid(invalid, 'image') ? t('admin.events.modal.imageError', 'يرجى رفع صورة الفعالية قبل الحفظ.') : null}
             onUpload={(file, onProgress) => uploadManagedFile('event-image', file, onProgress)}
             onUploaded={(asset) => {
-              setForm((current) => ({ ...current, image: asset.publicUrl }));
+              setForm((current: any) => ({ ...current, image: asset.publicUrl }));
               clearInvalid(setInvalid, 'image');
             }}
           />
@@ -2615,7 +2614,7 @@ function EventsTab({ events, currentUser }: {
             canPublish={canCreate && (!editId || isPresident || ownedEventIds.has(editId))}
             translations={translations}
             onTranslationChange={(loc, name, val) => {
-              setTranslations((prev) => ({
+              setTranslations((prev: any) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
               }));
@@ -2640,6 +2639,7 @@ function EventsTab({ events, currentUser }: {
             <button type="submit" className="btn-primary"><CheckCircle2 className="h-4 w-4" /> {editId ? t('admin.events.modal.saveChanges', 'حفظ التعديلات') : t('common.add', 'إضافة')}</button>
           </div>
         </form>
+        )}
       </Modal>
       <TransientToast message={toast} onClose={() => setToast(null)} />
     </div>

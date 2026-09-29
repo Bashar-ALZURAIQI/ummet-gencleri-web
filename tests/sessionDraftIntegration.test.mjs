@@ -19,6 +19,25 @@ test('test_cms_translation_tabs_preserves_empty_string_over_async_load', () => {
     componentSource.includes('if (!preserveProvidedTranslations) {'),
     'Should guard CMS field loading with if (!preserveProvidedTranslations)'
   );
+
+  // activeTab API
+  assert.ok(
+    componentSource.includes("activeTab?: 'ar' | LocalizedCmsLocale;"),
+    'Should declare activeTab prop'
+  );
+  assert.ok(
+    componentSource.includes("onActiveTabChange?: (tab: 'ar' | LocalizedCmsLocale) => void;"),
+    'Should declare onActiveTabChange prop'
+  );
+});
+
+// Task 3: UnsavedDraftDecision uses localization
+test('test_unsaved_draft_decision_uses_localization', () => {
+  const componentPath = path.resolve('src/components/UnsavedDraftDecision.tsx');
+  const componentSource = fs.readFileSync(componentPath, 'utf8');
+  assert.ok(componentSource.includes("const { t } = useTranslation();"));
+  assert.ok(componentSource.includes("t('drafts.unsavedTitle')"));
+  assert.ok(componentSource.includes("t('drafts.continueEditing')"));
 });
 
 // Task 4: Event editor uses correct feature keys and validation with contentLoading
@@ -26,9 +45,33 @@ test('test_event_editor_uses_correct_feature_keys_and_validation_with_contentLoa
   const adminDashboardPath = path.resolve('src/pages/AdminDashboard.tsx');
   const source = fs.readFileSync(adminDashboardPath, 'utf8');
 
+  // admin:events create key and entity-scoped edit key
+  assert.ok(source.includes("buildSessionDraftKey(currentUser.userId, 'admin:events', editId ? 'edit' : 'create', editId ?? undefined)"));
+
+  // editId not persisted inside EventDraftData
+  assert.ok(!source.includes("form: { editId"));
+
+  // modalOpen not persisted inside EventDraftData
+  assert.ok(!source.includes("form: { modalOpen"));
+
+  // contentLoading => unknown
+  assert.ok(source.includes("if (contentLoading) {\n    validation = 'unknown';"));
+
+  // non-President ownership readiness => unknown
+  assert.ok(source.includes("if (!ownedEventIdsLoaded) {\n        validation = 'unknown';"));
+
+  // successful submit clears exact draft
+  assert.ok(source.includes("draft.clearDraft();"));
+
+  // activeLocale wired to draft UI
+  assert.ok(source.includes("activeTab={draft.ui.activeLocale as any}"));
+  assert.ok(source.includes("onActiveTabChange={(t) => draft.setUi(prev => ({...prev, activeLocale: t as 'ar' | 'tr' | 'en'}))}"));
+
+  // findOpenSessionDraft used
   assert.ok(source.includes("findOpenSessionDraft(currentUser.userId, 'admin:events')"));
-  assert.ok(source.includes("buildSessionDraftKey(currentUser.userId, 'admin:events'"));
-  assert.ok(source.includes("validation = 'unknown'"));
-  assert.ok(source.includes("ownedEventIdsLoaded"));
-  assert.ok(source.includes("if (contentLoading) {"));
+
+  // decision rendered inside existing Modal
+  assert.ok(source.includes("<Modal open={modalOpen} onClose={draft.requestClose}"));
+  assert.ok(source.includes("{draft.isDecisionOpen ? ("));
+  assert.ok(source.includes("<UnsavedDraftDecision"));
 });
