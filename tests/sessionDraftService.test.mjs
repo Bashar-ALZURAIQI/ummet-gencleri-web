@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import {
-  buildSessionDraftKey,
-  saveSessionDraft,
-  loadSessionDraft,
-  removeSessionDraft,
+import { 
+  buildSessionDraftKey, 
+  saveSessionDraft, 
+  loadSessionDraft, 
+  removeSessionDraft, 
   clearSessionDraftsForUser,
   findOpenSessionDraft,
   parseSessionDraftKey
@@ -13,26 +13,26 @@ import {
 // Fake Storage
 const mockStorage = {
   store: new Map(),
-  getItem(key) {
+  getItem(key) { 
     if (this.shouldThrowGetItem) throw new Error('getItem failed');
-    return this.store.get(key) || null;
+    return this.store.get(key) || null; 
   },
-  setItem(key, value) {
+  setItem(key, value) { 
     if (this.shouldThrowSetItem) throw new Error('Quota exceeded');
-    this.store.set(key, String(value));
+    this.store.set(key, String(value)); 
   },
-  removeItem(key) {
+  removeItem(key) { 
     if (this.shouldThrowRemoveItem) throw new Error('removeItem failed');
-    this.store.delete(key);
+    this.store.delete(key); 
   },
   clear() { this.store.clear(); },
-  get length() {
+  get length() { 
     if (this.shouldThrowLength) throw new Error('length failed');
-    return this.store.size;
+    return this.store.size; 
   },
-  key(index) {
+  key(index) { 
     if (this.shouldThrowKey) throw new Error('key failed');
-    return Array.from(this.store.keys())[index] || null;
+    return Array.from(this.store.keys())[index] || null; 
   },
   resetThrows() {
     this.shouldThrowGetItem = false;
@@ -83,12 +83,34 @@ test('test_buildSessionDraftKey_separates_entities', () => {
 });
 
 test('test_buildSessionDraftKey_rejects_unsafe_delimiters', () => {
-  assert.throws(() => buildSessionDraftKey('user:1', 'feature', 'create'), /Delimiter not allowed/);
-  assert.throws(() => buildSessionDraftKey('user1', 'feature', 'edit', 'entity:1'), /Delimiter not allowed/);
+  assert.throws(() => buildSessionDraftKey('user:1', 'feature', 'create'), /Invalid userId/);
+  assert.throws(() => buildSessionDraftKey('user1', 'feature', 'edit', 'entity:1'), /Invalid entityId/);
+});
+
+test('test_buildSessionDraftKey_rejects_empty_userId', () => {
+  assert.throws(() => buildSessionDraftKey('', 'feature', 'create'), /Invalid userId/);
+});
+
+test('test_buildSessionDraftKey_rejects_empty_feature', () => {
+  assert.throws(() => buildSessionDraftKey('user', '', 'create'), /Feature must not be empty/);
+});
+
+test('test_buildSessionDraftKey_rejects_empty_feature_segment', () => {
+  assert.throws(() => buildSessionDraftKey('user', 'admin::events', 'create'), /Invalid feature segment/);
+});
+
+test('test_buildSessionDraftKey_rejects_reserved_feature_segment', () => {
+  assert.throws(() => buildSessionDraftKey('user', 'admin:create:events', 'create'), /Invalid feature segment/);
+  assert.throws(() => buildSessionDraftKey('user', 'edit', 'create'), /Invalid feature segment/);
+});
+
+test('test_buildSessionDraftKey_rejects_reserved_entityId', () => {
+  assert.throws(() => buildSessionDraftKey('user', 'feature', 'edit', 'create'), /Invalid entityId/);
+  assert.throws(() => buildSessionDraftKey('user', 'feature', 'edit', 'edit'), /Invalid entityId/);
 });
 
 test('test_buildSessionDraftKey_requires_entityId_for_edit_mode', () => {
-  assert.throws(() => buildSessionDraftKey('user-1', 'feature', 'edit'), /entityId is required/);
+  assert.throws(() => buildSessionDraftKey('user-1', 'feature', 'edit'), /Invalid entityId/);
 });
 
 test('test_buildSessionDraftKey_prohibits_entityId_for_create_mode', () => {
@@ -106,6 +128,11 @@ test('test_parseSessionDraftKey_rejects_create_with_extra_suffix', () => {
 
 test('test_parseSessionDraftKey_rejects_unknown_mode', () => {
   assert.strictEqual(parseSessionDraftKey('draft:v1:user:feature:delete'), null);
+});
+
+test('test_parser_rejects_reserved_ambiguous_segments', () => {
+  assert.strictEqual(parseSessionDraftKey('draft:v1:user:create:create'), null);
+  assert.strictEqual(parseSessionDraftKey('draft:v1:user:feature:edit:create'), null);
 });
 
 // 3. Validation JSON Safety
@@ -152,6 +179,38 @@ test('test_save_rejects_Promise', () => {
   assert.strictEqual(saveSessionDraft('k', createValidEnvelope({ value: { p: Promise.resolve() } })), false);
 });
 
+test('test_save_rejects_Date', () => {
+  mockStorage.clear();
+  assert.strictEqual(saveSessionDraft('k', createValidEnvelope({ value: { d: new Date() } })), false);
+});
+
+test('test_save_rejects_Map', () => {
+  mockStorage.clear();
+  assert.strictEqual(saveSessionDraft('k', createValidEnvelope({ value: { m: new Map() } })), false);
+});
+
+test('test_save_rejects_Set', () => {
+  mockStorage.clear();
+  assert.strictEqual(saveSessionDraft('k', createValidEnvelope({ value: { s: new Set() } })), false);
+});
+
+test('test_save_rejects_RegExp', () => {
+  mockStorage.clear();
+  assert.strictEqual(saveSessionDraft('k', createValidEnvelope({ value: { r: /test/ } })), false);
+});
+
+test('test_save_rejects_custom_class_instance', () => {
+  mockStorage.clear();
+  class CustomClass {}
+  assert.strictEqual(saveSessionDraft('k', createValidEnvelope({ value: { c: new CustomClass() } })), false);
+});
+
+test('test_save_allows_null_prototype_plain_object', () => {
+  mockStorage.clear();
+  const env = createValidEnvelope({ value: Object.create(null) });
+  assert.strictEqual(saveSessionDraft(env.key, env), true);
+});
+
 test('test_save_allows_plain_managed_asset_reference', () => {
   mockStorage.clear();
   const env = createValidEnvelope({ value: { asset: { id: "123", path: "a.jpg", publicUrl: "http" } } });
@@ -166,24 +225,56 @@ test('test_save_preserves_empty_string_false_and_zero_exactly', () => {
   assert.deepStrictEqual(loaded.value, { str: "", bool: false, num: 0, arr: [], nil: null });
 });
 
-// 4. Envelope load validation
+// 4. Envelope load/save validation
+test('test_save_rejects_key_envelope_key_mismatch', () => {
+  mockStorage.clear();
+  const env = createValidEnvelope({ key: 'different-key' });
+  assert.strictEqual(saveSessionDraft('some-key', env), false);
+});
+
+test('test_save_rejects_key_envelope_user_mismatch', () => {
+  mockStorage.clear();
+  const key = buildSessionDraftKey('user-A', 'admin:events', 'create');
+  const env = createValidEnvelope({ key, userId: 'user-B' });
+  assert.strictEqual(saveSessionDraft(key, env), false);
+});
+
+test('test_save_rejects_invalid_timestamp', () => {
+  mockStorage.clear();
+  const key = buildSessionDraftKey('user-1', 'admin:events', 'create');
+  const env = createValidEnvelope({ key, updatedAt: 'banana' });
+  assert.strictEqual(saveSessionDraft(key, env), false);
+});
+
+test('test_save_invalid_envelope_writes_nothing', () => {
+  mockStorage.clear();
+  const key = buildSessionDraftKey('user-1', 'admin:events', 'create');
+  const env = createValidEnvelope({ key, updatedAt: 'banana' });
+  saveSessionDraft(key, env);
+  assert.strictEqual(mockStorage.store.has(key), false);
+});
+
 test('test_load_rejects_wrong_version', () => {
-  mockStorage.store.set('key', JSON.stringify(createValidEnvelope({ version: 2, key: 'key' })));
-  assert.strictEqual(loadSessionDraft('key'), null);
+  const key = buildSessionDraftKey('user-1', 'admin:events', 'create');
+  mockStorage.store.set(key, JSON.stringify(createValidEnvelope({ key, version: 2 })));
+  assert.strictEqual(loadSessionDraft(key), null);
 });
 
 test('test_load_rejects_non_object_root', () => {
-  mockStorage.store.set('key', JSON.stringify("string"));
-  assert.strictEqual(loadSessionDraft('key'), null);
+  const key = buildSessionDraftKey('user-1', 'admin:events', 'create');
+  mockStorage.store.set(key, JSON.stringify("string"));
+  assert.strictEqual(loadSessionDraft(key), null);
 });
 
 test('test_load_rejects_arrays_as_root', () => {
-  mockStorage.store.set('key', JSON.stringify([]));
-  assert.strictEqual(loadSessionDraft('key'), null);
+  const key = buildSessionDraftKey('user-1', 'admin:events', 'create');
+  mockStorage.store.set(key, JSON.stringify([]));
+  assert.strictEqual(loadSessionDraft(key), null);
 });
 
 test('test_load_rejects_storage_key_mismatch', () => {
-  mockStorage.store.set('storage-key', JSON.stringify(createValidEnvelope({ key: 'different-key' })));
+  const key = buildSessionDraftKey('user-1', 'admin:events', 'create');
+  mockStorage.store.set('storage-key', JSON.stringify(createValidEnvelope({ key })));
   assert.strictEqual(loadSessionDraft('storage-key'), null);
 });
 
@@ -241,6 +332,12 @@ test('test_clear_handles_length_throw', () => {
 test('test_findOpen_handles_key_throw', () => {
   mockStorage.resetThrows(); mockStorage.shouldThrowKey = true;
   assert.doesNotThrow(() => findOpenSessionDraft('user-1', 'feat'));
+});
+
+test('test_findOpen_returns_null_when_key_enumeration_throws', () => {
+  mockStorage.resetThrows();
+  mockStorage.shouldThrowKey = true;
+  assert.strictEqual(findOpenSessionDraft('user-1', 'feat'), null);
 });
 
 // 6. User / Feature Isolation
@@ -301,11 +398,8 @@ test('test_findOpenSessionDraft_timestamp_tie_uses_deterministic_key_order', () 
   mockStorage.clear(); mockStorage.resetThrows();
   const k1 = buildSessionDraftKey('u1', 'feat', 'edit', 'B');
   const k2 = buildSessionDraftKey('u1', 'feat', 'edit', 'A');
-  // Same time
   saveSessionDraft(k1, createValidEnvelope({ key: k1, userId: 'u1', updatedAt: '2026-09-30T00:00:00Z' }));
   saveSessionDraft(k2, createValidEnvelope({ key: k2, userId: 'u1', updatedAt: '2026-09-30T00:00:00Z' }));
   const win = findOpenSessionDraft('u1', 'feat');
-  // Expected fallback order: k2 ('A' comes before 'B' if ascending, but string localeCompare is used.
-  // Wait, my impl does `timeB - timeA || a.key.localeCompare(b.key)`. So 'A' comes before 'B'.
   assert.strictEqual(win.key, k2);
 });

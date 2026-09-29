@@ -30,42 +30,52 @@ export type ParsedSessionDraftKey = {
   entityId?: string;
 };
 
+function isValidUserId(userId: string): boolean {
+  return userId.length > 0 && !userId.includes(':');
+}
+
+function isValidEntityId(entityId: string): boolean {
+  return entityId.length > 0 && !entityId.includes(':') && entityId !== 'create' && entityId !== 'edit';
+}
+
+function isValidFeatureSegment(segment: string): boolean {
+  return segment.length > 0 && segment !== 'create' && segment !== 'edit';
+}
+
 export function parseSessionDraftKey(key: string): ParsedSessionDraftKey | null {
-  // grammar: draft:v1:<userId>:<feature>:<mode>[:entityId]
   const parts = key.split(':');
   if (parts.length < 5) return null;
   if (parts[0] !== 'draft' || parts[1] !== 'v1') return null;
-
+  
   const userId = parts[2];
-  if (!userId) return null;
-
-  // mode is always the last part if create, or second to last if edit.
-  // wait, feature can contain colons.
-  // let's scan from the end.
+  if (!isValidUserId(userId)) return null;
+  
   const last = parts[parts.length - 1];
   const secondToLast = parts[parts.length - 2];
-
+  
   let mode: 'create' | 'edit';
   let entityId: string | undefined;
   let featureEndIndex: number;
-
+  
   if (last === 'create') {
     mode = 'create';
     featureEndIndex = parts.length - 1;
   } else if (secondToLast === 'edit') {
     mode = 'edit';
     entityId = last;
-    if (!entityId) return null;
+    if (!isValidEntityId(entityId)) return null;
     featureEndIndex = parts.length - 2;
   } else {
-    return null; // Unknown mode or malformed
+    return null;
   }
-
+  
   const featureParts = parts.slice(3, featureEndIndex);
   if (featureParts.length === 0) return null;
-
+  for (const seg of featureParts) {
+    if (!isValidFeatureSegment(seg)) return null;
+  }
+  
   const feature = featureParts.join(':');
-
   return { userId, feature, mode, entityId };
 }
 
@@ -75,18 +85,26 @@ export function buildSessionDraftKey(
   mode: 'create' | 'edit',
   entityId?: string
 ): string {
-  if (userId.includes(':')) {
-    throw new Error('Delimiter not allowed in userId');
+  if (!isValidUserId(userId)) {
+    throw new Error('Invalid userId: must not be empty and no colons allowed');
   }
-  if (entityId && entityId.includes(':')) {
-    throw new Error('Delimiter not allowed in entityId');
+  if (!feature) {
+    throw new Error('Feature must not be empty');
+  }
+  const featureParts = feature.split(':');
+  if (featureParts.length === 0) throw new Error('Feature must not be empty');
+  for (const seg of featureParts) {
+    if (!isValidFeatureSegment(seg)) throw new Error('Invalid feature segment');
   }
 
-  if (mode === 'edit' && !entityId) {
-    throw new Error('entityId is required for edit mode');
-  }
-  if (mode === 'create' && entityId) {
-    throw new Error('entityId must not be provided for create mode');
+  if (mode === 'edit') {
+    if (!entityId || !isValidEntityId(entityId)) {
+      throw new Error('Invalid entityId for edit mode');
+    }
+  } else if (mode === 'create') {
+    if (entityId) {
+      throw new Error('entityId must not be provided for create mode');
+    }
   }
 
   const base = `draft:v1:${userId}:${feature}:${mode}`;
@@ -107,22 +125,29 @@ function isUnsupportedRuntimeValue(val: any): boolean {
   return false;
 }
 
+function isPlainObject(obj: any): boolean {
+  if (typeof obj !== 'object' || obj === null) return false;
+  const proto = Object.getPrototypeOf(obj);
+  return proto === Object.prototype || proto === null;
+}
+
 function ensureJsonSafe(value: any, seen: Set<any>): boolean {
   if (value === null) return true;
   if (typeof value === 'string' || typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) {
     return true;
   }
   if (isUnsupportedRuntimeValue(value)) return false;
-
+  
   if (typeof value === 'object') {
     if (seen.has(value)) return false; // Cyclic
     seen.add(value);
-
+    
     if (Array.isArray(value)) {
       for (const item of value) {
         if (!ensureJsonSafe(item, seen)) return false;
       }
     } else {
+      if (!isPlainObject(value)) return false;
       for (const k of Object.keys(value)) {
         if (!ensureJsonSafe(value[k], seen)) return false;
       }
@@ -133,9 +158,41 @@ function ensureJsonSafe(value: any, seen: Set<any>): boolean {
   return false;
 }
 
+function validateSessionDraftEnvelopeForKey(key: string, data: any): boolean {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  if (data.version !== 1) return false;
+  if (data.key !== key) return false;
+  if (typeof data.userId !== 'string' || data.userId === '') return false;
+  
+  const parsedKey = parseSessionDraftKey(key);
+  if (!parsedKey || parsedKey.userId !== data.userId) return false;
+  
+  if (typeof data.updatedAt !== 'string') return false;
+  const time = Date.parse(data.updatedAt);
+  if (!Number.isFinite(time)) return false;
+
+  if (typeof data.open !== 'boolean') return false;
+  if (typeof data.dirty !== 'boolean') return false;
+  if (data.value === undefined) return false;
+  if (!ensureJsonSafe(data.value, new Set())) return false;
+
+  if (data.baselineFingerprint !== undefined && typeof data.baselineFingerprint !== 'string') {
+    return false;
+  }
+
+  if (data.ui !== undefined) {
+    if (typeof data.ui !== 'object' || Array.isArray(data.ui)) return false;
+    if (data.ui.activeLocale !== undefined && !['ar', 'tr', 'en'].includes(data.ui.activeLocale)) return false;
+    if (data.ui.activeTab !== undefined && typeof data.ui.activeTab !== 'string') return false;
+    if (data.ui.fileReselectionRequired !== undefined && typeof data.ui.fileReselectionRequired !== 'boolean') return false;
+  }
+
+  return true;
+}
+
 export function saveSessionDraft<T>(key: string, envelope: SessionDraftEnvelope<T>): boolean {
   try {
-    if (!ensureJsonSafe(envelope, new Set())) {
+    if (!validateSessionDraftEnvelopeForKey(key, envelope)) {
       return false;
     }
     const json = JSON.stringify(envelope);
@@ -151,36 +208,7 @@ export function loadSessionDraft<T>(key: string): SessionDraftEnvelope<T> | null
     const item = sessionStorage.getItem(key);
     if (!item) return null;
     const data = JSON.parse(item);
-
-    // Validate Envelope Shape
-    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
-    if (data.version !== 1) return null;
-    if (data.key !== key) return null;
-    if (typeof data.userId !== 'string' || data.userId === '') return null;
-
-    const parsedKey = parseSessionDraftKey(key);
-    if (!parsedKey || parsedKey.userId !== data.userId) return null;
-
-    if (typeof data.updatedAt !== 'string') return null;
-    const time = Date.parse(data.updatedAt);
-    if (!Number.isFinite(time)) return null;
-
-    if (typeof data.open !== 'boolean') return null;
-    if (typeof data.dirty !== 'boolean') return null;
-    if (data.value === undefined) return null;
-    if (!ensureJsonSafe(data.value, new Set())) return null;
-
-    if (data.baselineFingerprint !== undefined && typeof data.baselineFingerprint !== 'string') {
-      return null;
-    }
-
-    if (data.ui !== undefined) {
-      if (typeof data.ui !== 'object' || Array.isArray(data.ui)) return null;
-      if (data.ui.activeLocale !== undefined && !['ar', 'tr', 'en'].includes(data.ui.activeLocale)) return null;
-      if (data.ui.activeTab !== undefined && typeof data.ui.activeTab !== 'string') return null;
-      if (data.ui.fileReselectionRequired !== undefined && typeof data.ui.fileReselectionRequired !== 'boolean') return null;
-    }
-
+    if (!validateSessionDraftEnvelopeForKey(key, data)) return null;
     return data as SessionDraftEnvelope<T>;
   } catch (err) {
     return null;
@@ -197,7 +225,7 @@ export function removeSessionDraft(key: string): void {
 
 export function clearSessionDraftsForUser(userId: string): void {
   try {
-    if (userId.includes(':')) return; // delimiter safety
+    if (!isValidUserId(userId)) return;
     const prefix = `draft:v1:${userId}:`;
     let len: number;
     try {
@@ -206,17 +234,19 @@ export function clearSessionDraftsForUser(userId: string): void {
 
     const keysToRemove: string[] = [];
     for (let i = 0; i < len; i++) {
+      let key: string | null = null;
       try {
-        const key = sessionStorage.key(i);
-        if (key && key.startsWith(prefix)) {
-          const parsed = parseSessionDraftKey(key);
-          // ensure it's exact user, not just string prefix match
-          if (parsed && parsed.userId === userId) {
-            keysToRemove.push(key);
-          }
-        }
+        key = sessionStorage.key(i);
       } catch {
-        continue;
+        // enumeration failure policy: skip this but don't abort for clearing
+        continue; 
+      }
+      if (key && key.startsWith(prefix)) {
+        const parsed = parseSessionDraftKey(key);
+        // ensure it's exact user, not just string prefix match
+        if (parsed && parsed.userId === userId) {
+          keysToRemove.push(key);
+        }
       }
     }
     for (const k of keysToRemove) {
@@ -233,7 +263,7 @@ export function clearSessionDraftsForUser(userId: string): void {
 
 export function findOpenSessionDraft<T>(userId: string, feature: string): LocatedSessionDraft<T> | null {
   try {
-    if (userId.includes(':')) return null;
+    if (!isValidUserId(userId)) return null;
     const prefix = `draft:v1:${userId}:${feature}:`;
     let len: number;
     try {
@@ -246,8 +276,11 @@ export function findOpenSessionDraft<T>(userId: string, feature: string): Locate
       let key: string | null = null;
       try {
         key = sessionStorage.key(i);
-      } catch { continue; }
-
+      } catch { 
+        // enumeration failure policy: return null if enumeration itself cannot safely proceed
+        return null;
+      }
+      
       if (key && key.startsWith(prefix)) {
         const parsedKey = parseSessionDraftKey(key);
         if (parsedKey && parsedKey.userId === userId && parsedKey.feature === feature) {
