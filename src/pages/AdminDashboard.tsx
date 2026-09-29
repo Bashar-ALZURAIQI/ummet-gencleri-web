@@ -2664,14 +2664,83 @@ function NewsTab({ news, currentUser, submitSiteEdit }: {
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [invalid, setInvalid] = useState<string[]>([]);
-  const [translations, setTranslations] = useState<Record<'tr' | 'en', Record<string, string>>>({
-    tr: { title: '', excerpt: '', fullContent: '' },
-    en: { title: '', excerpt: '', fullContent: '' },
+
+  type NewsDraftData = {
+    form: { title: string; category: string; date: string; excerpt: string; fullContent: string; image: string; externalUrl: string; pinnedOnHomepage: boolean; };
+    translations: Record<'tr' | 'en', Record<string, string>>;
+  };
+
+  const defaultDraftData: NewsDraftData = useMemo(() => {
+    if (editId) {
+      const n = news.find(nw => nw.id === editId);
+      if (n) {
+        return {
+          form: {
+            title: n.title, category: n.category, date: n.date, excerpt: n.excerpt,
+            fullContent: n.fullContent || '', image: n.image, externalUrl: n.externalUrl ?? '',
+            pinnedOnHomepage: n.pinnedOnHomepage ?? false,
+          },
+          translations: {
+            tr: { title: '', excerpt: '', fullContent: '' },
+            en: { title: '', excerpt: '', fullContent: '' },
+          }
+        };
+      }
+    }
+    return {
+      form: { title: '', category: '', date: new Date().toISOString().slice(0, 10), excerpt: '', fullContent: '', image: '', externalUrl: '', pinnedOnHomepage: true },
+      translations: {
+        tr: { title: '', excerpt: '', fullContent: '' },
+        en: { title: '', excerpt: '', fullContent: '' },
+      }
+    };
+  }, [editId, news]);
+
+  let validation: DraftEntityValidation = 'unknown';
+  if (editId) {
+    validation = news.some(n => n.id === editId) ? 'valid' : 'invalid';
+  } else {
+    validation = 'valid';
+  }
+
+  const draftKey = modalOpen && currentUser?.userId
+    ? buildSessionDraftKey(currentUser.userId, 'admin:news', editId ? 'edit' : 'create', editId ?? undefined)
+    : null;
+
+  const draft = useSessionDraft<NewsDraftData>({
+    key: draftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: defaultDraftData,
+    validation,
+    baselineFingerprint: editId ? `${editId}-${news.find(n => n.id === editId)?.date}` : 'create',
+    isDirty: (d) => JSON.stringify(d) !== JSON.stringify(defaultDraftData),
   });
-  const [form, setForm] = useState({
-    title: '', category: '', date: new Date().toISOString().slice(0, 10),
-    excerpt: '', fullContent: '', image: '', externalUrl: '', pinnedOnHomepage: true,
-  });
+
+  const form = draft.data.form;
+  const setForm = (updater: React.SetStateAction<NewsDraftData['form']>) => draft.setData(prev => ({ ...prev, form: typeof updater === 'function' ? updater(prev.form) : updater }));
+  const translations = draft.data.translations;
+  const setTranslations = (updater: React.SetStateAction<NewsDraftData['translations']>) => draft.setData(prev => ({ ...prev, translations: typeof updater === 'function' ? updater(prev.translations) : updater }));
+
+  useEffect(() => {
+    if (currentUser?.userId) {
+      const openDraft = findOpenSessionDraft(currentUser.userId, 'admin:news');
+      if (openDraft) {
+        if (openDraft.mode === 'edit') {
+          setEditId(openDraft.entityId ?? null);
+        } else {
+          setEditId(null);
+        }
+        setModalOpen(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (modalOpen && !draft.open) {
+      setModalOpen(false);
+    }
+  }, [modalOpen, draft.open]);
 
   const mediaNotice = () => undefined;
 
@@ -2706,25 +2775,13 @@ function NewsTab({ news, currentUser, submitSiteEdit }: {
 
   const openAdd = () => {
     setEditId(null);
-    setForm({ title: '', category: '', date: new Date().toISOString().slice(0, 10), excerpt: '', fullContent: '', image: '', externalUrl: '', pinnedOnHomepage: true });
-    setTranslations({
-      tr: { title: '', excerpt: '', fullContent: '' },
-      en: { title: '', excerpt: '', fullContent: '' },
-    });
+    draft.setOpen(true);
     setModalOpen(true);
   };
 
   const openEdit = (n: NewsItem) => {
     setEditId(n.id);
-    setForm({
-      title: n.title, category: n.category, date: n.date, excerpt: n.excerpt,
-      fullContent: n.fullContent || '', image: n.image, externalUrl: n.externalUrl ?? '',
-      pinnedOnHomepage: n.pinnedOnHomepage ?? false,
-    });
-    setTranslations({
-      tr: { title: '', excerpt: '', fullContent: '' },
-      en: { title: '', excerpt: '', fullContent: '' },
-    });
+    draft.setOpen(true);
     setModalOpen(true);
   };
 
@@ -2750,6 +2807,8 @@ function NewsTab({ news, currentUser, submitSiteEdit }: {
           if (!submitted) return;
           mediaNotice();
         }
+        draft.clearDraft();
+        draft.setOpen(false);
         setModalOpen(false);
         return;
       }
@@ -2772,6 +2831,8 @@ function NewsTab({ news, currentUser, submitSiteEdit }: {
           if (!submitted) return;
           mediaNotice();
         }
+        draft.clearDraft();
+        draft.setOpen(false);
         setModalOpen(false);
         return;
       }
@@ -2789,6 +2850,8 @@ function NewsTab({ news, currentUser, submitSiteEdit }: {
         return;
       }
     }
+    draft.clearDraft();
+    draft.setOpen(false);
     setModalOpen(false);
   };
 
@@ -2866,7 +2929,14 @@ function NewsTab({ news, currentUser, submitSiteEdit }: {
         )}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editId ? t('admin.news.modal.editTitle', 'تعديل الخبر') : t('admin.news.modal.addTitle', 'إضافة خبر جديد')} maxWidth="max-w-xl">
+      <Modal open={modalOpen} onClose={draft.requestClose} title={editId ? t('admin.news.modal.editTitle', 'تعديل الخبر') : t('admin.news.modal.addTitle', 'إضافة خبر جديد')} maxWidth="max-w-xl">
+        {draft.isDecisionOpen ? (
+          <UnsavedDraftDecision
+            onContinue={draft.continueEditing}
+            onKeep={draft.keepDraftAndClose}
+            onDiscard={draft.discardDraftAndClose}
+          />
+        ) : (
         <form onSubmit={save} className="space-y-4">
           <div>
             <label className="label-field">{t('admin.news.modal.dateLabel', 'التاريخ')} <RequiredMark /></label>
@@ -2901,6 +2971,9 @@ function NewsTab({ news, currentUser, submitSiteEdit }: {
           <CmsEntityTranslationTabs
             target="news"
             recordId={editId}
+            activeTab={draft.ui.activeLocale}
+            onActiveTabChange={(t) => draft.setUi(prev => ({...prev, activeLocale: t as 'ar' | 'tr' | 'en'}))}
+            preserveProvidedTranslations={draft.restoredFromStorage}
             canonicalPayload={editId ? news.map((n) => (n.id === editId ? { ...n, title: form.title, category: form.category, excerpt: form.excerpt, fullContent: form.fullContent } : n)) : news}
             fields={[
               {
@@ -2961,10 +3034,11 @@ function NewsTab({ news, currentUser, submitSiteEdit }: {
           </CmsEntityTranslationTabs>
 
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setModalOpen(false)} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
+            <button type="button" onClick={draft.requestClose} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
             <button type="submit" className="btn-primary"><CheckCircle2 className="h-4 w-4" /> {editId ? t('admin.news.modal.saveChanges', 'حفظ التعديلات') : t('admin.news.modal.add', 'إضافة')}</button>
           </div>
         </form>
+        )}
       </Modal>
     </div>
   );
