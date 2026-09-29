@@ -38,13 +38,26 @@ Below is the exhaustive inventory of all identified long-form create/edit/compos
 
 **Total Inventory Row Count: 27 components/surfaces mapped.**
 
-## 3. UX Semantics
-The persistence system must differentiate between **Internal Navigation** and **Explicit Close**:
-- **Internal Navigation**: Navigating away without closing the editor automatically saves the draft, including the `open=true` state. Returning to the page automatically reopens the editor exactly as it was.
-- **Explicit Close**: Clicking "X", Cancel, or the backdrop on a dirty editor triggers a 3-choice confirmation:
-  1. **Continue editing**: Keeps the editor open and does nothing.
-  2. **Keep draft**: Closes the editor (`open=false`) but retains the data in storage. Returning to the page does NOT auto-open it, but clicking "Add/Edit" again restores the saved data.
-  3. **Discard draft**: Deletes the draft entirely and closes the editor.
+## 3. UX Semantics & Explicit Close Behavior
+The persistence system must differentiate between **Internal Navigation** and **Explicit Close**.
+
+**Internal Navigation**: Navigating away without closing the editor automatically saves the draft, including the `open=true` state. Returning to the page automatically reopens the editor exactly as it was.
+
+**Explicit Close Semantics**:
+The existing `<Modal>` currently calls `onClose()` for explicit X, Escape, and backdrop clicks. Phase 1 will NOT modify `Modal.tsx`. Therefore, the editor component will pass a context-aware `onClose` handler that behaves conditionally based on its state:
+
+- **NORMAL EDITOR STATE**:
+  - Pristine → closes immediately.
+  - Dirty → transitions into the **Unsaved Draft Decision State**.
+
+- **UNSAVED DRAFT DECISION STATE**:
+  - **Escape** → dismisses only the decision state (equivalent to Continue Editing). Editor stays open, draft intact, focus returns to editor.
+  - **Backdrop click** → dismisses only the decision state (equivalent to Continue Editing).
+  - Explicit X/Cancel buttons inside the decision state must be respected:
+    1. **Continue editing**: Dismisses the decision state, keeps editor open, keeps draft.
+    2. **Keep draft**: Persists data, persists `open=false`, and fully closes the editor.
+    3. **Discard draft**: Deletes the draft and fully closes the editor.
+  - Under NO circumstances can an Escape or backdrop click while in the decision state bypass it to fully discard or close the editor.
 
 ## 4. Accessibility and Dialog Architecture
 The existing `src/components/Modal.tsx` handles some basics (Escape listener, backdrop click, aria-label) but lacks robust accessible dialog compliance (e.g., `role="dialog"`, `aria-modal="true"`, focus trapping).
@@ -179,6 +192,9 @@ The future implementation MUST satisfy all 30 of the following behavioral tests:
 28. Separate browser tabs naturally maintain isolated `sessionStorage` drafts.
 29. Current push/notification behavior remains entirely unaffected.
 30. Current structural submit and validation behavior remains perfectly intact.
+31. Escape key press while decision state is active safely returns to the editor.
+32. Backdrop click while decision state is active safely returns to the editor.
+33. Neither Escape nor backdrop actions while in decision state clear the draft.
 *(Also explicitly test managed asset references vs. local File objects to guarantee integrity).*
 
 ## 16. Manual Acceptance Scenarios
@@ -200,10 +216,10 @@ The future implementation MUST satisfy all 30 of the following behavioral tests:
 - **Expected**: Draft is deleted. Reopening Add Event yields a clean form.
 
 **Scenario 2: Student Suggestion Workflow**
-1. Student begins writing a suggestion on the `suggestions` tab of the Student Dashboard.
-2. Clicks on the `activities` tab within the dashboard to review a past activity.
-3. Clicks back to the `suggestions` tab.
-- **Expected**: The suggestion composer seamlessly retains the title, body, category, and targetRole without any data loss or prompts.
+1. Student opens the Student Dashboard and begins writing a suggestion on the `suggestions` tab.
+2. The student navigates away to a completely different public view (e.g., clicking on "Home" or "Student Guide" in the main navigation), causing the `StudentDashboard` to fully unmount.
+3. The student returns to the Student Dashboard.
+- **Expected**: Phase 1 explicitly persists the selected student tab as lightweight UI state. The user naturally lands back on the `suggestions` tab, and the suggestion composer seamlessly restores the title, body, category, and targetRole without any data loss or prompts.
 
 ## 17. Implementation Boundaries
 The Phase 1 code implementation will be localized to the following proposed architecture:
