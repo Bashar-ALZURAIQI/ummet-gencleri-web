@@ -18,6 +18,9 @@ import { studentPortalTabs, type StudentPortalTabId } from '../domain/phaseThree
 import { resolvePublicBrandName } from '../domain/publicBrand';
 import { getAcademicYearPresentation } from '../domain/academicYearPresentation';
 import { getExecutiveSectionLabel, getExecutiveRoleLabel } from '../domain/executivePresentation';
+import { useSessionDraft } from '../hooks/useSessionDraft';
+import { findOpenSessionDraft, buildSessionDraftKey } from '../domain/sessionDraft';
+import { useMemo } from 'react';
 
 const STUDENT_TAB_ICONS = {
   activities: CalendarDays,
@@ -50,7 +53,34 @@ export default function StudentDashboard() {
     contactMessagesError,
   } = useApp();
   const [tab, setTab] = useState<StudentPortalTabId>('activities');
-  const [form, setForm] = useState({ title: '', body: '', category: '', targetRole: '' });
+type SuggestionDraftData = { title: string; body: string; category: string; targetRole: string; };
+  const defaultDraftData: SuggestionDraftData = useMemo(() => ({ title: '', body: '', category: '', targetRole: '' }), []);
+
+  const draftKey = currentStudent?.id
+    ? buildSessionDraftKey(currentStudent.id, 'student:suggestion', 'create')
+    : null;
+
+  const draft = useSessionDraft<SuggestionDraftData>({
+    key: draftKey,
+    userId: currentStudent?.id ?? null,
+    defaultData: defaultDraftData,
+    validation: 'valid',
+    baselineFingerprint: 'create',
+    isDirty: (d) => JSON.stringify(d) !== JSON.stringify(defaultDraftData),
+  });
+
+  const form = draft.data;
+  const setForm = (updater: React.SetStateAction<SuggestionDraftData>) => draft.setData(updater);
+
+  useEffect(() => {
+    if (currentStudent?.id) {
+      const openDraft = findOpenSessionDraft(currentStudent.id, 'student:suggestion');
+      if (openDraft) {
+        setTab('suggestions');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [invalid, setInvalid] = useState<string[]>([]);
   const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
