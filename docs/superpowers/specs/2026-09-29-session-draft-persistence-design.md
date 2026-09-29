@@ -3,13 +3,40 @@
 ## 1. Problem Statement
 Currently, throughout the application, many forms and editor modals lose all their unsaved information if their React component unmounts. For example, if a user starts composing a long Arabic description in the "Create Event" modal and navigates to another page to copy a Turkish translation, all typed content is permanently lost upon returning. This is unacceptable UX. The application needs a robust, modern persistent-draft system so that forms and editors naturally preserve their state during internal navigation and browser interruptions.
 
-## 2. Current Architecture / Root Cause
-Forms and modals across the application (e.g., in `AdminDashboard.tsx`, `StudentDashboard.tsx`, `ProgramsPage.tsx`, `MediaGallery.tsx`) manage their state exclusively using inline React `useState`. For example:
-```tsx
-const [modalOpen, setModalOpen] = useState(false);
-const [form, setForm] = useState({ title: '', body: '' });
-```
-When a user navigates to a different page or section, the component unmounts. React naturally discards this component-local state. Upon returning to the page, the component remounts with the initial empty state, causing the permanent loss of the unsaved draft.
+## 2. Complete Inventory of Forms & Editors
+Below is the exhaustive inventory of all identified long-form create/edit/compose surfaces targeted for this architecture, explicitly distinguishing Phase 1 selections.
+
+| Surface | Component/File | Create/Edit/Compose | Current State Owner | Unmount Destroys State? | Should Persist? | Sensitive? | Has File Input? | Has Translations? | Priority | Notes |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Admin Events** | `AdminDashboard.tsx` | Create/Edit | `modalOpen`, `form`, `editId` | Yes | Yes | No | Yes | Yes | **Phase 1** | Primary target for testing |
+| **Admin News** | `AdminDashboard.tsx` | Create/Edit | `modalOpen`, `form`, `editId` | Yes | Yes | No | Yes | Yes | **Phase 1** | Primary target for testing |
+| **Student Suggestion** | `StudentDashboard.tsx` | Compose | inline `form` state | Yes | Yes | No | No | No | **Phase 1** | Core student interaction |
+| Gallery Album | `AdminDashboard.tsx` / `MediaGallery.tsx` | Create/Edit | `albumModalOpen`, `albumForm` | Yes | Yes | No | Yes | Yes | Phase 2 | |
+| Gallery Media | `AdminDashboard.tsx` / `MediaGallery.tsx` | Create/Edit | `mediaModalOpen`, `mediaForm` | Yes | Yes | No | Yes | Yes | Phase 2 | |
+| Gallery Category | `MediaGallery.tsx` | Create/Edit | `categoryModalOpen`, `categoryForm` | Yes | Yes | No | No | Yes | Phase 2 | |
+| Board Member | `AdminDashboard.tsx` / `CommitteePage.tsx` | Create/Edit | `memberModal`, `memberForm` | Yes | Yes | No | Yes | Yes | Phase 2 | |
+| Board Head | `AdminDashboard.tsx` / `CommitteePage.tsx` | Edit | `headModal`, `headForm` | Yes | Yes | No | Yes | Yes | Phase 2 | |
+| Responsibility | `AdminDashboard.tsx` / `CommitteePage.tsx` | Create/Edit | `respModal`, `respForm` | Yes | Yes | No | No | Yes | Phase 2 | |
+| Plans | `AdminDashboard.tsx` | Create/Edit | `planModal`, `planForm` | Yes | Yes | No | Yes | Yes | Phase 2 | |
+| Reports | `AdminDashboard.tsx` | Create/Edit | `reportModal`, `reportForm` | Yes | Yes | No | Yes | Yes | Phase 2 | |
+| FAQ Category | `FAQPage.tsx` | Create/Edit | `catModalOpen`, `catForm` | Yes | Yes | No | No | Yes | Phase 2 | |
+| FAQ Question | `FAQPage.tsx` | Create/Edit | `qModalOpen`, `qForm` | Yes | Yes | No | No | Yes | Phase 2 | |
+| Contact Card | `ContactPage.tsx` | Edit | `cardModalOpen`, `cardForm` | Yes | Yes | No | No | Yes | Phase 2 | |
+| Contact Map | `ContactPage.tsx` | Edit | `mapModalOpen`, `mapForm` | Yes | Yes | No | No | Yes | Phase 2 | |
+| Guide Section | `StudentGuide.tsx` | Create/Edit | `sectionModalOpen`, `sectionForm` | Yes | Yes | No | No | Yes | Phase 2 | |
+| Guide Item | `StudentGuide.tsx` | Create/Edit | `itemModalOpen`, `itemForm` | Yes | Yes | No | Yes | Yes | Phase 2 | |
+| Guide Contact | `StudentGuide.tsx` | Create/Edit | `contactModalOpen`, `contactForm` | Yes | Yes | No | No | Yes | Phase 2 | |
+| Profile Editor | `StudentDashboard.tsx` | Edit | `editOpen`, `profileForm` | Yes | Yes | No | Yes | No | Phase 2 | |
+| Programs Event | `ProgramsPage.tsx` | Create/Edit | `modalOpen`, `form` | Yes | Yes | No | Yes | Yes | Phase 2 | |
+| Excuse Activity | `ProgramsPage.tsx` | Compose | `excuseActivity`, `excuseReason` | Yes | Yes | No | Yes | No | Phase 2 | |
+| Suggestion Reply | `AdminDashboard.tsx` | Compose | `replyOpen`, `replyForm` | Yes | No | No | No | No | *Excluded* | Transient/Read-heavy |
+| Internal Tasks | (various) | Create/Edit | `taskModalOpen` | Yes | Yes | No | No | No | Phase 2 | |
+| Internal Activity | (various) | Create/Edit | `activityModalOpen` | Yes | Yes | No | No | No | Phase 2 | |
+| **Delete Confirmations** | (various) | Action | (various) | Yes | **No** | No | No | No | *Excluded* | Transient state |
+| **Role Transfers** | (various) | Action | (various) | Yes | **No** | No | No | No | *Excluded* | Transient state |
+| **Auth/Password** | `Auth.tsx` / `ResetPassword.tsx` | Edit | - | Yes | **No** | **Yes**| No | No | *Excluded* | Security risk |
+
+**Total Inventory Row Count: 27 components/surfaces mapped.**
 
 ## 3. UX Semantics
 The persistence system must differentiate between **Internal Navigation** and **Explicit Close**:
@@ -19,12 +46,24 @@ The persistence system must differentiate between **Internal Navigation** and **
   2. **Keep draft**: Closes the editor (`open=false`) but retains the data in storage. Returning to the page does NOT auto-open it, but clicking "Add/Edit" again restores the saved data.
   3. **Discard draft**: Deletes the draft entirely and closes the editor.
 
-## 4. Storage Choice
-The architecture will use **`sessionStorage`** as the underlying store.
-- **Why**: It naturally survives component unmounts, internal router navigations, and page reloads within the same tab. It is isolated to the current tab session, naturally preventing drafts from leaking into permanent cross-session `localStorage` or cluttering the database unnecessarily. It avoids putting lengthy text in URL parameters.
+## 4. Accessibility and Dialog Architecture
+The existing `src/components/Modal.tsx` handles some basics (Escape listener, backdrop click, aria-label) but lacks robust accessible dialog compliance (e.g., `role="dialog"`, `aria-modal="true"`, focus trapping).
 
-## 5. Draft Key Design
-Drafts must be strictly isolated to prevent cross-user contamination and collisions between create and edit modes. The standard key format will be:
+**Crucially, the dirty-close confirmation MUST NOT be implemented as a second stacked `<Modal>` overlay.** Two simultaneous modals create Escape-listener race conditions, focus-trap bugs, and close-order unpredictability.
+
+**Architecture**: The editor remains the single outer modal context. When a dirty explicit-close is requested, the editor seamlessly swaps its internal body view into a "close decision" state (`UnsavedDraftDecision`). 
+- There is only one Escape listener.
+- Focus is cleanly moved into the decision controls.
+- "Continue Editing" swaps the view back and restores focus to the editor inputs.
+- Future enhancements to `<Modal>` should add `role="dialog"`, `aria-modal="true"`, and native focus trapping.
+
+## 5. Storage Choice & Contract Semantics
+The architecture will use **`sessionStorage`** as the underlying store.
+- **Product Contract**: Drafts are intentionally session-scoped. There is no permanent database/`localStorage` draft retention. Closing the browser is NOT guaranteed to be a cross-browser deletion boundary (some browsers restore sessionStorage on reopening). Explicit user logout is the absolute boundary that clears owned drafts.
+- No aggressive TTL is required for Phase 1. 
+
+## 6. Draft Key Design
+Drafts must be strictly isolated to prevent cross-user contamination and collisions between create and edit modes. 
 `draft:v1:<userId>:<feature>:<mode>[:entityId]`
 
 Examples:
@@ -32,8 +71,8 @@ Examples:
 - `draft:v1:usr_123:admin:events:edit:evt_456`
 - `draft:v1:usr_890:student:suggestion:create`
 
-## 6. Draft Envelope Schema
-To ensure type safety and schema validation, drafts will be wrapped in a versioned envelope:
+## 7. Draft Envelope and Serializable Payload
+To ensure type safety and serialization bounds, drafts will be wrapped in a versioned envelope:
 ```typescript
 interface SessionDraftEnvelope<T> {
   version: 1;
@@ -42,142 +81,117 @@ interface SessionDraftEnvelope<T> {
   updatedAt: string;
   open: boolean;
   dirty: boolean;
-  value: T;
+  baselineFingerprint?: string; // For accurate edit-mode dirty diffing
+  value: T; // MUST BE STRICTLY JSON-SERIALIZABLE
   ui?: {
     activeLocale?: string;
-    activeStep?: string;
+    fileReselectionRequired?: boolean;
   };
 }
 ```
-The storage service will validate `version` and `userId` before restoring a draft. Malformed JSON or schema mismatches will fail gracefully (treating the draft as missing) rather than crashing the UI.
 
-## 7. Hook / Service Architecture
-The solution relies on a two-tier architecture:
-1. **`SessionDraftService`**: A centralized utility that handles raw `sessionStorage` serialization/deserialization, key formatting, and schema validation.
-2. **`useSessionDraft`**: A reusable React hook consumed by individual forms.
+**Explicitly Serializable Constraint**: Arbitrary component state must NOT be blindly serialized. 
+- The runtime state must pass through a strict adapter (e.g., `toDraftData(form)`).
+- `File`, `Blob`, Object URLs, DOM objects, functions, and Promises are **strictly forbidden** from the persisted envelope.
+- **File Uploads**: Unuploaded `File` objects are dropped, and `ui.fileReselectionRequired = true` is set if needed. Already-uploaded, stable `ManagedAssetReferences` (URLs or IDs) are safe to persist. The system must never automatically upload a file merely to satisfy draft persistence.
+
+## 8. Save Frequency (Phase 1)
+To avoid debounce complexity and last-keystroke data loss, Phase 1 will use **synchronous write-through persistence**.
+Whenever the runtime editor state changes:
+1. The React state is updated.
+2. A stable React `ref` captures the latest serializable envelope.
+3. `sessionStorage.setItem` is written synchronously.
+
+`pagehide` and `visibilitychange` (only when `document.visibilityState === 'hidden'`) serve strictly as defensive flush mechanisms using the stable `ref`, entirely eliminating stale-closure risks.
+
+## 9. Restore Initialization (No UI Flash)
+To prevent the jarring UX of a clean editor appearing and jumping to populated state a frame later, `useSessionDraft` will utilize lazy initialization for its React state:
 ```typescript
-function useSessionDraft<T>(options: {
-  key: string | null; // null disables persistence
-  defaultData: T;
-  isDirty: (current: T, initial: T) => boolean;
-}) {
-  // Manages internal state, syncs to SessionDraftService on change, 
-  // and handles unmount flush.
-  return {
-    isOpen,
-    setIsOpen,
-    data,
-    setData,
-    uiState,
-    setUiState,
-    handleExplicitClose,
-    clearDraft,
-  };
-}
+const [data, setData] = useState(() => {
+  const draft = SessionDraftService.load(key);
+  return draft?.value ?? defaultData;
+});
 ```
+The storage is read synchronously during the initial render phase. Validation is performed immediately, and `open` state is accurately initialized, preventing any layout thrashing or empty form flashing.
 
-## 8. Dirty-State Model
-A reliable `dirty` flag is crucial to prevent showing confirmation dialogs for completely untouched forms.
-- For **Create Mode**: `isDirty` checks if the current `data` differs from the clean `defaultData`.
-- For **Edit Mode**: `isDirty` checks if the current `data` differs from the initial database snapshot of the entity.
+## 10. Open/Closed Restore Semantics
+The state machine strictly dictates:
+- **`open: true`**: Returning to the owning surface auto-reopens the editor immediately upon component mount.
+- **`open: false`**: Returning to the surface does NOT auto-open. The user must manually invoke the identical action (e.g., click "Add Event" or "Edit Event X") to resurrect the saved draft. 
+- Editing Entity X restores strictly Entity X's draft. It must never bleed into Entity Y.
 
-## 9. Restore Rules
-When a component using `useSessionDraft` mounts:
-1. Try to fetch the envelope from `SessionDraftService`.
-2. Verify the envelope's `userId` matches the current authenticated user.
-3. If it's an **Edit Draft**, optionally allow the component to verify the entity still exists. If the entity was deleted, the draft is deemed stale and is discarded.
-4. If valid, initialize `data`, `isOpen`, `uiState` (like active locale), and `dirty` from the envelope.
+## 11. Stale Edit-Draft Validation
+Entity validation must gracefully handle asynchronous server loads without immediately discarding a valid draft. A 3-state validation model is used:
+1. **UNKNOWN (Loading)**: Retain draft. Do not auto-delete. Wait for authoritative data.
+2. **VALID**: Restore and permit editing.
+3. **INVALID**: The entity was deleted or permission was lost. Safely delete the stale draft from storage and optionally show a localized non-blocking notice. The editor remains closed.
 
-## 10. Explicit Close Confirmation Flow
-When `handleExplicitClose` is triggered:
-- If `!dirty`: Close immediately (`isOpen=false`) without confirmation.
-- If `dirty`: Render a fully accessible, localized three-choice modal overlay:
-  - **Continue editing** -> No-op.
-  - **Keep draft** -> Calls `setIsOpen(false)`, retains draft in `sessionStorage`.
-  - **Discard draft** -> Calls `clearDraft()`, closes editor.
+## 12. Dirty Baselines
+- **CREATE**: `baseline = canonical clean DraftData`.
+- **EDIT**: `baseline = normalized server snapshot` captured when the editor was originally opened. 
+To guarantee deterministic dirty comparisons across remounts, the hook will compute a `baselineFingerprint` (e.g., hash or serialized subset) of the initial entity snapshot and persist it inside the envelope. Continuous prop changes must not accidentally turn a dirty draft clean.
 
-## 11. Navigation Behavior
-Changes to the editor state trigger a lightweight save to `sessionStorage` (either immediately or via short debounce). To guarantee no data loss, a synchronous flush occurs on component `unmount`, `pagehide`, and `visibilitychange`. Returning to the route re-mounts the component, which sees `open=true` in the envelope and seamlessly restores the editor to the exact state the user left it.
+## 13. Auth Owner Change and Logout
+Ownership lifecycle is strict:
+- On explicit logout, `SessionDraftService.clearAllForUser(currentUserId)` is invoked before/with identity teardown.
+- Defensive fallback: If auth ownership unexpectedly changes without a normal logout path, the strict `userId` property inside the draft envelope guarantees that the new user cannot deserialize the previous user's payload. The old keys remain dormant/inaccessible until safely garbage collected.
 
-## 12. Translation Handling
-Multilingual CMS editors (e.g., `CmsEntityTranslationTabs`) will serialize their translation payloads (AR, TR, EN) within the `T` value of the envelope. The active translation tab is saved in `ui.activeLocale` so the user is immediately returned to the exact language tab they were editing.
-
-## 13. File Upload Handling
-`File`, `Blob`, and object URLs are unserializable and must **never** be stored in `sessionStorage`. 
-- Unuploaded local files will be dropped from the draft payload (the user will need to re-select them).
-- Stable managed-asset references (e.g., uploaded Supabase URLs or Asset IDs) will be safely persisted. Background uploads should not be forced just to satisfy draft state.
-
-## 14. Security / Privacy
-- **Strict Exclusions**: Forms handling passwords, password confirmations, tokens, or security credentials will intentionally **not** use draft persistence.
-- **Tab Isolation**: `sessionStorage` naturally prevents drafts from persisting indefinitely or bleeding into other tabs.
-
-## 15. Logout / User Isolation
-On successful logout, an explicit cleanup function `SessionDraftService.clearAllForUser(userId)` will be invoked to delete all draft keys belonging to the logging-out user. Additionally, the envelope's `userId` check mathematically guarantees a new user signing in on the same browser cannot restore the previous user's drafts.
-
-## 16. Stale Draft Handling
-If an edit draft points to an entity ID that has been deleted or is no longer authorized for the current user, the system will discard it. The component using the hook will provide validation logic (e.g., checking if the `editId` exists in the loaded list of events).
-
-## 17. Failure / Graceful Degradation
-If `sessionStorage` is unavailable (due to privacy settings or quota limits) or throws an exception, `SessionDraftService` will catch the error safely. `useSessionDraft` will degrade gracefully to behave exactly like standard volatile React state, ensuring the website remains fully functional.
-
-## 18. Accessibility
-The 3-choice confirmation dialog will not rely on `window.confirm`. Instead, it will use the application's existing accessible `<Modal>` system, ensuring proper focus trapping, ARIA labels, and logical Tab/Escape behaviors.
-
-## 19. Localization
-All new UI elements will be fully localized:
+## 14. Localization Requirements
+All persistence UI elements must be localized dynamically (AR/TR/EN):
 - `drafts.unsavedTitle`: "Unsaved draft" (مسودة غير محفوظة)
+- `drafts.unsavedDescription`: "You have unsaved changes. What would you like to do?" (لديك تعديلات غير محفوظة. ماذا تود أن تفعل؟)
 - `drafts.continueEditing`: "Continue editing" (متابعة التعديل)
 - `drafts.keepDraft`: "Keep draft" (الاحتفاظ بالمسودة)
 - `drafts.discardDraft`: "Discard draft" (تجاهل المسودة)
+- `drafts.restored`: "A saved draft was restored." (تم استعادة مسودة محفوظة.)
+- `drafts.staleDiscarded`: "The record is no longer available. Draft discarded." (السجل لم يعد متاحاً. تم تجاهل المسودة.)
+- `drafts.fileReselectionRequired`: "Please reselect your unuploaded file." (يرجى إعادة تحديد الملف غير المرفوع.)
 
-## 20. Phase 1 Scope
-Phase 1 implementation will focus strictly on establishing the architecture and proving it in three key areas:
-1. **Admin Event Editor**: Create/Edit modes (modal open state, content, translations, edit ID).
-2. **Admin News Editor**: Create/Edit modes (modal open state, content, translations, edit ID, active locale).
-3. **Student Suggestion Composer**: Compose mode (title, body, category, target role).
+## 15. Testing Matrix
+The future implementation MUST satisfy all 30 of the following behavioral tests:
+1. Draft survives component unmount/remount.
+2. Draft survives internal page navigation.
+3. `open=true` draft auto-reopens correctly upon returning.
+4. Exact form string/boolean values restore correctly.
+5. AR/TR/EN translation payloads restore accurately.
+6. Active translation locale tab restores seamlessly.
+7. Create and Edit keys categorically cannot collide.
+8. Edit Entity A and Edit Entity B keys cannot collide.
+9. User A cannot read, restore, or access User B's draft.
+10. Successful form submission automatically clears the draft.
+11. Failed form submission safely keeps the draft.
+12. Dirty explicit close transitions accurately to the decision state overlay.
+13. "Continue Editing" successfully keeps the editor open.
+14. "Keep Draft" closes the editor + retains data + saves `open=false`.
+15. Manually invoking Add/Edit for a saved closed draft rehydrates the data perfectly.
+16. "Discard Draft" clears the data and closes the editor.
+17. Pristine close bypasses the decision prompt entirely.
+18. Explicit logout successfully clears owned drafts.
+19. Malformed JSON handles safely and does not crash the UI.
+20. `sessionStorage` unavailable/throws degrades gracefully without breaking the forms.
+21. Confirmation/read-only modals are proven to bypass persistence entirely.
+22. Passwords/tokens/security data are proven to bypass persistence entirely.
+23. `File`, `Blob`, and runtime objects are never serialized.
+24. Stale edit draft patiently waits while validation is `unknown`.
+25. Stale deleted/unauthorized edit draft is removed strictly only after `invalid` is confirmed.
+26. Visibility/pagehide flush always uses the latest value, escaping stale React closures.
+27. Restored modal does not flash an empty state before hydration.
+28. Separate browser tabs naturally maintain isolated `sessionStorage` drafts.
+29. Current push/notification behavior remains entirely unaffected.
+30. Current structural submit and validation behavior remains perfectly intact.
+*(Also explicitly test managed asset references vs. local File objects to guarantee integrity).*
 
-## 21. Phase 2 Inventory
-Forms designated for future onboarding to draft persistence (Inventory Count: > 20):
-- Media Gallery: Album & Media Editors
-- Board Management: Member, Head, and Responsibility Editors
-- Committee Page Editors
-- Internal Economy: Tasks & Activities Editors
-- Strategic Plans & Reports Editors
-- Profile Editors
-- FAQ Editors
-- Contact Card & Map Editors
-- Student Guide Editors
-
-## 22. Explicit Exclusions
-The following components will intentionally **not** use draft persistence:
-- **Destructive Confirmations**: Delete Member, Delete Event, Transfer Role. (These are transient confirmations that should not randomly reopen).
-- **Security Contexts**: Password change, forgot password, login forms.
-- **Transient UI**: Loading states, success banners, network errors.
-- **Read-Only Modals**: Suggestion review/reply panels that don't involve long-form data entry from the viewer.
-
-## 23. Testing Strategy
-Future implementation requires tests verifying:
-1. Draft survives unmount/remount and navigation.
-2. Form values, translations, and `ui.activeLocale` restore perfectly.
-3. User A cannot read User B's draft.
-4. Successful submission automatically deletes the draft.
-5. Failed submission preserves the draft securely.
-6. The explicit close 3-choice modal triggers correctly for dirty forms.
-7. Unedited pristine forms close immediately without confirmation.
-8. Logout sweeps and destroys user drafts.
-9. Malformed `sessionStorage` triggers safe fallback without crashing.
-
-## 24. Manual Acceptance Scenarios
+## 16. Manual Acceptance Scenarios
 
 **Scenario 1: President Events Workflow**
-1. President opens Events tab.
+1. President opens Admin Events tab.
 2. Clicks Add Event.
 3. Writes Arabic title and long description.
 4. Navigates to Admin News tab.
 5. Returns to Events tab.
 - **Expected**: Event modal auto-opens. All fields are restored. No confirmation prompted during navigation.
 6. President clicks X to explicitly close.
-- **Expected**: 3-choice confirmation appears.
+- **Expected**: Close-decision UI overlay appears within the modal.
 7. Selects "Keep draft".
 - **Expected**: Modal closes.
 8. Clicks Add Event again.
@@ -186,12 +200,29 @@ Future implementation requires tests verifying:
 - **Expected**: Draft is deleted. Reopening Add Event yields a clean form.
 
 **Scenario 2: Student Suggestion Workflow**
-1. Student starts writing a suggestion on Dashboard.
-2. Navigates to Profile.
-3. Returns to Dashboard.
-- **Expected**: Suggestion composer retains title, text, category, and target role seamlessly.
+1. Student begins writing a suggestion on the `suggestions` tab of the Student Dashboard.
+2. Clicks on the `activities` tab within the dashboard to review a past activity.
+3. Clicks back to the `suggestions` tab.
+- **Expected**: The suggestion composer seamlessly retains the title, body, category, and targetRole without any data loss or prompts.
 
-## 25. Risks / Trade-offs
-- **Complexity**: Synchronizing modal `isOpen` state with storage introduces lifecycle complexity (e.g., ensuring flush before unmount).
-- **File Uploads**: Users might be confused if text fields are restored but an unuploaded File picker is cleared. UX must clearly communicate if files need re-selection.
-- **Debounce Delay**: If a user navigates away using a raw browser back button extremely quickly, a non-flushed keystroke might theoretically be lost. Explicit unmount flushing mitigates this heavily.
+## 17. Implementation Boundaries
+The Phase 1 code implementation will be localized to the following proposed architecture:
+- **`src/domain/sessionDraft.ts`**: Contains `SessionDraftService` (storage I/O, envelope serialization, prefix isolation).
+- **`src/hooks/useSessionDraft.ts`**: The reusable React abstraction bridging local state, initialization, and write-through sync.
+- **`src/components/UnsavedDraftDecision.tsx`**: The decision state UI component rendered inside the existing modal bounds.
+- **Existing Files Modified**:
+  - `src/pages/AdminDashboard.tsx` (Events/News editors bound to the new hook).
+  - `src/pages/StudentDashboard.tsx` (Suggestion composer bound to the new hook).
+  - `src/services/authService.ts` (or equivalent context) to inject logout cleanup.
+  - Translation files (AR/TR/EN JSON dictionaries).
+
+## 18. Explicit Exclusions
+The following components will intentionally **not** use draft persistence:
+- **Destructive Confirmations**: Delete Member, Delete Event, Transfer Role. (These are transient confirmations that should not randomly reopen).
+- **Security Contexts**: Password change, forgot password, login forms.
+- **Transient UI**: Loading states, success banners, network errors.
+- **Read-Only Modals**: Suggestion review/reply panels that don't involve long-form data entry from the viewer.
+
+## 19. Risks / Trade-offs
+- **File Uploads UX**: Users might be briefly confused if text fields are restored but an unuploaded File picker is cleared. The localized `drafts.fileReselectionRequired` notice mitigates this.
+- **Entity Deletions**: In the extremely rare case an entity is deleted while an edit draft is open in another tab, the `invalid` stale cleanup rule cleanly intercepts the conflict.
