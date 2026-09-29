@@ -2062,7 +2062,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
             }}
             translations={translations}
             onTranslationChange={(loc, name, val) => {
-              setTranslations((prev: any) => ({
+              setTranslations((prev) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
               }));
@@ -2323,9 +2323,9 @@ function EventsTab({ events, currentUser }: {
   });
 
   const form = draft.data.form;
-  const setForm = (updater: any) => draft.setData(prev => ({ ...prev, form: typeof updater === 'function' ? updater(prev.form) : updater }));
+  const setForm = (updater: React.SetStateAction<EventDraftData['form']>) => draft.setData(prev => ({ ...prev, form: typeof updater === 'function' ? updater(prev.form) : updater }));
   const translations = draft.data.translations;
-  const setTranslations = (updater: any) => draft.setData(prev => ({ ...prev, translations: typeof updater === 'function' ? updater(prev.translations) : updater }));
+  const setTranslations = (updater: React.SetStateAction<EventDraftData['translations']>) => draft.setData(prev => ({ ...prev, translations: typeof updater === 'function' ? updater(prev.translations) : updater }));
 
   useEffect(() => {
     if (modalOpen && !draft.open) {
@@ -2340,11 +2340,13 @@ function EventsTab({ events, currentUser }: {
 
   const openAdd = () => {
     setEditId(null);
+    draft.setOpen(true);
     setModalOpen(true);
   };
 
   const openEdit = (e: UEvent) => {
     setEditId(e.id);
+    draft.setOpen(true);
     setModalOpen(true);
   };
 
@@ -2404,6 +2406,8 @@ function EventsTab({ events, currentUser }: {
       await refreshPublishedLocalizations();
     }
     draft.clearDraft();
+    draft.setOpen(false);
+    setModalOpen(false);
     setToast({ id: Date.now(), type: 'success', text: t('admin.events.savedSuccess', 'تم حفظ الفعالية وإعدادات التسجيل الدائم.') });
   };
 
@@ -2555,7 +2559,7 @@ function EventsTab({ events, currentUser }: {
             error={isInvalid(invalid, 'image') ? t('admin.events.modal.imageError', 'يرجى رفع صورة الفعالية قبل الحفظ.') : null}
             onUpload={(file, onProgress) => uploadManagedFile('event-image', file, onProgress)}
             onUploaded={(asset) => {
-              setForm((current: any) => ({ ...current, image: asset.publicUrl }));
+              setForm((current) => ({ ...current, image: asset.publicUrl }));
               clearInvalid(setInvalid, 'image');
             }}
           />
@@ -2579,8 +2583,9 @@ function EventsTab({ events, currentUser }: {
           <CmsEntityTranslationTabs
             target="events"
             recordId={editId}
-            activeTab={draft.ui.activeLocale as any}
+            activeTab={draft.ui.activeLocale}
             onActiveTabChange={(t) => draft.setUi(prev => ({...prev, activeLocale: t as 'ar' | 'tr' | 'en'}))}
+            preserveProvidedTranslations={draft.restoredFromStorage}
             onPublishOverride={async (loc, fields) => {
               if (!editId) return;
               await repository.publishOwnedEventLocalization(editId, loc, fields);
@@ -2614,7 +2619,7 @@ function EventsTab({ events, currentUser }: {
             canPublish={canCreate && (!editId || isPresident || ownedEventIds.has(editId))}
             translations={translations}
             onTranslationChange={(loc, name, val) => {
-              setTranslations((prev: any) => ({
+              setTranslations((prev) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
               }));
@@ -2635,7 +2640,7 @@ function EventsTab({ events, currentUser }: {
           </CmsEntityTranslationTabs>
 
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setModalOpen(false)} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
+            <button type="button" onClick={draft.requestClose} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
             <button type="submit" className="btn-primary"><CheckCircle2 className="h-4 w-4" /> {editId ? t('admin.events.modal.saveChanges', 'حفظ التعديلات') : t('common.add', 'إضافة')}</button>
           </div>
         </form>

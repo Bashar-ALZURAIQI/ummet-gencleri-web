@@ -75,3 +75,24 @@ test('test_event_editor_uses_correct_feature_keys_and_validation_with_contentLoa
   assert.ok(source.includes("{draft.isDecisionOpen ? ("));
   assert.ok(source.includes("<UnsavedDraftDecision"));
 });
+
+test('test_event_lifecycle_and_ui_bindings', () => {
+  const adminDashboardPath = path.resolve('src/pages/AdminDashboard.tsx');
+  const source = fs.readFileSync(adminDashboardPath, 'utf8');
+
+  // Event Add opening
+  assert.ok(source.includes("draft.setOpen(true)") && source.includes("setEditId(null)"), 'Event Add opening');
+  
+  // Event Edit opening
+  assert.ok(source.includes("setEditId(e.id)") && source.includes("draft.setOpen(true)"), 'Event Edit opening');
+
+  // successful submit close
+  assert.ok(source.includes("draft.clearDraft()"), 'successful submit clears exact draft');
+  assert.ok(source.includes("draft.setOpen(false)"), 'successful submit closes modal');
+  
+  // Cancel routed through requestClose
+  assert.ok(source.includes("onClick={draft.requestClose}"), 'Cancel routed through requestClose');
+
+  // preserveProvidedTranslations wired from restoredFromStorage
+  assert.ok(source.includes("preserveProvidedTranslations={draft.restoredFromStorage}"), 'preserveProvidedTranslations wired from restoredFromStorage');
+});

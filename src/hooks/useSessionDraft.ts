@@ -24,6 +24,7 @@ export interface UseSessionDraftResult<T> {
   setUi: React.Dispatch<React.SetStateAction<SessionDraftUiState>>;
   dirty: boolean;
   isDecisionOpen: boolean;
+  restoredFromStorage: boolean;
   requestClose: () => void;
   continueEditing: () => void;
   keepDraftAndClose: () => void;
@@ -34,7 +35,7 @@ export interface UseSessionDraftResult<T> {
 export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessionDraftResult<T> {
   const machineRef = useRef<SessionDraftStateMachine<T> | null>(null);
 
-  // Lazy initialization
+  // Lazy initialization for first render
   if (machineRef.current === null) {
     const envelope = options.key ? loadSessionDraft<T>(options.key) : null;
     machineRef.current = new SessionDraftStateMachine(options, envelope);
@@ -46,15 +47,40 @@ export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessi
     setState(machineRef.current!.getState());
   }, []);
 
-  // Watch for validation changing to invalid
+  // Watch for key or userId changes (E1: rebind when key changes)
+  const prevKeyRef = useRef(options.key);
+  const prevUserIdRef = useRef(options.userId);
   useEffect(() => {
-    if (options.validation === 'invalid') {
-      machineRef.current?.clearDraft();
-      // Ensure it stays closed if invalid
-      machineRef.current?.setOpen(false);
-      syncState();
+    const prevKey = prevKeyRef.current;
+    if (prevKey !== options.key || prevUserIdRef.current !== options.userId) {
+      if (machineRef.current) {
+        machineRef.current.flush();
+      }
+      prevKeyRef.current = options.key;
+      prevUserIdRef.current = options.userId;
+      const envelope = options.key ? loadSessionDraft<T>(options.key) : null;
+      machineRef.current = new SessionDraftStateMachine(options, envelope);
+      setState(machineRef.current.getState());
     }
-  }, [options.validation, syncState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options.key, options.userId]);
+
+  // Sync config options (including validation) with machine
+  useEffect(() => {
+    if (machineRef.current) {
+      machineRef.current.updateConfig(options);
+      setState(machineRef.current.getState());
+    }
+  }, [
+    options.key,
+    options.userId,
+    options.defaultData,
+    options.defaultOpen,
+    options.initialUi,
+    options.validation,
+    options.baselineFingerprint,
+    options.isDirty
+  ]);
 
   // Lifecycle flush
   useEffect(() => {
@@ -75,10 +101,11 @@ export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessi
       window.removeEventListener('pagehide', handlePageHide);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setData = useCallback((action: React.SetStateAction<T>) => {
-    const nextData = typeof action === 'function' 
+    const nextData = typeof action === 'function'
       ? (action as (prev: T) => T)(machineRef.current!.getState().data)
       : action;
     machineRef.current!.updateData(nextData);
@@ -132,6 +159,7 @@ export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessi
     setUi,
     dirty: state.dirty,
     isDecisionOpen: state.isDecisionOpen,
+    restoredFromStorage: state.restoredFromStorage,
     requestClose,
     continueEditing,
     keepDraftAndClose,

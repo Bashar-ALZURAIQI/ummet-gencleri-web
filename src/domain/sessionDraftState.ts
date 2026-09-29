@@ -9,6 +9,7 @@ export interface SessionDraftState<T> {
   ui: SessionDraftUiState;
   dirty: boolean;
   isDecisionOpen: boolean;
+  restoredFromStorage: boolean;
 }
 
 export interface SessionDraftConfig<T> {
@@ -32,11 +33,14 @@ export class SessionDraftStateMachine<T> {
     let initialData = config.defaultData;
     let initialOpen = config.defaultOpen ?? false;
     let initialUi = config.initialUi ?? {};
-    let isDecisionOpen = false;
+    const isDecisionOpen = false;
+
+    let restoredFromStorage = false;
 
     if (restoredEnvelope && config.validation !== 'invalid') {
       initialData = restoredEnvelope.value;
       initialOpen = restoredEnvelope.open;
+      restoredFromStorage = true;
       if (restoredEnvelope.ui) {
         initialUi = restoredEnvelope.ui;
       }
@@ -54,12 +58,26 @@ export class SessionDraftStateMachine<T> {
       open: initialOpen,
       ui: initialUi,
       dirty: config.isDirty(initialData),
-      isDecisionOpen
+      isDecisionOpen,
+      restoredFromStorage
     };
   }
 
   public getState(): SessionDraftState<T> {
     return { ...this.state };
+  }
+
+  public updateConfig(newConfig: SessionDraftConfig<T>): void {
+    this.config = newConfig;
+    if (this.config.validation === 'invalid') {
+      this.state.open = false;
+      this.state.isDecisionOpen = false;
+      this.state.data = this.config.defaultData;
+      this.state.dirty = false;
+      if (this.config.key) {
+        removeSessionDraft(this.config.key);
+      }
+    }
   }
 
   public updateData(newData: T): void {
@@ -79,7 +97,11 @@ export class SessionDraftStateMachine<T> {
   }
 
   public requestClose(): void {
-    if (this.state.dirty) {
+    if (this.state.isDecisionOpen) {
+      this.state.isDecisionOpen = false;
+      this.state.open = true;
+      this.persist();
+    } else if (this.state.dirty) {
       this.state.isDecisionOpen = true;
     } else {
       this.state.open = false;
@@ -121,7 +143,7 @@ export class SessionDraftStateMachine<T> {
       removeSessionDraft(this.config.key);
     }
   }
-  
+
   public flush(): void {
     this.persist();
   }

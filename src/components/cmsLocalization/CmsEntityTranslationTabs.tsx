@@ -111,7 +111,7 @@ export function CmsEntityTranslationTabs({
 
   const [internalActiveTab, setInternalActiveTab] = useState<'ar' | LocalizedCmsLocale>('ar');
   const activeTab = controlledActiveTab !== undefined ? controlledActiveTab : internalActiveTab;
-  
+
   const handleTabChange = (tab: 'ar' | LocalizedCmsLocale) => {
     setInternalActiveTab(tab);
     onActiveTabChange?.(tab);

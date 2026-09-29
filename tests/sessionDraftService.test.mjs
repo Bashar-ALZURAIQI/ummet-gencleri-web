@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { 
-  buildSessionDraftKey, 
-  saveSessionDraft, 
-  loadSessionDraft, 
-  removeSessionDraft, 
+import {
+  buildSessionDraftKey,
+  saveSessionDraft,
+  loadSessionDraft,
+  removeSessionDraft,
   clearSessionDraftsForUser,
   findOpenSessionDraft,
   parseSessionDraftKey
@@ -13,26 +13,26 @@ import {
 // Fake Storage
 const mockStorage = {
   store: new Map(),
-  getItem(key) { 
+  getItem(key) {
     if (this.shouldThrowGetItem) throw new Error('getItem failed');
-    return this.store.get(key) || null; 
+    return this.store.get(key) || null;
   },
-  setItem(key, value) { 
+  setItem(key, value) {
     if (this.shouldThrowSetItem) throw new Error('Quota exceeded');
-    this.store.set(key, String(value)); 
+    this.store.set(key, String(value));
   },
-  removeItem(key) { 
+  removeItem(key) {
     if (this.shouldThrowRemoveItem) throw new Error('removeItem failed');
-    this.store.delete(key); 
+    this.store.delete(key);
   },
   clear() { this.store.clear(); },
-  get length() { 
+  get length() {
     if (this.shouldThrowLength) throw new Error('length failed');
-    return this.store.size; 
+    return this.store.size;
   },
-  key(index) { 
+  key(index) {
     if (this.shouldThrowKey) throw new Error('key failed');
-    return Array.from(this.store.keys())[index] || null; 
+    return Array.from(this.store.keys())[index] || null;
   },
   resetThrows() {
     this.shouldThrowGetItem = false;

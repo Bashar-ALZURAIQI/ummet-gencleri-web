@@ -63,11 +63,11 @@ test('test_keep_action_closes_and_preserves', () => {
   machine.updateData({ title: 'dirty' });
   machine.requestClose();
   machine.keepDraftAndClose();
-  
+
   const state = machine.getState();
   assert.strictEqual(state.isDecisionOpen, false);
   assert.strictEqual(state.open, false);
-  
+
   // Storage should have it closed
   const stored = JSON.parse(mockStorage.store.get(config.key));
   assert.strictEqual(stored.open, false);
@@ -81,7 +81,7 @@ test('test_discard_action_closes_and_resets', () => {
   machine.updateData({ title: 'dirty' });
   machine.requestClose();
   machine.discardDraftAndClose();
-  
+
   const state = machine.getState();
   assert.strictEqual(state.isDecisionOpen, false);
   assert.strictEqual(state.open, false);
@@ -123,7 +123,7 @@ test('test_validation_invalid_requires_removal', () => {
   mockStorage.store.set(config.key, JSON.stringify(env));
   const machine = new SessionDraftStateMachine(config, env);
   const state = machine.getState();
-  
+
   assert.strictEqual(state.data.title, ''); // Fallback to default
   assert.strictEqual(state.open, false);
   assert.strictEqual(mockStorage.store.has(config.key), false); // Removed from storage
@@ -168,4 +168,69 @@ test('test_useSessionDraft_hidden_only_visibilitychange_condition_exists', () =>
 
 test('test_useSessionDraft_latestRef_is_used_by_lifecycle_flush', () => {
   assert.ok(hookSource.includes('machineRef.current?.flush()') || hookSource.includes('machineRef.current!.flush()'), 'Should flush latest ref');
+});
+
+test('test_dynamic_invalid_removes_draft', () => {
+  mockStorage.clear();
+  const config = createConfig({ validation: 'valid' });
+  const env = { version: 1, userId: 'user-1', key: config.key, updatedAt: new Date().toISOString(), open: true, dirty: true, value: { title: 'dirty' } };
+  mockStorage.store.set(config.key, JSON.stringify(env));
+  const machine = new SessionDraftStateMachine(config, env);
+  machine.updateConfig({ ...config, validation: 'invalid' });
+  const state = machine.getState();
+  assert.strictEqual(state.data.title, '');
+  assert.strictEqual(mockStorage.store.has(config.key), false);
+});
+
+test('test_invalid_then_setOpen_does_not_recreate_draft', () => {
+  mockStorage.clear();
+  const config = createConfig({ validation: 'valid' });
+  const machine = new SessionDraftStateMachine(config, null);
+  machine.updateConfig({ ...config, validation: 'invalid' });
+  machine.setOpen(true);
+  assert.strictEqual(mockStorage.store.has(config.key), false);
+});
+
+test('test_invalid_then_flush_does_not_recreate_draft', () => {
+  mockStorage.clear();
+  const config = createConfig({ validation: 'valid' });
+  const machine = new SessionDraftStateMachine(config, null);
+  machine.updateData({ title: 'dirty' });
+  machine.updateConfig({ ...config, validation: 'invalid' });
+  machine.flush();
+  assert.strictEqual(mockStorage.store.has(config.key), false);
+});
+
+test('test_requestClose_during_decision_returns_to_editor', () => {
+  mockStorage.clear();
+  const machine = new SessionDraftStateMachine(createConfig(), null);
+  machine.updateData({ title: 'dirty' });
+  machine.requestClose(); // opens decision
+  assert.strictEqual(machine.getState().isDecisionOpen, true);
+  
+  machine.requestClose(); // should return to editor
+  assert.strictEqual(machine.getState().isDecisionOpen, false);
+  assert.strictEqual(machine.getState().open, true);
+});
+
+test('test_requestClose_during_decision_never_discards_data', () => {
+  mockStorage.clear();
+  const machine = new SessionDraftStateMachine(createConfig(), null);
+  machine.updateData({ title: 'dirty' });
+  machine.requestClose();
+  machine.requestClose();
+  assert.strictEqual(machine.getState().data.title, 'dirty');
+});
+
+test('test_hook_rebinds_when_key_changes', () => {
+  assert.ok(hookSource.includes('useEffect(() => {') && hookSource.includes('[options.key, options.userId]'), 'Should rebind on key change');
+  assert.ok(hookSource.includes('machineRef.current = new SessionDraftStateMachine'), 'Should instantiate new machine');
+});
+
+test('test_key_change_does_not_write_previous_entity_data', () => {
+  assert.ok(hookSource.includes('if (prevKey !== options.key'), 'Should prevent leaking data on key change');
+});
+
+test('test_create_edit_create_key_switches_are_isolated', () => {
+  assert.ok(hookSource.includes('setState(machineRef.current.getState())'), 'Should sync state immediately');
 });

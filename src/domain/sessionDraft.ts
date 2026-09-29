@@ -46,17 +46,17 @@ export function parseSessionDraftKey(key: string): ParsedSessionDraftKey | null 
   const parts = key.split(':');
   if (parts.length < 5) return null;
   if (parts[0] !== 'draft' || parts[1] !== 'v1') return null;
-  
+
   const userId = parts[2];
   if (!isValidUserId(userId)) return null;
-  
+
   const last = parts[parts.length - 1];
   const secondToLast = parts[parts.length - 2];
-  
+
   let mode: 'create' | 'edit';
   let entityId: string | undefined;
   let featureEndIndex: number;
-  
+
   if (last === 'create') {
     mode = 'create';
     featureEndIndex = parts.length - 1;
@@ -68,13 +68,13 @@ export function parseSessionDraftKey(key: string): ParsedSessionDraftKey | null 
   } else {
     return null;
   }
-  
+
   const featureParts = parts.slice(3, featureEndIndex);
   if (featureParts.length === 0) return null;
   for (const seg of featureParts) {
     if (!isValidFeatureSegment(seg)) return null;
   }
-  
+
   const feature = featureParts.join(':');
   return { userId, feature, mode, entityId };
 }
@@ -137,11 +137,11 @@ function ensureJsonSafe(value: any, seen: Set<any>): boolean {
     return true;
   }
   if (isUnsupportedRuntimeValue(value)) return false;
-  
+
   if (typeof value === 'object') {
     if (seen.has(value)) return false; // Cyclic
     seen.add(value);
-    
+
     if (Array.isArray(value)) {
       for (const item of value) {
         if (!ensureJsonSafe(item, seen)) return false;
@@ -163,10 +163,10 @@ function validateSessionDraftEnvelopeForKey(key: string, data: any): boolean {
   if (data.version !== 1) return false;
   if (data.key !== key) return false;
   if (typeof data.userId !== 'string' || data.userId === '') return false;
-  
+
   const parsedKey = parseSessionDraftKey(key);
   if (!parsedKey || parsedKey.userId !== data.userId) return false;
-  
+
   if (typeof data.updatedAt !== 'string') return false;
   const time = Date.parse(data.updatedAt);
   if (!Number.isFinite(time)) return false;
@@ -239,7 +239,7 @@ export function clearSessionDraftsForUser(userId: string): void {
         key = sessionStorage.key(i);
       } catch {
         // enumeration failure policy: skip this but don't abort for clearing
-        continue; 
+        continue;
       }
       if (key && key.startsWith(prefix)) {
         const parsed = parseSessionDraftKey(key);
@@ -276,11 +276,11 @@ export function findOpenSessionDraft<T>(userId: string, feature: string): Locate
       let key: string | null = null;
       try {
         key = sessionStorage.key(i);
-      } catch { 
+      } catch {
         // enumeration failure policy: return null if enumeration itself cannot safely proceed
         return null;
       }
-      
+
       if (key && key.startsWith(prefix)) {
         const parsedKey = parseSessionDraftKey(key);
         if (parsedKey && parsedKey.userId === userId && parsedKey.feature === feature) {
