@@ -1,3 +1,9 @@
+export type SessionDraftUiState = {
+  activeLocale?: 'ar' | 'tr' | 'en';
+  activeTab?: string;
+  fileReselectionRequired?: boolean;
+};
+
 export interface SessionDraftEnvelope<T> {
   version: 1;
   userId: string;
@@ -7,7 +13,7 @@ export interface SessionDraftEnvelope<T> {
   dirty: boolean;
   baselineFingerprint?: string;
   value: T;
-  ui?: any;
+  ui?: SessionDraftUiState;
 }
 
 export type LocatedSessionDraft<T> = {
@@ -16,6 +22,52 @@ export type LocatedSessionDraft<T> = {
   entityId?: string;
   envelope: SessionDraftEnvelope<T>;
 };
+
+export type ParsedSessionDraftKey = {
+  userId: string;
+  feature: string;
+  mode: 'create' | 'edit';
+  entityId?: string;
+};
+
+export function parseSessionDraftKey(key: string): ParsedSessionDraftKey | null {
+  // grammar: draft:v1:<userId>:<feature>:<mode>[:entityId]
+  const parts = key.split(':');
+  if (parts.length < 5) return null;
+  if (parts[0] !== 'draft' || parts[1] !== 'v1') return null;
+
+  const userId = parts[2];
+  if (!userId) return null;
+
+  // mode is always the last part if create, or second to last if edit.
+  // wait, feature can contain colons.
+  // let's scan from the end.
+  const last = parts[parts.length - 1];
+  const secondToLast = parts[parts.length - 2];
+
+  let mode: 'create' | 'edit';
+  let entityId: string | undefined;
+  let featureEndIndex: number;
+
+  if (last === 'create') {
+    mode = 'create';
+    featureEndIndex = parts.length - 1;
+  } else if (secondToLast === 'edit') {
+    mode = 'edit';
+    entityId = last;
+    if (!entityId) return null;
+    featureEndIndex = parts.length - 2;
+  } else {
+    return null; // Unknown mode or malformed
+  }
+
+  const featureParts = parts.slice(3, featureEndIndex);
+  if (featureParts.length === 0) return null;
+
+  const feature = featureParts.join(':');
+
+  return { userId, feature, mode, entityId };
+}
 
 export function buildSessionDraftKey(
   userId: string,
@@ -41,18 +93,52 @@ export function buildSessionDraftKey(
   return mode === 'edit' ? `${base}:${entityId}` : base;
 }
 
-function safeStringify(value: any): string {
-  return JSON.stringify(value, (key, val) => {
-    if (val instanceof File || val instanceof Blob || val instanceof Promise) {
-      return undefined;
+function isUnsupportedRuntimeValue(val: any): boolean {
+  if (val === undefined) return true;
+  if (typeof val === 'function') return true;
+  if (typeof val === 'symbol') return true;
+  if (typeof val === 'bigint') return true;
+  if (typeof val === 'number' && !Number.isFinite(val)) return true;
+  if (typeof Promise !== 'undefined' && val instanceof Promise) return true;
+  if (typeof File !== 'undefined' && val instanceof File) return true;
+  if (typeof Blob !== 'undefined' && val instanceof Blob) return true;
+  if (typeof AbortController !== 'undefined' && val instanceof AbortController) return true;
+  if (typeof Node !== 'undefined' && val instanceof Node) return true;
+  return false;
+}
+
+function ensureJsonSafe(value: any, seen: Set<any>): boolean {
+  if (value === null) return true;
+  if (typeof value === 'string' || typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) {
+    return true;
+  }
+  if (isUnsupportedRuntimeValue(value)) return false;
+
+  if (typeof value === 'object') {
+    if (seen.has(value)) return false; // Cyclic
+    seen.add(value);
+
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (!ensureJsonSafe(item, seen)) return false;
+      }
+    } else {
+      for (const k of Object.keys(value)) {
+        if (!ensureJsonSafe(value[k], seen)) return false;
+      }
     }
-    return val;
-  });
+    seen.delete(value);
+    return true;
+  }
+  return false;
 }
 
 export function saveSessionDraft<T>(key: string, envelope: SessionDraftEnvelope<T>): boolean {
   try {
-    const json = safeStringify(envelope);
+    if (!ensureJsonSafe(envelope, new Set())) {
+      return false;
+    }
+    const json = JSON.stringify(envelope);
     sessionStorage.setItem(key, json);
     return true;
   } catch (err) {
@@ -65,16 +151,35 @@ export function loadSessionDraft<T>(key: string): SessionDraftEnvelope<T> | null
     const item = sessionStorage.getItem(key);
     if (!item) return null;
     const data = JSON.parse(item);
-    
-    // Envelope validation
-    if (!data || typeof data !== 'object') return null;
+
+    // Validate Envelope Shape
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
     if (data.version !== 1) return null;
-    if (!data.key || data.key !== key) return null;
-    if (!data.userId) return null;
+    if (data.key !== key) return null;
+    if (typeof data.userId !== 'string' || data.userId === '') return null;
+
+    const parsedKey = parseSessionDraftKey(key);
+    if (!parsedKey || parsedKey.userId !== data.userId) return null;
+
     if (typeof data.updatedAt !== 'string') return null;
+    const time = Date.parse(data.updatedAt);
+    if (!Number.isFinite(time)) return null;
+
     if (typeof data.open !== 'boolean') return null;
     if (typeof data.dirty !== 'boolean') return null;
     if (data.value === undefined) return null;
+    if (!ensureJsonSafe(data.value, new Set())) return null;
+
+    if (data.baselineFingerprint !== undefined && typeof data.baselineFingerprint !== 'string') {
+      return null;
+    }
+
+    if (data.ui !== undefined) {
+      if (typeof data.ui !== 'object' || Array.isArray(data.ui)) return null;
+      if (data.ui.activeLocale !== undefined && !['ar', 'tr', 'en'].includes(data.ui.activeLocale)) return null;
+      if (data.ui.activeTab !== undefined && typeof data.ui.activeTab !== 'string') return null;
+      if (data.ui.fileReselectionRequired !== undefined && typeof data.ui.fileReselectionRequired !== 'boolean') return null;
+    }
 
     return data as SessionDraftEnvelope<T>;
   } catch (err) {
@@ -92,41 +197,66 @@ export function removeSessionDraft(key: string): void {
 
 export function clearSessionDraftsForUser(userId: string): void {
   try {
+    if (userId.includes(':')) return; // delimiter safety
     const prefix = `draft:v1:${userId}:`;
+    let len: number;
+    try {
+      len = sessionStorage.length;
+    } catch { return; }
+
     const keysToRemove: string[] = [];
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i);
-      if (key && key.startsWith(prefix)) {
-        keysToRemove.push(key);
+    for (let i = 0; i < len; i++) {
+      try {
+        const key = sessionStorage.key(i);
+        if (key && key.startsWith(prefix)) {
+          const parsed = parseSessionDraftKey(key);
+          // ensure it's exact user, not just string prefix match
+          if (parsed && parsed.userId === userId) {
+            keysToRemove.push(key);
+          }
+        }
+      } catch {
+        continue;
       }
     }
-    keysToRemove.forEach(k => sessionStorage.removeItem(k));
+    for (const k of keysToRemove) {
+      try {
+        sessionStorage.removeItem(k);
+      } catch {
+        // Ignore individual failures
+      }
+    }
   } catch (err) {
     // Ignore
   }
 }
+
 export function findOpenSessionDraft<T>(userId: string, feature: string): LocatedSessionDraft<T> | null {
   try {
+    if (userId.includes(':')) return null;
     const prefix = `draft:v1:${userId}:${feature}:`;
+    let len: number;
+    try {
+      len = sessionStorage.length;
+    } catch { return null; }
+
     const openDrafts: LocatedSessionDraft<T>[] = [];
 
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i);
-      if (key && key.startsWith(prefix)) {
-        const envelope = loadSessionDraft<T>(key);
-        if (envelope && envelope.open) {
-          // Parse mode and entityId
-          const remaining = key.substring(prefix.length);
-          const parts = remaining.split(':');
-          
-          if (parts[0] === 'create' || parts[0] === 'edit') {
-            const mode = parts[0] as 'create' | 'edit';
-            const entityId = mode === 'edit' ? parts.slice(1).join(':') : undefined;
+    for (let i = 0; i < len; i++) {
+      let key: string | null = null;
+      try {
+        key = sessionStorage.key(i);
+      } catch { continue; }
 
+      if (key && key.startsWith(prefix)) {
+        const parsedKey = parseSessionDraftKey(key);
+        if (parsedKey && parsedKey.userId === userId && parsedKey.feature === feature) {
+          const envelope = loadSessionDraft<T>(key);
+          if (envelope && envelope.open) {
             openDrafts.push({
               key,
-              mode,
-              entityId,
+              mode: parsedKey.mode,
+              entityId: parsedKey.entityId,
               envelope
             });
           }
@@ -137,8 +267,8 @@ export function findOpenSessionDraft<T>(userId: string, feature: string): Locate
     if (openDrafts.length === 0) return null;
 
     openDrafts.sort((a, b) => {
-      const timeA = new Date(a.envelope.updatedAt).getTime();
-      const timeB = new Date(b.envelope.updatedAt).getTime();
+      const timeA = Date.parse(a.envelope.updatedAt);
+      const timeB = Date.parse(b.envelope.updatedAt);
       if (timeA !== timeB) return timeB - timeA; // Descending
       return a.key.localeCompare(b.key);
     });
@@ -148,8 +278,9 @@ export function findOpenSessionDraft<T>(userId: string, feature: string): Locate
     // Normalize older drafts to open: false
     for (let i = 1; i < openDrafts.length; i++) {
       const older = openDrafts[i];
-      older.envelope.open = false;
-      saveSessionDraft(older.key, older.envelope);
+      // Do not mutate older.envelope before saving
+      const closedEnvelope = { ...older.envelope, open: false };
+      saveSessionDraft(older.key, closedEnvelope);
     }
 
     return winner;
