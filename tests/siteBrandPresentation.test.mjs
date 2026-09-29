@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 
 async function read(path) {
   try {
@@ -89,4 +89,36 @@ test('brand presentation wires the current logo into the navbar and app provider
   assert.match(faviconSynchronizer, /createElement\(['"]link['"]\)/);
   assert.match(app, /<DynamicFavicon\s*\/>/);
   assert.match(app, /<AppProvider>[\s\S]*<DynamicFavicon\s*\/>[\s\S]*<Router\s*\/>[\s\S]*<\/AppProvider>/);
+});
+
+test('favicon static artifacts correctly point to public branding assets', async () => {
+  const [indexHtml, manifestJson] = await Promise.all([
+    read('index.html'),
+    read('public/manifest.webmanifest'),
+  ]);
+
+  const { DEFAULT_FAVICON_HREF } = await loadFaviconModule();
+
+  // index.html correctly configured
+  assert.match(indexHtml, /<link rel="icon" href="\/favicon\.png" \/>/, 'index.html favicon points to /favicon.png');
+  assert.doesNotMatch(indexHtml, /union-push-icon\.svg/i, 'index.html must not use push icon as favicon');
+  assert.doesNotMatch(indexHtml, /type="image\//i, 'favicon link must not hardcode MIME type incompatible with future formats');
+
+  // DEFAULT_FAVICON_HREF matches static configuration
+  assert.equal(DEFAULT_FAVICON_HREF, '/favicon.png', 'fallback favicon href matches static file');
+
+  // manifest.webmanifest correctly configured
+  assert.doesNotMatch(manifestJson, /union-push-icon\.svg/i, 'manifest must not use push icon');
+  const manifest = JSON.parse(manifestJson);
+  const icon192 = manifest.icons.find(i => i.sizes === '192x192');
+  const icon512 = manifest.icons.find(i => i.sizes === '512x512');
+
+  assert.ok(icon192, 'manifest must declare 192x192 icon');
+  assert.equal(icon192.src, '/icons/union-brand-192.png');
+  assert.ok(icon512, 'manifest must declare 512x512 icon');
+  assert.equal(icon512.src, '/icons/union-brand-512.png');
+
+  for (const icon of manifest.icons) {
+    assert.doesNotMatch(icon.purpose || '', /maskable/i, 'manifest must NOT claim maskable unless a dedicated verified maskable file exists');
+  }
 });
