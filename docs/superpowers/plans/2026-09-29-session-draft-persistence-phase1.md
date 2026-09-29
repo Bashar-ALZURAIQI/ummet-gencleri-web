@@ -30,7 +30,7 @@ The five highest-risk implementation failure classes mapped to concrete tests:
 3. **Escape/Focus Trapping Conflicts:** Adding a decision overlay could cause an Escape press to accidentally dismiss both the decision state and the outer editor entirely.
    - *Test:* Manual Check - Escape in Decision state keeps editor open and active.
 4. **Stale Edit-Draft Validation Conflict:** A user might have a saved edit draft for an Event that gets deleted by another Admin. If not validated, opening it could crash or re-create an invalid state.
-   - *Test:* `tests/sessionDraftState.test.mjs` - `test_validation_remains_unknown_if_missing_but_loading` and `test_validation_invalid_deletes_draft`
+   - *Test:* `tests/sessionDraftState.test.mjs` - `test_validation_remains_unknown_if_missing_but_loading` and `test_validation_invalid_triggers_removal`
 5. **SessionStorage Quota Exceeded/Disabled:** Incognito mode or a full disk might throw errors on `setItem`, breaking the entire page.
    - *Test:* `tests/sessionDraftService.test.mjs` - `test_save_fails_gracefully_when_sessionStorage_throws`
 
@@ -113,19 +113,26 @@ Create the storage abstraction that handles keys, envelopes, discovery, and safe
 
 **TDD Steps:**
 - [ ] Write failing test `test_buildSessionDraftKey_outputs_exact_grammar` in `tests/sessionDraftService.test.mjs`
-- [ ] Run `node --test tests/sessionDraftService.test.mjs`
-- [ ] Expected: FAIL because it doesn't exist
+- [ ] Write failing test `test_buildSessionDraftKey_separates_create_edit`
+- [ ] Write failing test `test_buildSessionDraftKey_separates_entities`
+- [ ] Run `node --test tests/sessionDraftService.test.mjs` -> Expected FAIL
 - [ ] Implement `buildSessionDraftKey`
-- [ ] Run same test -> Expected: PASS
-- [ ] Write failing tests for `saveSessionDraft`, `loadSessionDraft`, `removeSessionDraft`, isolating user JSON payload.
-- [ ] Run command -> Expected: FAIL
-- [ ] Implement storage adapters with `try/catch`.
-- [ ] Run test -> Expected: PASS
-- [ ] Write failing tests for `findOpenSessionDraft` ensuring it finds open create drafts, extracts entity IDs from edit drafts, isolates users, and resolves timestamp conflicts deterministically.
-- [ ] Run command -> Expected: FAIL
+- [ ] Run test -> Expected PASS
+- [ ] Write failing test `test_save_load_roundtrips_JSON`
+- [ ] Write failing test `test_load_handles_malformed_JSON`
+- [ ] Write failing test `test_strips_invalid_data`
+- [ ] Write failing test `test_clearSessionDraftsForUser_deletes_only_matched_user_prefix`
+- [ ] Write failing test `test_save_fails_gracefully_when_sessionStorage_throws`
+- [ ] Run test -> Expected FAIL
+- [ ] Implement storage adapters
+- [ ] Run test -> Expected PASS
+- [ ] Write failing test `test_findOpenSessionDraft_discovers_open_create`
+- [ ] Write failing test `test_findOpenSessionDraft_extracts_entityId`
+- [ ] Write failing test `test_findOpenSessionDraft_isolates_users`
+- [ ] Write failing test `test_findOpenSessionDraft_resolves_timestamp_conflicts`
+- [ ] Run test -> Expected FAIL
 - [ ] Implement `findOpenSessionDraft`
-- [ ] Run test -> Expected: PASS
-- [ ] Run all regression tests
+- [ ] Run test -> Expected PASS
 - [ ] Commit `feat: add session draft storage foundation`
 
 ---
@@ -148,17 +155,16 @@ Extract the business logic into a pure module and create the reusable React hook
 
 **TDD Steps:**
 - [ ] Write failing test `test_validation_remains_unknown_if_missing_but_loading` in `tests/sessionDraftState.test.mjs`
-- [ ] Run `node --test tests/sessionDraftState.test.mjs`
-- [ ] Expected: FAIL
-- [ ] Implement `computeDraftValidationState` in `sessionDraftState.ts`
-- [ ] Run same test -> Expected: PASS
 - [ ] Write failing test `test_validation_invalid_triggers_removal`
-- [ ] Run command -> Expected: FAIL
-- [ ] Implement removal logic
-- [ ] Run same test -> Expected: PASS
+- [ ] Write failing test `test_dirty_close_enters_decision`
+- [ ] Write failing test `test_continue_action_keeps_open`
+- [ ] Write failing test `test_keep_action_closes_and_saves`
+- [ ] Write failing test `test_discard_action_clears_data`
+- [ ] Write failing test `test_pristine_close_bypasses_decision`
+- [ ] Run `node --test tests/sessionDraftState.test.mjs` -> Expected FAIL
+- [ ] Implement `computeDraftValidationState` and transition logic in `sessionDraftState.ts`
+- [ ] Run test -> Expected PASS
 - [ ] Implement `useSessionDraft.ts` React bindings according to locked API
-- [ ] Write integration test `test_hook_wiring_and_stale_validation` in `tests/sessionDraftIntegration.test.mjs`
-- [ ] Run `node --test tests/sessionDraftIntegration.test.mjs`
 - [ ] Commit `feat: add persistent session draft hook and state logic`
 
 ---
@@ -208,8 +214,11 @@ Wire the Admin Events forms to the new draft architecture and implement open dra
 ```
 
 **Stale Validation Provider:**
-- President: Event ID exists in global `events` array => `valid`.
-- Non-President: Relies on `ownedEventIdsLoaded` (or equivalent async state). Before `listOwnEventIds()` resolves, validation = `unknown`. If loaded and event exists but not owned => `invalid`. If loaded and owned => `valid`.
+- Relies on `contentLoading` from `AppContext` and `ownedEventIdsLoaded` (for non-presidents).
+- **ALL ROLES**: If `contentLoading === true`, validation = `unknown`.
+- **After `contentLoading === false`**:
+  - *President*: Event ID exists in global `events` array => `valid`. If missing => `invalid`.
+  - *Non-President*: If `ownedEventIdsLoaded` is false => `unknown`. If failed/unauthorized => remain `unknown` (do not delete). Only after **BOTH** `contentLoading === false` and `ownedEventIdsLoaded === true`: if event missing => `invalid`, if exists but not owned => `invalid`, if exists and owned => `valid`.
 
 **Files Modified:**
 - `src/pages/AdminDashboard.tsx`
@@ -223,7 +232,7 @@ Wire the Admin Events forms to the new draft architecture and implement open dra
 - Successful submit clears the draft.
 
 **TDD Steps:**
-- [ ] Write integration test `test_event_editor_uses_correct_feature_keys_and_validation` in `tests/sessionDraftIntegration.test.mjs`
+- [ ] Write integration test `test_event_editor_uses_correct_feature_keys_and_validation_with_contentLoading` in `tests/sessionDraftIntegration.test.mjs`
 - [ ] Run `node --test tests/sessionDraftIntegration.test.mjs` -> Expected: FAIL
 - [ ] Implement `findOpenSessionDraft` lookup and hook integration in `EventsManagement`.
 - [ ] Run test -> Expected: PASS
@@ -327,35 +336,42 @@ Intercept the logout flow to defensively clear owned drafts.
 
 ## Task 8 — Phase 1 integration/regression verification
 
-Execute final verification against the testing matrix.
+### Summary of Test Requirements
+- **Approved behavioral requirements:** 33
+- **Requirements covered by automation:** 17
+- **Requirements covered by manual acceptance:** 16
+- **Planned automated `test(...)` cases:** 24
+- **Planned manual acceptance scenarios/checks:** 16
+
+### Mapping Matrix
 
 | # | Requirement | Task | Automated Test File/Test Name | Manual? |
 |---|---|---|---|---|
 | 1 | Draft survives component unmount/remount. | T4/T6 | N/A | Yes |
 | 2 | Draft survives internal page navigation. | T4/T6 | N/A | Yes |
-| 3 | `open=true` draft auto-reopens correctly upon returning. | T1 | `tests/sessionDraftService.test.mjs` - `test_findOpenSessionDraft_discovers_open_create` | No |
-| 4 | Exact form string/boolean values restore correctly. | T1 | `tests/sessionDraftService.test.mjs` - `test_save_load_roundtrips_JSON` | No |
-| 5 | AR/TR/EN translation payloads restore accurately. | T1 | `tests/sessionDraftService.test.mjs` - `test_save_load_roundtrips_JSON` | No |
+| 3 | `open=true` draft auto-reopens correctly upon returning. | T1 | `test_findOpenSessionDraft_discovers_open_create` | No |
+| 4 | Exact form string/boolean values restore correctly. | T1 | `test_save_load_roundtrips_JSON` | No |
+| 5 | AR/TR/EN translation payloads restore accurately. | T1 | `test_save_load_roundtrips_JSON` | No |
 | 6 | Active translation locale tab restores seamlessly. | T4/T5 | N/A | Yes |
-| 7 | Create and Edit keys categorically cannot collide. | T1 | `tests/sessionDraftService.test.mjs` - `test_key_builder_separates_create_edit` | No |
-| 8 | Edit Entity A and Edit Entity B keys cannot collide. | T1 | `tests/sessionDraftService.test.mjs` - `test_key_builder_separates_entities` | No |
-| 9 | User A cannot read, restore, or access User B's draft. | T1 | `tests/sessionDraftService.test.mjs` - `test_findOpenSessionDraft_isolates_users` | No |
+| 7 | Create and Edit keys categorically cannot collide. | T1 | `test_buildSessionDraftKey_separates_create_edit` | No |
+| 8 | Edit Entity A and Edit Entity B keys cannot collide. | T1 | `test_buildSessionDraftKey_separates_entities` | No |
+| 9 | User A cannot read, restore, or access User B's draft. | T1 | `test_findOpenSessionDraft_isolates_users` | No |
 | 10 | Successful form submission automatically clears the draft. | T4/T6 | N/A | Yes |
 | 11 | Failed form submission safely keeps the draft. | T4/T6 | N/A | Yes |
-| 12 | Dirty explicit close transitions accurately to decision state. | T2 | `tests/sessionDraftState.test.mjs` - `test_dirty_close_enters_decision` | No |
-| 13 | "Continue Editing" successfully keeps the editor open. | T2 | `tests/sessionDraftState.test.mjs` - `test_continue_action_keeps_open` | No |
-| 14 | "Keep Draft" closes the editor + retains data + saves `open=false`. | T2 | `tests/sessionDraftState.test.mjs` - `test_keep_action_closes_and_saves` | No |
+| 12 | Dirty explicit close transitions accurately to decision state. | T2 | `test_dirty_close_enters_decision` | No |
+| 13 | "Continue Editing" successfully keeps the editor open. | T2 | `test_continue_action_keeps_open` | No |
+| 14 | "Keep Draft" closes the editor + retains data + saves `open=false`. | T2 | `test_keep_action_closes_and_saves` | No |
 | 15 | Manually invoking Add/Edit for a saved closed draft rehydrates. | T4/T6 | N/A | Yes |
-| 16 | "Discard Draft" clears the data and closes the editor. | T2 | `tests/sessionDraftState.test.mjs` - `test_discard_action_clears_data` | No |
-| 17 | Pristine close bypasses the decision prompt entirely. | T2 | `tests/sessionDraftState.test.mjs` - `test_pristine_close_bypasses_decision` | No |
-| 18 | Explicit logout successfully clears owned drafts. | T7 | `tests/sessionDraftIntegration.test.mjs` - `test_logout_calls_clearSessionDraftsForUser_with_currentUserId` | No |
-| 19 | Malformed JSON handles safely and does not crash the UI. | T1 | `tests/sessionDraftService.test.mjs` - `test_load_handles_malformed_JSON` | No |
-| 20 | `sessionStorage` unavailable/throws degrades gracefully. | T1 | `tests/sessionDraftService.test.mjs` - `test_save_fails_gracefully_when_sessionStorage_throws` | No |
+| 16 | "Discard Draft" clears the data and closes the editor. | T2 | `test_discard_action_clears_data` | No |
+| 17 | Pristine close bypasses the decision prompt entirely. | T2 | `test_pristine_close_bypasses_decision` | No |
+| 18 | Explicit logout successfully clears owned drafts. | T7 | `test_logout_calls_clearSessionDraftsForUser_with_currentUserId` | No |
+| 19 | Malformed JSON handles safely and does not crash the UI. | T1 | `test_load_handles_malformed_JSON` | No |
+| 20 | `sessionStorage` unavailable/throws degrades gracefully. | T1 | `test_save_fails_gracefully_when_sessionStorage_throws` | No |
 | 21 | Confirmation/read-only modals are proven to bypass persistence. | N/A | N/A (Excluded by design) | Yes |
 | 22 | Passwords/tokens/security data are proven to bypass persistence. | N/A | N/A (Excluded by design) | Yes |
-| 23 | `File`, `Blob`, and runtime objects are never serialized. | T1 | `tests/sessionDraftService.test.mjs` - `test_strips_invalid_data` | No |
-| 24 | Stale edit draft patiently waits while validation is `unknown`. | T2 | `tests/sessionDraftState.test.mjs` - `test_validation_remains_unknown_if_missing_but_loading` | No |
-| 25 | Stale deleted/unauthorized edit draft is removed strictly only after `invalid` is confirmed. | T2 | `tests/sessionDraftState.test.mjs` - `test_validation_invalid_triggers_removal` | No |
+| 23 | `File`, `Blob`, and runtime objects are never serialized. | T1 | `test_strips_invalid_data` | No |
+| 24 | Stale edit draft patiently waits while validation is `unknown`. | T2 | `test_validation_remains_unknown_if_missing_but_loading` | No |
+| 25 | Stale deleted/unauthorized edit draft is removed strictly only after `invalid` is confirmed. | T2 | `test_validation_invalid_triggers_removal` | No |
 | 26 | Visibility/pagehide flush always uses the latest value. | T2 | N/A | Yes |
 | 27 | Restored modal does not flash an empty state before hydration. | T2 | N/A | Yes |
 | 28 | Separate browser tabs naturally maintain isolated `sessionStorage`. | T1 | N/A (Native browser feature) | Yes |
