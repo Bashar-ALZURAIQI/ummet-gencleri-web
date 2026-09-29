@@ -13,6 +13,7 @@ import {
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, type ServiceResult } from '../lib/supabase';
+import { clearSessionDraftsForUser } from '../domain/sessionDraft';
 import { i18n } from '../i18n/config.ts';
 import { overlayLocalizedCmsPayload } from '../domain/cmsPublicRead.ts';
 import { createVisibilityRefreshPolling } from '../domain/visibilityRefreshPolling.ts';
@@ -2636,7 +2637,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const logoutEpoch = authEpoch.suspendEvents();
     latestAuthEventRef.current = null;
     explicitLoginIntentEpochRef.current = null;
-    const currentUserId = currentUser?.userId;
+    const currentUserId = currentUser?.userId ?? currentStudent?.id;
+    if (currentUserId) {
+      clearSessionDraftsForUser(currentUserId);
+    }
     setCurrentStudent(null);
     setCurrentUser(null);
     setAuthError(null);
