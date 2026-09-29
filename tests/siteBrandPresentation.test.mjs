@@ -122,3 +122,44 @@ test('favicon static artifacts correctly point to public branding assets', async
     assert.doesNotMatch(icon.purpose || '', /maskable/i, 'manifest must NOT claim maskable unless a dedicated verified maskable file exists');
   }
 });
+
+test('SEO structured data properly identifies the union', async () => {
+  const indexHtml = await read('index.html');
+
+  assert.match(indexHtml, /<meta name="application-name" content="Ümmet Gençleri Birliği" \/>/, 'application-name is present');
+  assert.match(indexHtml, /<meta property="og:site_name" content="Ümmet Gençleri Birliği" \/>/, 'og:site_name is present');
+  assert.match(indexHtml, /<link rel="canonical" href="https:\/\/ummet-genc\.vercel\.app\/" \/>/, 'canonical URL is correctly present with trailing slash');
+
+  const jsonLdMatch = indexHtml.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+  assert.ok(jsonLdMatch, 'JSON-LD script must exist');
+  
+  const jsonLdText = jsonLdMatch[1];
+  assert.doesNotMatch(jsonLdText, /Vercel/, 'structured data site name must not be Vercel');
+
+  const structuredData = JSON.parse(jsonLdText);
+  assert.equal(structuredData['@context'], 'https://schema.org');
+
+  const graph = structuredData['@graph'];
+  assert.ok(Array.isArray(graph), 'should use @graph array');
+
+  const org = graph.find(e => e['@type'] === 'Organization');
+  assert.ok(org, 'Organization entity must exist');
+  assert.equal(org.name, 'Ümmet Gençleri Birliği');
+  assert.ok(org.alternateName.includes('اتحاد شباب الأمة'));
+  assert.ok(org.alternateName.includes('UMS Union'));
+  assert.ok(org.alternateName.includes('Ummah Youth Union'));
+  assert.equal(org.url, 'https://ummet-genc.vercel.app/');
+  assert.equal(org.logo['@type'], 'ImageObject');
+  assert.equal(org.logo.url, 'https://ummet-genc.vercel.app/favicon.png');
+  assert.equal(org.logo.width, 898);
+  assert.equal(org.logo.height, 898);
+
+  const website = graph.find(e => e['@type'] === 'WebSite');
+  assert.ok(website, 'WebSite entity must exist');
+  assert.equal(website.name, 'Ümmet Gençleri Birliği');
+  assert.ok(website.alternateName.includes('اتحاد شباب الأمة'));
+  assert.ok(website.alternateName.includes('UMS Union'));
+  assert.ok(website.alternateName.includes('Ummah Youth Union'));
+  assert.equal(website.url, 'https://ummet-genc.vercel.app/');
+  assert.equal(website.publisher['@id'], org['@id']);
+});
