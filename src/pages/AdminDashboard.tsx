@@ -3269,7 +3269,19 @@ function MembersTab({ members, currentUser, transferMemberRole, revokeExecutiveA
   removeMember: ReturnType<typeof useApp>['removeMember'];
 }) {
   const { t } = useTranslation();
-  const [search, setSearch] = useState('');
+  
+  const panelDraftKey = currentUser?.userId ? buildSessionDraftKey(currentUser.userId, 'admin:members-panel', 'edit', 'tab') : null;
+  const panelDraft = useSessionDraft({
+    key: panelDraftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: { search: '' },
+    defaultOpen: true,
+    validation: { readiness: 'VALID' },
+    isDirty: () => true
+  });
+  const search = panelDraft.data.search;
+  const setSearch = (s: string) => panelDraft.setData(p => ({ ...p, search: s }));
+
   const [roleModal, setRoleModal] = useState<ReturnType<typeof useApp>['members'][0] | null>(null);
   const [removeCandidate, setRemoveCandidate] = useState<ReturnType<typeof useApp>['members'][0] | null>(null);
   const [roleForm, setRoleForm] = useState<UserRole | ''>('');
@@ -3635,8 +3647,21 @@ function ApplicationsTab({
   retryApplicationEmailNotification: (applicationId: string, eventType: ApplicationEmailEventType) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const { t } = useTranslation();
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  
+  const panelDraftKey = currentUser?.userId ? buildSessionDraftKey(currentUser.userId, 'admin:applications-panel', 'edit', 'tab') : null;
+  const panelDraft = useSessionDraft({
+    key: panelDraftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: { search: '', statusFilter: 'all' },
+    defaultOpen: true,
+    validation: { readiness: 'VALID' },
+    isDirty: () => true
+  });
+  const search = panelDraft.data.search;
+  const setSearch = (s: string) => panelDraft.setData(p => ({ ...p, search: s }));
+  const statusFilter = panelDraft.data.statusFilter;
+  const setStatusFilter = (s: string) => panelDraft.setData(p => ({ ...p, statusFilter: s }));
+
   const [editInterviewId, setEditInterviewId] = useState<string | null>(null);
   const [editDecisionId, setEditDecisionId] = useState<string | null>(null);
 
