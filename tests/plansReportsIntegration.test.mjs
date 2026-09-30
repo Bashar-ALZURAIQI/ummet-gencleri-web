@@ -15,6 +15,9 @@ test('test_plans_use_session_draft', () => {
   assert.ok(source.includes("buildSessionDraftKey(currentUser.userId, 'admin:plan', editPlanId === 'create' ? 'create' : 'edit', editPlanId === 'create' ? undefined : editPlanId)"), 'Must build plan edit key');
   assert.ok(source.includes("planDraft.clearDraft()"), 'Plan submit success must clear draft');
   assert.ok(source.includes("<UnsavedDraftDecision onContinue={planDraft.continueEditing} onKeep={planDraft.keepDraftAndClose} onDiscard={planDraft.discardDraftAndClose} />"), 'Must render UnsavedDraftDecision for plan');
+  // Regression test for create sentinel
+  assert.ok(source.includes("const isEditingPlan = editPlanId !== null && editPlanId !== 'create';"), 'Plan UI semantics fixed (isEditingPlan)');
+  assert.ok(source.includes("recordId={isEditingPlan ? editPlanId : null}"), 'Plan create recordId null');
 });
 
 test('test_reports_use_session_draft', () => {
@@ -24,4 +27,7 @@ test('test_reports_use_session_draft', () => {
   assert.ok(source.includes("buildSessionDraftKey(currentUser.userId, 'admin:report', editReportId === 'create' ? 'create' : 'edit', editReportId === 'create' ? undefined : editReportId)"), 'Must build report edit key');
   assert.ok(source.includes("reportDraft.clearDraft()"), 'Report submit success must clear draft');
   assert.ok(source.includes("<UnsavedDraftDecision onContinue={reportDraft.continueEditing} onKeep={reportDraft.keepDraftAndClose} onDiscard={reportDraft.discardDraftAndClose} />"), 'Must render UnsavedDraftDecision for report');
+  // Regression test for create sentinel
+  assert.ok(source.includes("const isEditingReport = editReportId !== null && editReportId !== 'create';"), 'Report UI semantics fixed (isEditingReport)');
+  assert.ok(source.includes("recordId={isEditingReport ? editReportId : null}"), 'Report create recordId null');
 });

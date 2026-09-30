@@ -426,6 +426,7 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
   const locale = i18n.language;
   const [activeSuggestion, setActiveSuggestion] = useState<Suggestion | null>(null);
   const [replySubmitting, setReplySubmitting] = useState(false);
+  const [refreshPending, setRefreshPending] = useState(false);
    
    
   
@@ -508,7 +509,8 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
     if (!validateRequired({ replyText }, ['replyText'], setInvalid)) return;
     setReplySubmitting(true);
     setReplyError(null);
-    const { ok, refreshPending } = await respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
+    const { ok, refreshPending: wasRefreshPending } = await respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
+    setRefreshPending(wasRefreshPending || false);
     setReplySubmitting(false);
     if (!ok) {
       setReplyError(t('suggestionsV2.responseFailure', 'Failed to send response.'));
@@ -737,6 +739,7 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
   const { t } = useTranslation();
   const [activeSuggestion, setActiveSuggestion] = useState<Suggestion | null>(null);
   const [replySubmitting, setReplySubmitting] = useState(false);
+  const [refreshPending, setRefreshPending] = useState(false);
    
    
   
@@ -797,7 +800,8 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
     if (!validateRequired({ replyText }, ['replyText'], setInvalid)) return;
     setReplySubmitting(true);
     setReplyError(null);
-    const { ok, refreshPending } = await respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
+    const { ok, refreshPending: wasRefreshPending } = await respondToSuggestion(activeSuggestion.id, replyText.trim(), status);
+    setRefreshPending(wasRefreshPending || false);
     setReplySubmitting(false);
     if (!ok) {
       setReplyError(t('suggestionsV2.responseFailure', 'Failed to send response.'));
@@ -1221,7 +1225,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
   };
   const openEditMember = (committeeId: CommitteeId, m: CommitteeMember) => {
     setEditMemberId({ committeeId, memberId: m.id });
-    memberDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-member', 'edit', `${committeeId}.${m.id}`), { memberForm: { studentId: m.id, position: m.position, photo: m.photo }, studentSearch: m.name, memberAvatarAsset: null, translations: { tr: { position: m.position }, en: { position: m.position } }, targetCommitteeId: committeeId });
+    memberDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-member', 'edit', `${committeeId}.${m.id}`), { memberForm: { studentId: m.id, position: m.position, photo: m.photo }, studentSearch: m.name, memberAvatarAsset: null, translations: { tr: { position: '' }, en: { position: '' } }, targetCommitteeId: committeeId });
   };
   const resolveTargetUserId = () => {
     const selected = students.find((student) => student.id === memberForm.studentId);
@@ -2008,15 +2012,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
 
   const openEditAlbum = (album: GalleryAlbum) => {
     setEditAlbumId(album.id);
-    setAlbumForm({
-      title: album.title, categoryId: album.categoryId, date: album.date,
-      location: album.location, coverImage: album.coverImage, description: album.description,
-    });
-    setTranslations({
-      tr: { title: '', location: '', description: '' },
-      en: { title: '', location: '', description: '' },
-    });
-    albumDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:gallery-album', 'edit', album.id), { albumForm: { title: album.title, categoryId: album.categoryId, coverImage: album.coverImage, date: album.date, location: album.location || '', description: album.description || '' }, translations: { tr: { title: album.title, location: '', description: '' }, en: { title: album.title, location: '', description: '' } } });
+    albumDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:gallery-album', 'edit', album.id), { albumForm: { title: album.title, categoryId: album.categoryId, coverImage: album.coverImage, date: album.date, location: album.location || '', description: album.description || '' }, translations: { tr: { title: '', location: '', description: '' }, en: { title: '', location: '', description: '' } } });
   };
 
   const saveAlbum = async (e: React.FormEvent) => {
@@ -2151,7 +2147,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
 
   const openEditMedia = (album: GalleryAlbum, m: GalleryMedia) => {
     setEditMediaId({ albumId: album.id, mediaId: m.id });
-    mediaDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:gallery-media', 'edit', `${album.id}.${m.id}`), { mediaForm: { type: m.type, source: m.type === 'video' && /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)/i.test(m.url) ? 'external' : 'upload', url: m.url, thumbnail: m.thumbnail ?? '', caption: m.caption ?? '', photoUrl: m.photoUrl ?? '' }, targetAlbumId: album.id, mediaAsset: null, translations: { tr: { caption: m.caption ?? '' }, en: { caption: m.caption ?? '' } } });
+    mediaDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:gallery-media', 'edit', `${album.id}.${m.id}`), { mediaForm: { type: m.type, source: m.type === 'video' && /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)/i.test(m.url) ? 'external' : 'upload', url: m.url, thumbnail: m.thumbnail ?? '', caption: m.caption ?? '', photoUrl: m.photoUrl ?? '' }, targetAlbumId: album.id, mediaAsset: null, translations: { tr: { caption: '' }, en: { caption: '' } } });
   };
 
   const saveMedia = async (e: React.FormEvent) => {
@@ -4272,6 +4268,8 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
   };
 
   const [editPlanId, setEditPlanId] = useState<string | 'create' | null>(null);
+  const isEditingPlan = editPlanId !== null && editPlanId !== 'create';
+  const isCreatingPlan = editPlanId === 'create';
   const [invalid, setInvalid] = useState<string[]>([]);
 
   useEffect(() => {
@@ -4385,6 +4383,8 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
   };
 
   const [editReportId, setEditReportId] = useState<string | 'create' | null>(null);
+  const isEditingReport = editReportId !== null && editReportId !== 'create';
+  const isCreatingReport = editReportId === 'create';
 
   useEffect(() => {
     if (!currentUser) return;
@@ -4596,7 +4596,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
       </div>
 
       {/* Plan Modal */}
-      <Modal open={planModal} onClose={planDraft.requestClose || (() => setPlanModal(false))} title={editPlanId ? t('admin.plans.planModal.editTitle', 'تعديل الخطة') : t('admin.plans.planModal.addTitle', 'إضافة خطة إدارية')} maxWidth="max-w-lg">
+      <Modal open={planModal} onClose={planDraft.requestClose || (() => setPlanModal(false))} title={isEditingPlan ? t('admin.plans.planModal.editTitle', 'تعديل الخطة') : t('admin.plans.planModal.addTitle', 'إضافة خطة إدارية')} maxWidth="max-w-lg">
         {planDraft.isDecisionOpen ? (
           <UnsavedDraftDecision onContinue={planDraft.continueEditing} onKeep={planDraft.keepDraftAndClose} onDiscard={planDraft.discardDraftAndClose} />
         ) : (
@@ -4658,11 +4658,11 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
 
           <CmsEntityTranslationTabs
             target="plans"
-            recordId={editPlanId}
+            recordId={isEditingPlan ? editPlanId : null}
             activeTab={planDraft.ui.activeLocale}
             onActiveTabChange={(t) => planDraft.setUi(prev => ({...prev, activeLocale: t as "ar" | "tr" | "en"}))}
             preserveProvidedTranslations={planDraft.restoredFromStorage}
-            canonicalPayload={editPlanId ? plans.map((p) => p.id === editPlanId ? { ...p, title: planForm.title, description: planForm.description } : p) : plans}
+            canonicalPayload={isEditingPlan ? plans.map((p) => p.id === editPlanId ? { ...p, title: planForm.title, description: planForm.description } : p) : plans}
             fields={[
               {
                 name: 'title',
@@ -4679,7 +4679,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
                 placeholder: t('admin.plans.planModal.descriptionLabel', 'الوصف التفصيلي'),
               },
             ]}
-            canEdit={isPresident || !editPlanId || plans.find((p) => p.id === editPlanId)?.authorId === currentUser?.email}
+            canEdit={isCreatingPlan || isPresident || plans.find((p) => p.id === editPlanId)?.authorId === currentUser?.email}
             canPublish={isPresident}
             translations={planTranslations}
             onTranslationChange={(loc, name, val) => {
@@ -4701,14 +4701,14 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
           </CmsEntityTranslationTabs>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={planDraft.requestClose || (() => setPlanModal(false))} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
-            <button type="submit" className="btn-primary"><CheckCircle2 className="h-4 w-4" /> {editPlanId ? t('admin.plans.planModal.saveChanges', 'حفظ التعديلات') : t('admin.plans.planModal.add', 'إضافة')}</button>
+            <button type="submit" className="btn-primary"><CheckCircle2 className="h-4 w-4" /> {isEditingPlan ? t('admin.plans.planModal.saveChanges', 'حفظ التعديلات') : t('admin.plans.planModal.add', 'إضافة')}</button>
           </div>
         </form>
         )}
       </Modal>
 
       {/* Report Modal */}
-      <Modal open={reportModal} onClose={reportDraft.requestClose || (() => setReportModal(false))} title={editReportId ? t('admin.plans.reportModal.editTitle', 'تعديل التقرير') : t('admin.plans.reportModal.addTitle', 'إضافة تقرير')} maxWidth="max-w-lg">
+      <Modal open={reportModal} onClose={reportDraft.requestClose || (() => setReportModal(false))} title={isEditingReport ? t('admin.plans.reportModal.editTitle', 'تعديل التقرير') : t('admin.plans.reportModal.addTitle', 'إضافة تقرير')} maxWidth="max-w-lg">
         {reportDraft.isDecisionOpen ? (
           <UnsavedDraftDecision onContinue={reportDraft.continueEditing} onKeep={reportDraft.keepDraftAndClose} onDiscard={reportDraft.discardDraftAndClose} />
         ) : (
@@ -4756,11 +4756,11 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
 
           <CmsEntityTranslationTabs
             target="reports"
-            recordId={editReportId}
+            recordId={isEditingReport ? editReportId : null}
             activeTab={reportDraft.ui.activeLocale}
             onActiveTabChange={(t) => reportDraft.setUi(prev => ({...prev, activeLocale: t as "ar" | "tr" | "en"}))}
             preserveProvidedTranslations={reportDraft.restoredFromStorage}
-            canonicalPayload={editReportId ? reports.map((r) => r.id === editReportId ? { ...r, title: reportForm.title, summary: reportForm.summary, period: reportForm.period } : r) : reports}
+            canonicalPayload={isEditingReport ? reports.map((r) => r.id === editReportId ? { ...r, title: reportForm.title, summary: reportForm.summary, period: reportForm.period } : r) : reports}
             fields={[
               {
                 name: 'title',
@@ -4784,7 +4784,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
                 placeholder: t('admin.plans.reportModal.summaryLabel', 'ملخص التقرير'),
               },
             ]}
-            canEdit={isPresident || !editReportId || reports.find((r) => r.id === editReportId)?.authorId === currentUser?.email}
+            canEdit={isCreatingReport || isPresident || reports.find((r) => r.id === editReportId)?.authorId === currentUser?.email}
             canPublish={isPresident}
             translations={reportTranslations}
             onTranslationChange={(loc, name, val) => {
@@ -4810,7 +4810,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
           </CmsEntityTranslationTabs>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={reportDraft.requestClose || (() => setReportModal(false))} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
-            <button type="submit" className="btn-primary"><CheckCircle2 className="h-4 w-4" /> {editReportId ? t('admin.plans.reportModal.saveChanges', 'حفظ التعديلات') : t('admin.plans.reportModal.add', 'إضافة')}</button>
+            <button type="submit" className="btn-primary"><CheckCircle2 className="h-4 w-4" /> {isEditingReport ? t('admin.plans.reportModal.saveChanges', 'حفظ التعديلات') : t('admin.plans.reportModal.add', 'إضافة')}</button>
           </div>
         </form>
         )}

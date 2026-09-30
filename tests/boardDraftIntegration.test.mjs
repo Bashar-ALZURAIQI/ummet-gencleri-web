@@ -15,4 +15,8 @@ test('test_board_member_session_draft', () => {
   assert.ok(source.includes("`${editMemberId.committeeId}.${editMemberId.memberId}`"), 'Must serialize committee and member ids with dot separator (colon-free)');
   assert.ok(source.includes("memberDraft.clearDraft()"), 'Member save success must clear draft');
   assert.ok(source.includes("d.memberForm.photo.trim().length > 0"), 'Must use custom isDirty for photoUrl');
+  // Regression test for fresh edit translations
+  const openEditMemberRegex = /const openEditMember = [^{]+{.*?\.openTarget[^;]+;/s;
+  const openEditMemberCode = source.match(openEditMemberRegex)?.[0] || '';
+  assert.ok(openEditMemberCode.includes("translations: { tr: { position: '' }, en: { position: '' } }"), 'Board Member fresh TR/EN canonical-copy removed');
 });
