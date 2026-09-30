@@ -51,6 +51,7 @@ export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessi
     setState(machineRef.current!.getState());
   }, []);
 
+   
   let currentState = state;
 
   const prevKeyRef = useRef(options.key);
@@ -171,9 +172,27 @@ export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessi
   }, [syncState]);
 
   const openTarget = useCallback((targetKey: string | null, initialData?: T) => {
-    pendingOpenKeyRef.current = targetKey;
-    pendingInitialDataRef.current = initialData;
-  }, []);
+    if (targetKey !== null && targetKey === prevKeyRef.current) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const currentData = machineRef.current!.getState().data as any;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const newData = initialData as any;
+      if (newData && currentData) {
+        if (newData.targetCommitteeId !== undefined && currentData.targetCommitteeId !== undefined && newData.targetCommitteeId !== currentData.targetCommitteeId) {
+          machineRef.current!.clearDraft();
+          machineRef.current!.updateData(newData);
+        } else if (newData.targetAlbumId !== undefined && currentData.targetAlbumId !== undefined && newData.targetAlbumId !== currentData.targetAlbumId) {
+          machineRef.current!.clearDraft();
+          machineRef.current!.updateData(newData);
+        }
+      }
+      machineRef.current!.setOpen(true);
+      syncState();
+    } else {
+      pendingOpenKeyRef.current = targetKey;
+      pendingInitialDataRef.current = initialData;
+    }
+  }, [syncState]);
 
   const clearDraft = useCallback(() => {
     machineRef.current!.clearDraft();

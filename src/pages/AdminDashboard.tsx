@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useMemo, useEffect } from 'react';
 import {
   LayoutDashboard, CalendarDays, Users, ClipboardList, BarChart3, PieChart,
@@ -428,7 +426,9 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
   const locale = i18n.language;
   const [activeSuggestion, setActiveSuggestion] = useState<Suggestion | null>(null);
   const [replySubmitting, setReplySubmitting] = useState(false);
-  const [refreshPending, setRefreshPending] = useState(false);
+   
+   
+  
   const [replyError, setReplyError] = useState<string | null>(null);
   const [toast, setToast] = useState(false);
   const [invalid, setInvalid] = useState<string[]>([]);
@@ -737,7 +737,9 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
   const { t } = useTranslation();
   const [activeSuggestion, setActiveSuggestion] = useState<Suggestion | null>(null);
   const [replySubmitting, setReplySubmitting] = useState(false);
-  const [refreshPending, setRefreshPending] = useState(false);
+   
+   
+  
   const [replyError, setReplyError] = useState<string | null>(null);
   const [toast, setToast] = useState(false);
   const [invalid, setInvalid] = useState<string[]>([]);
@@ -1146,11 +1148,13 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
 
   useEffect(() => {
     if (!currentUser) return;
-    const openMember = findOpenSessionDraft<{ memberForm: any; translations: any; studentSearch: string; memberAvatarAsset: any }>(currentUser.userId, 'admin:board-member');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openMember = findOpenSessionDraft<{  memberForm: any; translations: any; studentSearch: string; memberAvatarAsset: any }>(currentUser.userId, 'admin:board-member');
     if (openMember && openMember.envelope.open) {
       if (openMember.mode === 'create') {
         // For create, committeeId is not in the key - stored in draft value
         // We cannot restore the committee context from the key alone
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setEditMemberId({ committeeId: (openMember.envelope.value as any)?.targetCommitteeId || ('' as CommitteeId), memberId: 'create' });
       } else if (openMember.entityId) {
         // edit: compound entityId encoded as committeeId.memberId (dot separator)
@@ -1182,6 +1186,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
       targetCommitteeId: '' as import('../data/mockData').CommitteeId | ''
     },
     defaultOpen: false,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     validation: (!currentUser) ? 'unknown' : editMemberId?.memberId === 'create' ? (committees.find(c => c.id === editMemberId.committeeId) ? 'valid' : 'invalid') : (committees.find(c => c.id === editMemberId?.committeeId)?.members?.find((m: any) => m.id === editMemberId?.memberId) ? 'valid' : 'invalid'),
     isDirty: (d) => d.memberForm.studentId.trim().length > 0 || d.memberForm.position.trim().length > 0 || d.memberForm.photo.trim().length > 0
   });
@@ -1189,16 +1194,21 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
   const memberModal = memberDraft.open;
   const setMemberModal = memberDraft.setOpen;
   const memberForm = memberDraft.data.memberForm;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setMemberForm = (v: any) => memberDraft.setData(p => ({ ...p, memberForm: typeof v === 'function' ? v(p.memberForm) : v }));
   const memberAvatarAsset = memberDraft.data.memberAvatarAsset;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setMemberAvatarAsset = (v: any) => memberDraft.setData(p => ({ ...p, memberAvatarAsset: typeof v === 'function' ? v(p.memberAvatarAsset) : v }));
   const studentSearch = memberDraft.data.studentSearch;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setStudentSearch = (v: any) => memberDraft.setData(p => ({ ...p, studentSearch: typeof v === 'function' ? v(p.studentSearch) : v }));
   const memberTranslations = memberDraft.data.translations as Record<LocalizedCmsLocale, { position?: string }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setMemberTranslations = (v: any) => memberDraft.setData(p => ({ ...p, translations: typeof v === 'function' ? v(p.translations) : v }));
 
   const editMember = editMemberId ? {
     committeeId: editMemberId.committeeId,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     member: editMemberId.memberId === 'create' ? null : (committees.find(c => c.id === editMemberId.committeeId)?.members?.find((m: any) => m.id === editMemberId.memberId) ?? null)
   } : null;
 
@@ -1211,10 +1221,6 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
   };
   const openEditMember = (committeeId: CommitteeId, m: CommitteeMember) => {
     setEditMemberId({ committeeId, memberId: m.id });
-    setMemberForm({ studentId: '', position: m.position, photo: m.photo });
-    setMemberAvatarAsset(null);
-    setStudentSearch(m.name);
-    setStudentDropdownOpen(false);
     memberDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-member', 'edit', `${committeeId}.${m.id}`), { memberForm: { studentId: m.id, position: m.position, photo: m.photo }, studentSearch: m.name, memberAvatarAsset: null, translations: { tr: { position: m.position }, en: { position: m.position } }, targetCommitteeId: committeeId });
   };
   const resolveTargetUserId = () => {
@@ -1336,7 +1342,8 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
 
   useEffect(() => {
     if (!currentUser) return;
-    const openHead = findOpenSessionDraft<{ headForm: any, translations: any }>(currentUser.userId, 'admin:board-head');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openHead = findOpenSessionDraft<{  headForm: any, translations: any }>(currentUser.userId, 'admin:board-head');
     if (openHead && openHead.envelope.open && openHead.entityId) {
       // entityId for head is just committeeId (dot-free string) - no prefix
       setHeadCommittee(openHead.entityId as CommitteeId);
@@ -1362,15 +1369,16 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
   const headModal = headDraft.open;
   const setHeadModal = headDraft.setOpen;
   const headForm = headDraft.data.headForm;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setHeadForm = (v: any) => headDraft.setData(p => ({ ...p, headForm: typeof v === 'function' ? v(p.headForm) : v }));
   const headTranslations = headDraft.data.translations as Record<LocalizedCmsLocale, Record<string, string>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setHeadTranslations = (v: any) => headDraft.setData(p => ({ ...p, translations: typeof v === 'function' ? v(p.translations) : v }));
 
   const openHead = (c: typeof committees[0]) => {
     if (c.head?.id !== currentUser?.userId) return;
     setHeadCommittee(c.id);
     headDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-head', 'edit', c.id), { headForm: { name: c.head?.name ?? '', role: c.head?.role ?? '', bio: c.head?.bio ?? '', photo: c.head?.photo ?? '', email: currentUser.contactEmail ?? '', phone: c.head?.phone ?? '', university: c.head?.university ?? '', major: c.head?.major ?? '', year: c.head?.year ?? '' }, translations: { tr: {}, en: {} } });
-    setHeadForm({ name: c.head?.name ?? '', role: c.head?.role ?? '', bio: c.head?.bio ?? '', photo: c.head?.photo ?? '', email: currentUser.contactEmail ?? '', phone: c.head?.phone ?? '', university: c.head?.university ?? '', major: c.head?.major ?? '', year: c.head?.year ?? '' });
   };
   const saveHead = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1403,11 +1411,12 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
 
   useEffect(() => {
     if (!currentUser) return;
-    const openResp = findOpenSessionDraft<{ respText: string, translations: any }>(currentUser.userId, 'admin:board-resp');
-    if (openResp && openResp.envelope.open && openResp.entityId) {
-      const parts = openResp.entityId.split(':');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openResp = findOpenSessionDraft<{  respText: string, translations: any }>(currentUser.userId, 'admin:board-resp');
+    if (openResp && openResp.envelope.open) {
       if (openResp.mode === 'create') {
         // committeeId is in draft value for create - use a safe default
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setRespTarget({ committeeId: (openResp.envelope.value as any)?.targetCommitteeId || ('' as CommitteeId), idx: -1 });
       } else if (openResp.entityId) {
         // edit: compound entityId is committeeId.idx (dot separator)
@@ -1444,20 +1453,20 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
   const respModal = respDraft.open;
   const setRespModal = respDraft.setOpen;
   const respText = respDraft.data.respText;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setRespText = (v: any) => respDraft.setData(p => ({ ...p, respText: typeof v === 'function' ? v(p.respText) : v }));
   const respTranslations = respDraft.data.translations as Record<LocalizedCmsLocale, Record<string, string>>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setRespTranslations = (v: any) => respDraft.setData(p => ({ ...p, translations: typeof v === 'function' ? v(p.translations) : v }));
 
   const openAddResp = (committeeId: CommitteeId) => {
     setRespTarget({ committeeId, idx: -1 });
     respDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-resp', 'create'), { respText: '', translations: { tr: {}, en: {} }, targetCommitteeId: committeeId });
-    setRespText('');
   };
   const openEditResp = (committeeId: CommitteeId, idx: number) => {
     const c = committees.find((x) => x.id === committeeId);
     setRespTarget({ committeeId, idx });
     respDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-resp', 'edit', `${committeeId}.${idx}`), { respText: c?.responsibilities[idx] || '', translations: { tr: {}, en: {} }, targetCommitteeId: committeeId });
-    setRespText(c?.responsibilities[idx] || '');
   };
   const saveResp = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1597,6 +1606,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
                   id={fieldId('studentId')}
                   type="text"
                   value={studentSearch}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   onChange={(e) => { setStudentSearch(e.target.value); setStudentDropdownOpen(true); setMemberForm((prev: any) => ({ ...prev, studentId: '' })); clearInvalid(setInvalid, 'studentId'); }}
                   onFocus={() => setStudentDropdownOpen(true)}
                   className={`${isInvalid(invalid, 'studentId') ? 'input-field-error' : 'input-field'}`}
@@ -1612,6 +1622,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
                           key={s?.id ?? Math.random()}
                           type="button"
                           onClick={() => {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             setMemberForm((prev: any) => ({ ...prev, studentId: s?.id ?? '' }));
                             setStudentSearch(s?.name ?? '');
                             setStudentDropdownOpen(false);
@@ -1638,6 +1649,9 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
             recordId={editMember?.member?.id ?? null}
             committeeId={editMember?.committeeId}
             canonicalPayload={committees}
+            activeTab={memberDraft.ui.activeLocale}
+            onActiveTabChange={(t) => memberDraft.setUi(prev => ({...prev, activeLocale: t as "ar" | "tr" | "en"}))}
+            preserveProvidedTranslations={memberDraft.restoredFromStorage}
             fields={[
               {
                 name: 'position',
@@ -1650,6 +1664,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
             canEdit={true}
             translations={memberTranslations}
             onTranslationChange={(loc, name, val) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               setMemberTranslations((prev: any) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
@@ -1678,6 +1693,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
               return uploadManagedFile('avatar', file, onProgress, targetUserId);
             }}
             onUploaded={(asset) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               setMemberForm((current: any) => ({ ...current, photo: asset.publicUrl }));
               setMemberAvatarAsset(asset);
               clearInvalid(setInvalid, 'photo');
@@ -1712,6 +1728,9 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
             recordId={headCommittee}
             committeeId={headCommittee}
             canonicalPayload={committees}
+            activeTab={headDraft.ui.activeLocale}
+            onActiveTabChange={(t) => headDraft.setUi(prev => ({...prev, activeLocale: t as "ar" | "tr" | "en"}))}
+            preserveProvidedTranslations={headDraft.restoredFromStorage}
             fields={[
               {
                 name: 'head.bio',
@@ -1724,6 +1743,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
             canEdit={true}
             translations={headTranslations}
             onTranslationChange={(loc, name, val) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               setHeadTranslations((prev: any) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
@@ -1788,6 +1808,9 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
             recordId={respTarget?.committeeId ?? null}
             committeeId={respTarget?.committeeId}
             canonicalPayload={committees}
+            activeTab={respDraft.ui.activeLocale}
+            onActiveTabChange={(t) => respDraft.setUi(prev => ({...prev, activeLocale: t as "ar" | "tr" | "en"}))}
+            preserveProvidedTranslations={respDraft.restoredFromStorage}
             fields={[
               {
                 name: `responsibilities.${respTarget?.idx !== undefined && respTarget.idx >= 0 ? respTarget.idx : (committees.find((x) => x.id === respTarget?.committeeId)?.responsibilities?.length ?? 0)}`,
@@ -1800,6 +1823,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
             canEdit={true}
             translations={respTranslations}
             onTranslationChange={(loc, name, val) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               setRespTranslations((prev: any) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
@@ -1859,7 +1883,8 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
 
   useEffect(() => {
     if (!currentUser) return;
-    const openAlbum = findOpenSessionDraft<{ albumForm: any; translations: any }>(currentUser.userId, 'admin:gallery-album');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openAlbum = findOpenSessionDraft<{  albumForm: any; translations: any }>(currentUser.userId, 'admin:gallery-album');
     if (openAlbum && openAlbum.envelope.open) {
       setEditAlbumId(openAlbum.mode === 'create' ? 'create' : (openAlbum.entityId ?? null));
     }
@@ -1884,8 +1909,10 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
   const albumModalOpen = albumDraft.open;
   const setAlbumModalOpen = albumDraft.setOpen;
   const albumForm = albumDraft.data.albumForm;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setAlbumForm = (v: any) => albumDraft.setData(p => ({ ...p, albumForm: typeof v === 'function' ? v(p.albumForm) : v }));
   const translations = albumDraft.data.translations as Record<LocalizedCmsLocale, { title?: string; location?: string; description?: string }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setTranslations = (v: any) => albumDraft.setData(p => ({ ...p, translations: typeof v === 'function' ? v(p.translations) : v }));
 
   const editingAlbum = editAlbumId === 'create' ? null : (galleryAlbums.find(a => a.id === editAlbumId) ?? null);
@@ -1897,10 +1924,12 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
 
   useEffect(() => {
     if (!currentUser) return;
-    const openMedia = findOpenSessionDraft<{ mediaForm: any }>(currentUser.userId, 'admin:gallery-media');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openMedia = findOpenSessionDraft<{  mediaForm: any }>(currentUser.userId, 'admin:gallery-media');
     if (openMedia && openMedia.envelope.open) {
       if (openMedia.mode === 'create') {
         // albumId not in key for create - stored in draft value; cannot restore album context from key alone
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setEditMediaId({ albumId: (openMedia.envelope.value as any)?.targetAlbumId || '', mediaId: 'create' });
       } else if (openMedia.entityId) {
         // edit: compound entityId encoded as albumId.mediaId (dot separator)
@@ -1938,6 +1967,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
   const mediaModalOpen = mediaDraft.open;
   const setMediaModalOpen = mediaDraft.setOpen;
   const mediaForm = mediaDraft.data.mediaForm;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setMediaForm = (v: any) => mediaDraft.setData(p => ({ ...p, mediaForm: typeof v === 'function' ? v(p.mediaForm) : v }));
 
   const mediaAlbum = editMediaId ? (galleryAlbums.find(a => a.id === editMediaId.albumId) ?? null) : null;
@@ -2121,9 +2151,6 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
 
   const openEditMedia = (album: GalleryAlbum, m: GalleryMedia) => {
     setEditMediaId({ albumId: album.id, mediaId: m.id });
-    setMediaForm({
-      type: m.type, source: m.type === 'video' && /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)/i.test(m.url) ? 'external' : 'upload', url: m.url, thumbnail: m.thumbnail ?? '', caption: m.caption ?? '', photoUrl: m.photoUrl ?? '',
-    });
     mediaDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:gallery-media', 'edit', `${album.id}.${m.id}`), { mediaForm: { type: m.type, source: m.type === 'video' && /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)/i.test(m.url) ? 'external' : 'upload', url: m.url, thumbnail: m.thumbnail ?? '', caption: m.caption ?? '', photoUrl: m.photoUrl ?? '' }, targetAlbumId: album.id, mediaAsset: null, translations: { tr: { caption: m.caption ?? '' }, en: { caption: m.caption ?? '' } } });
   };
 
@@ -2301,6 +2328,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
             error={isInvalid(invalid, 'coverImage') ? t('admin.gallery.albumModal.coverImageError', 'يرجى رفع صورة غلاف الألبوم.') : null}
             onUpload={(file, onProgress) => uploadManagedFile('gallery-image', file, onProgress)}
             onUploaded={(asset) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               setAlbumForm((current: any) => ({ ...current, coverImage: asset.publicUrl }));
               clearInvalid(setInvalid, 'coverImage');
             }}
@@ -2309,6 +2337,9 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
           <CmsEntityTranslationTabs
             target="galleryAlbums"
             recordId={editingAlbum?.id ?? null}
+            activeTab={albumDraft.ui.activeLocale}
+            onActiveTabChange={(t) => albumDraft.setUi(prev => ({...prev, activeLocale: t as "ar" | "tr" | "en"}))}
+            preserveProvidedTranslations={albumDraft.restoredFromStorage}
             canonicalPayload={editingAlbum ? galleryAlbums.map((a) => a.id === editingAlbum.id ? { ...a, ...albumForm } : a) : galleryAlbums}
             fields={[
               {
@@ -2342,6 +2373,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
             }}
             translations={translations}
             onTranslationChange={(loc, name, val) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               setTranslations((prev: any) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
@@ -2443,6 +2475,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
               error={isInvalid(invalid, 'url') ? t('admin.gallery.mediaModal.fileRequiredError', 'يرجى رفع الملف قبل الحفظ.') : null}
               onUpload={(file, onProgress) => uploadManagedFile(mediaForm.type === 'photo' ? 'gallery-image' : 'video-file', file, onProgress)}
               onUploaded={(asset) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 setMediaForm((current: any) => ({ ...current, url: asset.publicUrl }));
                 clearInvalid(setInvalid, 'url');
               }}
@@ -2462,6 +2495,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
               error={isInvalid(invalid, 'thumbnail') ? t('admin.gallery.mediaModal.videoThumbnailError', 'يرجى رفع صورة مصغرة للفيديو.') : null}
               onUpload={(file, onProgress) => uploadManagedFile('gallery-image', file, onProgress)}
               onUploaded={(asset) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 setMediaForm((current: any) => ({ ...current, thumbnail: asset.publicUrl }));
                 clearInvalid(setInvalid, 'thumbnail');
               }}
@@ -3744,11 +3778,13 @@ function ApplicationsTab({
   const [retryingNotificationId, setRetryingNotificationId] = useState<string | null>(null);
   useEffect(() => {
     if (!currentUser?.userId) return;
-    const openInterview = findOpenSessionDraft<{ interviewForm: any }>(currentUser.userId, 'admin:application-interview');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openInterview = findOpenSessionDraft<{  interviewForm: any }>(currentUser.userId, 'admin:application-interview');
     if (openInterview && openInterview.envelope.open && openInterview.entityId) {
       setEditInterviewId(openInterview.entityId);
     }
-    const openDecision = findOpenSessionDraft<{ decisionForm: any }>(currentUser.userId, 'admin:application-decision');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openDecision = findOpenSessionDraft<{  decisionForm: any }>(currentUser.userId, 'admin:application-decision');
     if (openDecision && openDecision.envelope.open && openDecision.entityId) {
       setEditDecisionId(openDecision.entityId);
     }
@@ -3766,7 +3802,7 @@ function ApplicationsTab({
     userId: currentUser?.userId ?? null,
     defaultData: { interviewForm: { date: '', time: '16:00', meetingUrl: '' } },
     defaultOpen: false,
-    validation: (currentUser?.role === 'PRESIDENT' && editInterviewId && applications.find(a => a.id === editInterviewId && a.status === 'interview')) ? 'valid' : 'invalid',
+    validation: (currentUser?.role === 'PRESIDENT' && editInterviewId && applications.find(a => a.id === editInterviewId && a.status === 'pending')) ? 'valid' : 'invalid',
     isDirty: (d) => d.interviewForm.date.trim().length > 0 || d.interviewForm.meetingUrl.trim().length > 0
   });
 
@@ -3775,7 +3811,7 @@ function ApplicationsTab({
     userId: currentUser?.userId ?? null,
     defaultData: { decisionForm: { status: 'accepted' as 'accepted' | 'rejected', reason: '' } },
     defaultOpen: false,
-    validation: (currentUser?.role === 'PRESIDENT' && editDecisionId && applications.find(a => a.id === editDecisionId && a.status === 'pending')) ? 'valid' : 'invalid',
+    validation: (currentUser?.role === 'PRESIDENT' && editDecisionId && applications.find(a => a.id === editDecisionId && a.status === 'interview')) ? 'valid' : 'invalid',
     isDirty: (d) => d.decisionForm.reason.trim().length > 0
   });
 
@@ -3790,6 +3826,7 @@ function ApplicationsTab({
     }
   };
   const interviewForm = interviewDraft.data.interviewForm;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setInterviewForm = (v: any) => interviewDraft.setData(p => ({ ...p, interviewForm: typeof v === 'function' ? v(p.interviewForm) : v }));
 
   const decisionModal = editDecisionId ? applications.find(a => a.id === editDecisionId) ?? null : null;
@@ -3803,6 +3840,7 @@ function ApplicationsTab({
     }
   };
   const decisionForm = decisionDraft.data.decisionForm;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setDecisionForm = (v: any) => decisionDraft.setData(p => ({ ...p, decisionForm: typeof v === 'function' ? v(p.decisionForm) : v }));
 
   const getApplicationStatusLabel = (status: StudentApplication['status']) => {
@@ -3846,8 +3884,6 @@ function ApplicationsTab({
   const openInterview = (app: StudentApplication) => {
     setEditInterviewId(app.id);
     interviewDraft.openTarget(buildSessionDraftKey(currentUser!.userId!, 'admin:application-interview', 'edit', app.id), { interviewForm: { date: '', time: '16:00', meetingUrl: '' } });
-    setInterviewForm({ date: '', time: '16:00', meetingUrl: '' });
-    setInterviewError('');
   };
 
   const submitInterview = async (e: React.FormEvent) => {
@@ -3890,8 +3926,6 @@ function ApplicationsTab({
   const openDecision = (app: StudentApplication, status: 'accepted' | 'rejected') => {
     setEditDecisionId(app.id);
     decisionDraft.openTarget(buildSessionDraftKey(currentUser!.userId!, 'admin:application-decision', 'edit', app.id), { decisionForm: { status: status, reason: '' } });
-    setDecisionForm({ status, reason: '' });
-    setDecisionError('');
   };
 
   const submitDecision = async (e: React.FormEvent) => {
@@ -4242,6 +4276,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
 
   useEffect(() => {
     if (!currentUser) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const openPlan = findOpenSessionDraft<{ planForm: any; planTranslations: any }>(currentUser.userId, 'admin:plan');
     if (openPlan && openPlan.envelope.open) {
       setEditPlanId(openPlan.mode === 'create' ? 'create' : (openPlan.entityId ?? null));
@@ -4267,8 +4302,10 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
   const planModal = planDraft.open;
   const setPlanModal = planDraft.setOpen;
   const planForm = planDraft.data.planForm;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setPlanForm = (v: any) => planDraft.setData(p => ({ ...p, planForm: typeof v === 'function' ? v(p.planForm) : v }));
   const planTranslations = planDraft.data.planTranslations as Record<LocalizedCmsLocale, { title?: string; description?: string }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setPlanTranslations = (v: any) => planDraft.setData(p => ({ ...p, planTranslations: typeof v === 'function' ? v(p.planTranslations) : v }));
 
   const openAddPlan = () => {
@@ -4277,18 +4314,13 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
   };
   const openEditPlan = (p: ReturnType<typeof useApp>['plans'][0]) => {
     setEditPlanId(p.id);
-    setPlanForm({ title: p.title, description: p.description, quarter: p.quarter, owner: p.owner, status: p.status, progress: p.progress, committee: (p.committee ?? 'presidency') as CommitteeId, pdfUrl: p.pdfUrl ?? '' });
-    setPlanTranslations({
-      tr: { title: '', description: '' },
-      en: { title: '', description: '' },
-    });
     planDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:plan', 'edit', p.id), { planForm: { title: p.title, description: p.description, quarter: p.quarter, owner: p.owner, status: p.status, progress: p.progress, committee: (p.committee ?? 'presidency') as import('../data/mockData').CommitteeId, pdfUrl: p.pdfUrl ?? '' }, planTranslations: { tr: { title: '', description: '' }, en: { title: '', description: '' } } });
   };
   const savePlan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateRequired(planForm, ['title', 'description', 'quarter', 'owner', 'pdfUrl'], setInvalid)) return;
     const payload = { ...planForm, progress: Number(planForm.progress), committee: planForm.committee as CommitteeId, authorRole: currentUser?.role, authorId: currentUser?.email ?? '', pdfUrl: planForm.pdfUrl.trim() };
-    if (editPlanId) {
+    if (editPlanId && editPlanId !== 'create') {
       const next = plans.map((p) => p.id === editPlanId ? { ...p, ...payload } : p);
       if (isPresident) {
         const saved = await savePublishedSiteTarget('plans', next);
@@ -4356,6 +4388,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
 
   useEffect(() => {
     if (!currentUser) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const openReport = findOpenSessionDraft<{ reportForm: any; reportTranslations: any }>(currentUser.userId, 'admin:report');
     if (openReport && openReport.envelope.open) {
       setEditReportId(openReport.mode === 'create' ? 'create' : (openReport.entityId ?? null));
@@ -4381,8 +4414,10 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
   const reportModal = reportDraft.open;
   const setReportModal = reportDraft.setOpen;
   const reportForm = reportDraft.data.reportForm;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setReportForm = (v: any) => reportDraft.setData(p => ({ ...p, reportForm: typeof v === 'function' ? v(p.reportForm) : v }));
   const reportTranslations = reportDraft.data.reportTranslations as Record<LocalizedCmsLocale, { title?: string; summary?: string; period?: string }>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const setReportTranslations = (v: any) => reportDraft.setData(p => ({ ...p, reportTranslations: typeof v === 'function' ? v(p.reportTranslations) : v }));
 
   const openAddReport = () => {
@@ -4391,18 +4426,13 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
   };
   const openEditReport = (r: ReturnType<typeof useApp>['reports'][0]) => {
     setEditReportId(r.id);
-    setReportForm({ title: r.title, type: r.type, period: r.period, date: r.date, summary: r.summary, committee: (r.committee ?? 'presidency') as CommitteeId, pdfUrl: r.pdfUrl ?? '', isGeneral: r.isGeneral ?? false });
-    setReportTranslations({
-      tr: { title: '', summary: '', period: '' },
-      en: { title: '', summary: '', period: '' },
-    });
     reportDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:report', 'edit', r.id), { reportForm: { title: r.title, type: r.type, period: r.period, date: r.date, summary: r.summary, committee: (r.committee ?? 'presidency') as import('../data/mockData').CommitteeId, pdfUrl: r.pdfUrl ?? '', isGeneral: r.isGeneral ?? false }, reportTranslations: { tr: { title: '', summary: '', period: '' }, en: { title: '', summary: '', period: '' } } });
   };
   const saveReport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateRequired(reportForm, ['title', 'type', 'date', 'period', 'summary', 'pdfUrl'], setInvalid)) return;
     const payload = { ...reportForm, committee: reportForm.committee as CommitteeId, authorRole: currentUser?.role, authorId: currentUser?.email ?? '', pdfUrl: reportForm.pdfUrl.trim() };
-    if (editReportId) {
+    if (editReportId && editReportId !== 'create') {
       const next = reports.map((r) => r.id === editReportId ? { ...r, ...payload } : r);
       if (isPresident) {
         const saved = await savePublishedSiteTarget('reports', next);
@@ -4620,6 +4650,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
             error={isInvalid(invalid, 'pdfUrl') ? t('admin.plans.planModal.documentError', 'يرجى رفع ملف الخطة قبل الحفظ.') : null}
             onUpload={(file, onProgress) => uploadManagedFile('plan-document', file, onProgress)}
             onUploaded={(asset) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               setPlanForm((current: any) => ({ ...current, pdfUrl: asset.publicUrl }));
               clearInvalid(setInvalid, 'pdfUrl');
             }}
@@ -4628,6 +4659,9 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
           <CmsEntityTranslationTabs
             target="plans"
             recordId={editPlanId}
+            activeTab={planDraft.ui.activeLocale}
+            onActiveTabChange={(t) => planDraft.setUi(prev => ({...prev, activeLocale: t as "ar" | "tr" | "en"}))}
+            preserveProvidedTranslations={planDraft.restoredFromStorage}
             canonicalPayload={editPlanId ? plans.map((p) => p.id === editPlanId ? { ...p, title: planForm.title, description: planForm.description } : p) : plans}
             fields={[
               {
@@ -4649,6 +4683,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
             canPublish={isPresident}
             translations={planTranslations}
             onTranslationChange={(loc, name, val) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               setPlanTranslations((prev: any) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
@@ -4709,6 +4744,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
             error={isInvalid(invalid, 'pdfUrl') ? t('admin.plans.reportModal.documentError', 'يرجى رفع ملف التقرير قبل الحفظ.') : null}
             onUpload={(file, onProgress) => uploadManagedFile('report-document', file, onProgress)}
             onUploaded={(asset) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               setReportForm((current: any) => ({ ...current, pdfUrl: asset.publicUrl }));
               clearInvalid(setInvalid, 'pdfUrl');
             }}
@@ -4721,6 +4757,9 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
           <CmsEntityTranslationTabs
             target="reports"
             recordId={editReportId}
+            activeTab={reportDraft.ui.activeLocale}
+            onActiveTabChange={(t) => reportDraft.setUi(prev => ({...prev, activeLocale: t as "ar" | "tr" | "en"}))}
+            preserveProvidedTranslations={reportDraft.restoredFromStorage}
             canonicalPayload={editReportId ? reports.map((r) => r.id === editReportId ? { ...r, title: reportForm.title, summary: reportForm.summary, period: reportForm.period } : r) : reports}
             fields={[
               {
@@ -4749,6 +4788,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
             canPublish={isPresident}
             translations={reportTranslations}
             onTranslationChange={(loc, name, val) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               setReportTranslations((prev: any) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
