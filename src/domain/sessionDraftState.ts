@@ -154,18 +154,7 @@ export class SessionDraftStateMachine<T> {
   }
 
   public discardDraftAndClose(): void {
-    this.state.open = false;
-    this.state.isDecisionOpen = false;
-    this.state.data = this.config.defaultData;
-    this.state.dirty = false;
-    if (this.config.initialUi) {
-      this.state.ui = this.config.initialUi;
-    } else {
-      this.state.ui = {};
-    }
-    if (this.config.key) {
-      removeSessionDraft(this.config.key);
-    }
+    this.resetAndRemoveDraft();
   }
 
   /**
@@ -178,16 +167,7 @@ export class SessionDraftStateMachine<T> {
    * occurs: setOpen(true), updateData(...), or updateUi(...).
    */
   public clearDraft(): void {
-    this._cleared = true; // suspend persistence BEFORE touching state
-    this.state.data = this.config.defaultData;
-    this.state.ui = this.config.initialUi ?? {};
-    this.state.open = false;
-    this.state.dirty = false;
-    this.state.isDecisionOpen = false;
-    this.state.restoredFromStorage = false;
-    if (this.config.key) {
-      removeSessionDraft(this.config.key);
-    }
+    this.resetAndRemoveDraft();
     // Do NOT call persist() — the key must remain absent.
   }
 
@@ -212,5 +192,28 @@ export class SessionDraftStateMachine<T> {
       baselineFingerprint: this.config.baselineFingerprint
     };
     saveSessionDraft(this.config.key, envelope);
+  }
+
+  /**
+   * Shared removal helper used by both clearDraft() and discardDraftAndClose().
+   *
+   * Sets _cleared = true FIRST so that any subsequent persist() call — from a
+   * lifecycle flush, a setOpen(false) in the caller's cleanup path, or any
+   * React teardown — will be a no-op and will NOT recreate the deleted key.
+   *
+   * Persistence resumes only when the user starts a genuinely new draft action:
+   * setOpen(true), updateData(...), or updateUi(...).
+   */
+  private resetAndRemoveDraft(): void {
+    this._cleared = true; // suspend persistence BEFORE touching state
+    this.state.data = this.config.defaultData;
+    this.state.ui = this.config.initialUi ?? {};
+    this.state.open = false;
+    this.state.dirty = false;
+    this.state.isDecisionOpen = false;
+    this.state.restoredFromStorage = false;
+    if (this.config.key) {
+      removeSessionDraft(this.config.key);
+    }
   }
 }

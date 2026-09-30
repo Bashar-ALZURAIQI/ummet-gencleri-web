@@ -331,8 +331,51 @@ test('test_discardDraftAndClose_removes_storage', () => {
   machine.requestClose();
   machine.discardDraftAndClose();
 
+  const state = machine.getState();
   assert.strictEqual(mockStorage.store.has(config.key), false, 'discardDraftAndClose must remove storage key');
-  assert.strictEqual(machine.getState().data.title, '', 'discard must reset data');
+  assert.strictEqual(state.open, false, 'open must be false after discard');
+  assert.strictEqual(state.dirty, false, 'dirty must be false after discard');
+  assert.strictEqual(state.isDecisionOpen, false, 'isDecisionOpen must be false after discard');
+  assert.strictEqual(state.restoredFromStorage, false, 'restoredFromStorage must be false after discard');
+  assert.deepStrictEqual(state.data, config.defaultData, 'data must be reset to defaultData after discard');
+  assert.deepStrictEqual(state.ui, {}, 'ui must be reset after discard');
+});
+
+test('test_discard_then_flush_does_not_recreate', () => {
+  mockStorage.clear();
+  const config = createConfig({ defaultOpen: true });
+  const machine = new SessionDraftStateMachine(config, null);
+  machine.updateData({ title: 'dirty' });
+
+  machine.discardDraftAndClose();
+  machine.flush();
+
+  assert.strictEqual(mockStorage.store.has(config.key), false, 'flush after discard must NOT recreate storage key');
+});
+
+test('test_discard_then_setOpen_false_does_not_recreate', () => {
+  mockStorage.clear();
+  const config = createConfig({ defaultOpen: true });
+  const machine = new SessionDraftStateMachine(config, null);
+  machine.updateData({ title: 'dirty' });
+
+  machine.discardDraftAndClose();
+  machine.setOpen(false);
+
+  assert.strictEqual(mockStorage.store.has(config.key), false, 'setOpen(false) after discard must NOT recreate storage key');
+});
+
+test('test_discard_then_setOpen_true_starts_new_draft', () => {
+  mockStorage.clear();
+  const config = createConfig();
+  const machine = new SessionDraftStateMachine(config, null);
+  machine.updateData({ title: 'dirty' });
+
+  machine.discardDraftAndClose();
+  assert.strictEqual(mockStorage.store.has(config.key), false, 'pre-condition: discarded');
+
+  machine.setOpen(true);
+  assert.strictEqual(mockStorage.store.has(config.key), true, 'setOpen(true) after discard must resume persistence');
 });
 
 // ── source-contract: success paths do not mutate draft after clear ────────
