@@ -15,10 +15,14 @@ import {
 } from '../domain/profileSettingsPolicy';
 import { normalizeProfile } from '../utils/profileNormalize';
 import { getAcademicYearPresentation, ACADEMIC_YEAR_KEY_MAP } from '../domain/academicYearPresentation';
+import { useSessionDraft } from '../hooks/useSessionDraft';
+import { buildSessionDraftKey } from '../domain/sessionDraftState';
 import PasswordField from './PasswordField';
 import UserAvatar from './UserAvatar';
 
 export interface ProfileSettingsProfile {
+  id?: string;
+  userId?: string;
   name?: unknown;
   email?: unknown;
   loginEmail?: unknown;
@@ -99,7 +103,21 @@ export default function ProfileSettings({
     year: normalized.academicYear,
     bio: normalized.bio,
   });
-  const [form, setForm] = useState<FormState>(buildForm);
+
+  const userId = profile.userId ?? profile.id ?? null;
+  const draftKey = userId ? buildSessionDraftKey(userId, 'settings:profile', 'edit', 'form') : null;
+  
+  const profileDraft = useSessionDraft({
+    key: draftKey,
+    userId: userId,
+    defaultData: buildForm(),
+    defaultOpen: true,
+    validation: { readiness: 'VALID' },
+    isDirty: (d) => JSON.stringify(d) !== JSON.stringify(buildForm())
+  });
+
+  const form = profileDraft.data;
+  const setForm = profileDraft.setData;
   const [passwords, setPasswords] = useState({ current: '', next: '', confirmation: '' });
   const [selectedAvatar, setSelectedAvatar] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -114,8 +132,9 @@ export default function ProfileSettings({
   const [passwordResult, setPasswordResult] = useState<ResultState>(null);
 
   useEffect(() => {
-    setForm(buildForm());
-    // The confirmed profile object changes only after an authoritative refresh.
+    if (!profileDraft.dirty) {
+      setForm(buildForm());
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile]);
 
@@ -173,6 +192,9 @@ export default function ProfileSettings({
     if (!mountedRef.current) return;
     setProfileResult(result);
     setProfileBusy(false);
+    if (result.ok) {
+      profileDraft.clearDraft();
+    }
   };
 
   const uploadAvatar = async () => {
