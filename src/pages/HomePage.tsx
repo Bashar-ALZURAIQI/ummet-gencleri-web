@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { DEFAULT_SITE_CONTENT } from '../data/defaultSiteContent.ts';
 import { useTranslation } from 'react-i18next';
 import { resolvePublicBrandName } from '../domain/publicBrand';
 import { useTemporalBoundary } from '../hooks/useTemporalBoundary.ts';
@@ -36,9 +37,10 @@ const committeeIcons: Record<CommitteeId, LucideIcon> = {
 
 export default function HomePage() {
   const { t, i18n } = useTranslation();
-  const { news, events, setView, siteContent, currentUser, canEditSection } = useApp();
+  const { news, events, setView, siteContent, contentLoading, currentUser, canEditSection } = useApp();
   const [activeNews, setActiveNews] = useState<NewsItem | null>(null);
   const sc = siteContent;
+  const showHeroSkeleton = contentLoading && sc.hero.image === DEFAULT_SITE_CONTENT.hero.image;
   const brandName = resolvePublicBrandName(i18n.language, sc.brand);
   const HeroBadgeOneIcon = iconMap[sc.hero.badge1.icon ?? 'Award'] || Award;
   const HeroBadgeTwoIcon = iconMap[sc.hero.badge2.icon ?? 'TrendingUp'] || TrendingUp;
@@ -106,7 +108,11 @@ export default function HomePage() {
           <div className="relative hidden lg:block">
             <div className="relative mx-auto max-w-md">
               <EditableField config={{ path: 'hero.image', label: 'صورة الهيرو', type: 'image', target: 'site' }} currentValue={sc.hero.image} canEdit={canEdit}>
-                <img src={sc.hero.image} alt={sc.hero.title} className="rounded-3xl border border-white/10 shadow-2xl" />
+                {showHeroSkeleton ? (
+                  <div className="rounded-3xl border border-white/10 shadow-2xl h-[500px] w-full bg-navy-800/50 animate-pulse" />
+                ) : (
+                  <img src={sc.hero.image} alt={sc.hero.title} className="rounded-3xl border border-white/10 shadow-2xl" />
+                )}
               </EditableField>
               <div className="absolute -bottom-6 -right-6 rounded-2xl border border-gray-100 bg-white p-4 shadow-xl">
                 <EditableCard
