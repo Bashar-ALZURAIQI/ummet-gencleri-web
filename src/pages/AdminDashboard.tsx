@@ -1146,16 +1146,59 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
   const { t } = useTranslation();
   const { uploadManagedFile, replaceManagedMemberAvatar, members: accountMembers } = useApp();
   const repository = useCmsLocalizationRepository();
-  const [memberModal, setMemberModal] = useState(false);
-  const [editMember, setEditMember] = useState<{ committeeId: CommitteeId; member: CommitteeMember | null } | null>(null);
-  const [memberForm, setMemberForm] = useState({ studentId: '', position: '', photo: '' });
-  const [memberAvatarAsset, setMemberAvatarAsset] = useState<ManagedAssetReference | null>(null);
-  const [studentSearch, setStudentSearch] = useState('');
-  const [studentDropdownOpen, setStudentDropdownOpen] = useState(false);
-  const [memberTranslations, setMemberTranslations] = useState<Record<LocalizedCmsLocale, { position?: string }>>({
-    tr: { position: '' },
-    en: { position: '' },
+  const [editMemberId, setEditMemberId] = useState<{ committeeId: CommitteeId; memberId: string | 'create' } | null>(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const openMember = findOpenSessionDraft<{ memberForm: any; translations: any; studentSearch: string; memberAvatarAsset: any }>(currentUser.userId, 'admin:board-member');
+    if (openMember && openMember.envelope.open && openMember.entityId) {
+      const parts = openMember.entityId.split(':');
+      if (openMember.mode === 'create') {
+        setEditMemberId({ committeeId: openMember.entityId as CommitteeId, memberId: 'create' });
+      } else if (parts.length === 2) {
+        setEditMemberId({ committeeId: parts[0] as CommitteeId, memberId: parts[1] });
+      }
+    }
+  }, [currentUser]);
+
+  const memberDraftKey = currentUser && editMemberId
+    ? buildSessionDraftKey(
+        currentUser.userId,
+        'admin:board-member',
+        editMemberId.memberId === 'create' ? 'create' : 'edit',
+        editMemberId.memberId === 'create' ? editMemberId.committeeId : `${editMemberId.committeeId}:${editMemberId.memberId}`
+      )
+    : null;
+
+  const memberDraft = useSessionDraft({
+    key: memberDraftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: {
+      memberForm: { studentId: '', position: '', photo: '' },
+      studentSearch: '',
+      memberAvatarAsset: null as ManagedAssetReference | null,
+      translations: { tr: { position: '' }, en: { position: '' } }
+    },
+    defaultOpen: false,
+    validation: { readiness: 'VALID' },
+    isDirty: (d) => d.memberForm.studentId.trim().length > 0 || d.memberForm.position.trim().length > 0 || d.memberForm.photo.trim().length > 0
   });
+
+  const memberModal = memberDraft.open;
+  const setMemberModal = memberDraft.setOpen;
+  const memberForm = memberDraft.data.memberForm;
+  const setMemberForm = (v: any) => memberDraft.setData(p => ({ ...p, memberForm: typeof v === 'function' ? v(p.memberForm) : v }));
+  const memberAvatarAsset = memberDraft.data.memberAvatarAsset;
+  const setMemberAvatarAsset = (v: any) => memberDraft.setData(p => ({ ...p, memberAvatarAsset: typeof v === 'function' ? v(p.memberAvatarAsset) : v }));
+  const studentSearch = memberDraft.data.studentSearch;
+  const setStudentSearch = (v: any) => memberDraft.setData(p => ({ ...p, studentSearch: typeof v === 'function' ? v(p.studentSearch) : v }));
+  const memberTranslations = memberDraft.data.translations as Record<LocalizedCmsLocale, { position?: string }>;
+  const setMemberTranslations = (v: any) => memberDraft.setData(p => ({ ...p, translations: typeof v === 'function' ? v(p.translations) : v }));
+
+  const editMember = editMemberId ? {
+    committeeId: editMemberId.committeeId,
+    member: editMemberId.memberId === 'create' ? null : (committees.find(c => c.id === editMemberId.committeeId)?.members?.find((m: any) => m.id === editMemberId.memberId) ?? null)
+  } : null;
 
   const [headModal, setHeadModal] = useState(false);
   const [headCommittee, setHeadCommittee] = useState<CommitteeId | null>(null);
@@ -1176,28 +1219,16 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
   const [invalid, setInvalid] = useState<string[]>([]);
 
   const openAddMember = (committeeId: CommitteeId) => {
-    setEditMember({ committeeId, member: null });
-    setMemberForm({ studentId: '', position: '', photo: '' });
-    setMemberAvatarAsset(null);
-    setStudentSearch('');
-    setStudentDropdownOpen(false);
-    setMemberTranslations({
-      tr: { position: '' },
-      en: { position: '' },
-    });
-    setMemberModal(true);
+    setEditMemberId({ committeeId, memberId: 'create' });
+    memberDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-member', 'create', committeeId));
   };
   const openEditMember = (committeeId: CommitteeId, m: CommitteeMember) => {
-    setEditMember({ committeeId, member: m });
+    setEditMemberId({ committeeId, memberId: m.id });
     setMemberForm({ studentId: '', position: m.position, photo: m.photo });
     setMemberAvatarAsset(null);
     setStudentSearch(m.name);
     setStudentDropdownOpen(false);
-    setMemberTranslations({
-      tr: { position: '' },
-      en: { position: '' },
-    });
-    setMemberModal(true);
+    memberDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-member', 'edit', `${committeeId}:${m.id}`));
   };
   const resolveTargetUserId = () => {
     const selected = students.find((student) => student.id === memberForm.studentId);
@@ -1307,6 +1338,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
       }
     } catch { /* ignore corrupted state */ }
     setMemberModal(false);
+    memberDraft.clearDraft();
   };
   const removeMember = (committeeId: CommitteeId, memberId: string) => {
     if (!confirm(t('admin.board.confirmDeleteMember', 'هل أنت متأكد من حذف هذا العضو؟'))) return;
@@ -1481,7 +1513,10 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
       ))}
 
       {/* Member modal */}
-      <Modal open={memberModal} onClose={() => setMemberModal(false)} title={editMember?.member ? t('admin.board.memberModal.editTitle', 'تعديل عضو') : t('admin.board.memberModal.addTitle', 'إضافة عضو جديد')} maxWidth="max-w-md">
+      <Modal open={memberModal} onClose={memberDraft.requestClose || (() => setMemberModal(false))} title={editMember?.member ? t('admin.board.memberModal.editTitle', 'تعديل عضو') : t('admin.board.memberModal.addTitle', 'إضافة عضو جديد')} maxWidth="max-w-md">
+        {memberDraft.isDecisionOpen ? (
+          <UnsavedDraftDecision onContinue={memberDraft.continueEditing} onKeep={memberDraft.keepDraftAndClose} onDiscard={memberDraft.discardDraftAndClose} />
+        ) : (
         <form onSubmit={saveMember} className="space-y-4">
           <div>
             <label className="label-field">{t('admin.board.memberModal.memberLabel', 'العضو')} *</label>
@@ -1580,12 +1615,13 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
             }}
           />
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setMemberModal(false)} className="btn-ghost">{t('admin.board.memberModal.cancel', 'إلغاء')}</button>
+            <button type="button" onClick={memberDraft.requestClose || (() => setMemberModal(false))} className="btn-ghost">{t('admin.board.memberModal.cancel', 'إلغاء')}</button>
             <button type="submit" className="btn-primary">
               <Save className="h-4 w-4" /> {editMember?.member ? t('admin.board.memberModal.saveChanges', 'حفظ التعديلات') : t('admin.board.memberModal.add', 'إضافة')}
             </button>
           </div>
         </form>
+        )}
       </Modal>
 
       {/* Head modal */}
