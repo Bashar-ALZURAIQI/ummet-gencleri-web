@@ -225,6 +225,7 @@ export default function AdminDashboard() {
               markRead={markContactMessageRead}
               reply={replyToContactMessage}
               retryEmail={retryContactReplyEmail}
+              currentUser={currentUser!}
             />
           )}
           {tab === 'plans' && canEditSection('plans') && <PlansTab plans={plans} setPlans={setPlans} reports={reports} setReports={setReports} currentUser={currentUser} />}
@@ -243,28 +244,54 @@ export default function AdminDashboard() {
 }
 
 /* ---------------- Contact inbox ---------------- */
-function ContactInboxTab({ messages, loading, error, markRead, reply, retryEmail }: {
+function ContactInboxTab({ messages, loading, error, markRead, reply, retryEmail, currentUser }: {
   messages: ReturnType<typeof useApp>['contactMessages'];
   loading: boolean;
   error: string | null;
   markRead: ReturnType<typeof useApp>['markContactMessageRead'];
   reply: ReturnType<typeof useApp>['replyToContactMessage'];
   retryEmail: ReturnType<typeof useApp>['retryContactReplyEmail'];
+  currentUser: NonNullable<ReturnType<typeof useApp>['currentUser']>;
 }) {
   const { t } = useTranslation();
   const [activeId, setActiveId] = useState<string | null>(messages[0]?.id ?? null);
-  const [replyText, setReplyText] = useState('');
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'error' | 'warning'; text: string } | null>(null);
+
+  useEffect(() => {
+    if (loading || !currentUser) return;
+    const openDraft = findOpenSessionDraft<{ replyText: string }>(currentUser.userId, 'admin:inbox-reply');
+    if (openDraft && openDraft.envelope.open && openDraft.entityId && messages.some((m) => m.id === openDraft.entityId)) {
+      setActiveId(openDraft.entityId);
+    }
+  }, [loading, currentUser, messages]);
+
   const active = messages.find((message) => message.id === activeId) ?? messages[0] ?? null;
 
   useEffect(() => {
     if (!activeId || !messages.some((message) => message.id === activeId)) setActiveId(messages[0]?.id ?? null);
   }, [activeId, messages]);
 
+  const draftKey = currentUser && active?.id && canAccessContactInbox(currentUser.role)
+    ? buildSessionDraftKey(currentUser.userId, 'admin:inbox-reply', 'edit', active.id)
+    : null;
+
+  const draft = useSessionDraft({
+    key: draftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: { replyText: '' },
+    defaultOpen: true,
+    validation: {
+      readiness: loading ? 'UNKNOWN' : (active && !active.reply && canAccessContactInbox(currentUser?.role)) ? 'VALID' : 'INVALID',
+    },
+    isDirty: (d) => d.replyText.trim().length > 0,
+  });
+
+  const replyText = draft.data.replyText;
+  const setReplyText = (val: string) => draft.setData({ replyText: val });
+
   const openMessage = async (messageId: string) => {
     setActiveId(messageId);
-    setReplyText('');
     setFeedback(null);
     const selected = messages.find((message) => message.id === messageId);
     if (selected?.status === 'UNREAD') await markRead(messageId);
@@ -281,7 +308,7 @@ function ContactInboxTab({ messages, loading, error, markRead, reply, retryEmail
       setFeedback({ kind: 'error', text: result.error ?? t('admin.inbox.feedback.saveFailed', 'تعذر حفظ الرد.') });
       return;
     }
-    setReplyText('');
+    draft.clearDraft();
     setFeedback(result.emailWarning
       ? { kind: 'warning', text: result.emailWarning }
       : { kind: 'ok', text: t('admin.inbox.feedback.saveSuccess', 'تم حفظ الرد وإرساله بنجاح.') });
@@ -399,15 +426,43 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
 }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
-  const [replyOpen, setReplyOpen] = useState(false);
   const [activeSuggestion, setActiveSuggestion] = useState<Suggestion | null>(null);
-  const [status, setStatus] = useState<SuggestionStatus>('reviewing');
   const [replySubmitting, setReplySubmitting] = useState(false);
   const [refreshPending, setRefreshPending] = useState(false);
-  const [replyText, setReplyText] = useState('');
   const [replyError, setReplyError] = useState<string | null>(null);
   const [toast, setToast] = useState(false);
   const [invalid, setInvalid] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!currentUser || suggestions.length === 0) return;
+    const openDraft = findOpenSessionDraft<{ replyText: string; status: SuggestionStatus }>(currentUser.userId, 'admin:suggestion-reply');
+    if (openDraft && openDraft.envelope.open && openDraft.entityId) {
+      const match = suggestions.find(s => s.id === openDraft.entityId);
+      if (match) setActiveSuggestion(match);
+    }
+  }, [currentUser, suggestions]);
+
+  const draftKey = currentUser && activeSuggestion?.id
+    ? buildSessionDraftKey(currentUser.userId, 'admin:suggestion-reply', 'edit', activeSuggestion.id)
+    : null;
+
+  const draft = useSessionDraft({
+    key: draftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: { replyText: '', status: activeSuggestion?.status === 'new' ? 'reviewing' : (activeSuggestion?.status ?? 'reviewing') },
+    defaultOpen: false,
+    validation: {
+      readiness: activeSuggestion && canRespondToSuggestion(activeSuggestion) ? 'VALID' : 'INVALID'
+    },
+    isDirty: (d) => d.replyText.trim().length > 0 || (activeSuggestion && d.status !== (activeSuggestion.status === 'new' ? 'reviewing' : activeSuggestion.status)) || false
+  });
+
+  const replyOpen = draft.open;
+  const setReplyOpen = draft.setOpen;
+  const replyText = draft.data.replyText;
+  const setReplyText = (v: string) => draft.setData(prev => ({ ...prev, replyText: typeof v === 'function' ? v(prev.replyText) : v }));
+  const status = draft.data.status;
+  const setStatus = (v: SuggestionStatus) => draft.setData(prev => ({ ...prev, status: v }));
 
   const activeStudents = students.filter((s) => s.status === 'active').length;
   const upcoming = events.filter((e) => e.status === 'upcoming').length;
@@ -445,10 +500,8 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
 
   const openSuggestion = (s: Suggestion) => {
     setActiveSuggestion(s);
-    setStatus(s.status === 'new' ? 'reviewing' : s.status === 'reviewing' ? 'reviewing' : s.status);
-    setReplyText('');
     setReplyError(null);
-    setReplyOpen(true);
+    draft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:suggestion-reply', 'edit', s.id));
   };
 
   const submitReply = async (e: React.FormEvent) => {
@@ -464,6 +517,7 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
       return;
     }
     setReplyOpen(false);
+    draft.clearDraft();
     if (ok) {
       setToast(true);
       setTimeout(() => setToast(false), 3000);
@@ -652,6 +706,11 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
         onSubmit={submitReply}
         replySubmitting={replySubmitting}
         replyError={replyError}
+        isDecisionOpen={draft.isDecisionOpen}
+        requestClose={draft.requestClose}
+        continueEditing={draft.continueEditing}
+        keepDraftAndClose={draft.keepDraftAndClose}
+        discardDraftAndClose={draft.discardDraftAndClose}
       />
 
       {toast && (
@@ -679,15 +738,43 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
 }) {
   const { t } = useTranslation();
   const [activeSuggestion, setActiveSuggestion] = useState<Suggestion | null>(null);
-  const [replyOpen, setReplyOpen] = useState(false);
-  const [status, setStatus] = useState<SuggestionStatus>('reviewing');
   const [replySubmitting, setReplySubmitting] = useState(false);
   const [refreshPending, setRefreshPending] = useState(false);
-  const [replyText, setReplyText] = useState('');
   const [replyError, setReplyError] = useState<string | null>(null);
   const [toast, setToast] = useState(false);
   const [invalid, setInvalid] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | SuggestionStatus>('all');
+
+  useEffect(() => {
+    if (!currentUser || suggestions.length === 0) return;
+    const openDraft = findOpenSessionDraft<{ replyText: string; status: SuggestionStatus }>(currentUser.userId, 'admin:suggestion-reply');
+    if (openDraft && openDraft.envelope.open && openDraft.entityId) {
+      const match = suggestions.find(s => s.id === openDraft.entityId);
+      if (match) setActiveSuggestion(match);
+    }
+  }, [currentUser, suggestions]);
+
+  const draftKey = currentUser && activeSuggestion?.id
+    ? buildSessionDraftKey(currentUser.userId, 'admin:suggestion-reply', 'edit', activeSuggestion.id)
+    : null;
+
+  const draft = useSessionDraft({
+    key: draftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: { replyText: '', status: activeSuggestion?.status === 'new' ? 'reviewing' : (activeSuggestion?.status ?? 'reviewing') },
+    defaultOpen: false,
+    validation: {
+      readiness: activeSuggestion && canRespondToSuggestion(activeSuggestion) ? 'VALID' : 'INVALID'
+    },
+    isDirty: (d) => d.replyText.trim().length > 0 || (activeSuggestion && d.status !== (activeSuggestion.status === 'new' ? 'reviewing' : activeSuggestion.status)) || false
+  });
+
+  const replyOpen = draft.open;
+  const setReplyOpen = draft.setOpen;
+  const replyText = draft.data.replyText;
+  const setReplyText = (v: string) => draft.setData(prev => ({ ...prev, replyText: typeof v === 'function' ? v(prev.replyText) : v }));
+  const status = draft.data.status;
+  const setStatus = (v: SuggestionStatus) => draft.setData(prev => ({ ...prev, status: v }));
 
   const isPresident = currentUser.role === 'PRESIDENT';
   const filtered = statusFilter === 'all' ? suggestions : suggestions.filter((s) => s.status === statusFilter);
@@ -702,10 +789,8 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
 
   const openSuggestion = (s: Suggestion) => {
     setActiveSuggestion(s);
-    setStatus(s.status === 'new' ? 'reviewing' : s.status);
-    setReplyText('');
     setReplyError(null);
-    setReplyOpen(true);
+    draft.openTarget(buildSessionDraftKey(currentUser.userId, 'admin:suggestion-reply', 'edit', s.id));
   };
 
   const submitReply = async (e: React.FormEvent) => {
@@ -721,6 +806,7 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
       return;
     }
     setReplyOpen(false);
+    draft.clearDraft();
     setToast(true);
     setTimeout(() => setToast(false), 3000);
   };
@@ -825,6 +911,11 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
         onSubmit={submitReply}
         replySubmitting={replySubmitting}
         replyError={replyError}
+        isDecisionOpen={draft.isDecisionOpen}
+        requestClose={draft.requestClose}
+        continueEditing={draft.continueEditing}
+        keepDraftAndClose={draft.keepDraftAndClose}
+        discardDraftAndClose={draft.discardDraftAndClose}
       />
 
       {toast && (
@@ -865,7 +956,8 @@ function StatusPill({ status }: { status: SuggestionStatus }) {
 }
 
 function SuggestionReplyModal({
-  open, onClose, suggestion, currentUser, canReply, status, setStatus, replyText, setReplyText, invalid, setInvalid, onSubmit, replySubmitting, replyError
+  open, onClose, suggestion, currentUser, canReply, status, setStatus, replyText, setReplyText, invalid, setInvalid, onSubmit, replySubmitting, replyError,
+  isDecisionOpen, requestClose, continueEditing, keepDraftAndClose, discardDraftAndClose
 }: {
   open: boolean;
   onClose: () => void;
@@ -875,12 +967,17 @@ function SuggestionReplyModal({
   status: SuggestionStatus;
   setStatus: (s: SuggestionStatus) => void;
   replyText: string;
-  setReplyText: React.Dispatch<React.SetStateAction<string>>;
+  setReplyText: (s: string) => void;
   invalid: string[];
   setInvalid: React.Dispatch<React.SetStateAction<string[]>>;
   onSubmit: (e: React.FormEvent) => void;
   replySubmitting?: boolean;
   replyError?: string | null;
+  isDecisionOpen?: boolean;
+  requestClose?: () => void;
+  continueEditing?: () => void;
+  keepDraftAndClose?: () => void;
+  discardDraftAndClose?: () => void;
 }) {
   const { t } = useTranslation();
   const statusOptions: { value: SuggestionStatus; label: string; color: string }[] = [
@@ -890,8 +987,14 @@ function SuggestionReplyModal({
   ];
   const isPresident = currentUser?.role === 'PRESIDENT';
   return (
-    <Modal open={open} onClose={onClose} title={t('admin.suggestions.modal.title', 'تفاصيل الاقتراح والرد عليه')} maxWidth="max-w-2xl">
-      {!suggestion ? (
+    <Modal open={open} onClose={requestClose || onClose} title={t('admin.suggestions.modal.title', 'تفاصيل الاقتراح والرد عليه')} maxWidth="max-w-2xl">
+      {isDecisionOpen && continueEditing && keepDraftAndClose && discardDraftAndClose ? (
+        <UnsavedDraftDecision
+          onContinue={continueEditing}
+          onKeep={keepDraftAndClose}
+          onDiscard={discardDraftAndClose}
+        />
+      ) : !suggestion ? (
         <div className="py-10 text-center">
           <Inbox className="mx-auto h-10 w-10 text-gray-300" />
           <p className="mt-3 text-sm text-gray-400">{t('admin.suggestions.modal.empty', 'لا توجد اقتراحات حالية.')}</p>
@@ -1015,7 +1118,7 @@ function SuggestionReplyModal({
                 </div>
               )}
               <div className="flex items-center justify-end gap-3 pt-1">
-                <button type="button" onClick={onClose} className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50">
+                <button type="button" onClick={requestClose || onClose} className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50">
                   {t('common.cancel', 'إلغاء')}
                 </button>
                 <button type="submit" className="btn-primary" disabled={replySubmitting}>
