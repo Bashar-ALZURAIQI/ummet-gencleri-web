@@ -3637,16 +3637,71 @@ function ApplicationsTab({
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [interviewModal, setInterviewModal] = useState<StudentApplication | null>(null);
-  const [decisionModal, setDecisionModal] = useState<StudentApplication | null>(null);
-  const [interviewForm, setInterviewForm] = useState({ date: '', time: '16:00', meetingUrl: '' });
-  const [interviewError, setInterviewError] = useState('');
-  const [decisionError, setDecisionError] = useState('');
-  const [applicationActionBusy, setApplicationActionBusy] = useState(false);
-  const [retryingNotificationId, setRetryingNotificationId] = useState<string | null>(null);
-  const [applicationNotice, setApplicationNotice] = useState<{ kind: 'success' | 'warning'; text: string } | null>(null);
-  const [invalid, setInvalid] = useState<string[]>([]);
-  const [decisionForm, setDecisionForm] = useState({ status: 'accepted' as 'accepted' | 'rejected', reason: '' });
+  const [editInterviewId, setEditInterviewId] = useState<string | null>(null);
+  const [editDecisionId, setEditDecisionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentUser?.userId) return;
+    const openInterview = findOpenSessionDraft<{ interviewForm: any }>(currentUser.userId, 'admin:application-interview');
+    if (openInterview && openInterview.envelope.open && openInterview.entityId) {
+      setEditInterviewId(openInterview.entityId);
+    }
+    const openDecision = findOpenSessionDraft<{ decisionForm: any }>(currentUser.userId, 'admin:application-decision');
+    if (openDecision && openDecision.envelope.open && openDecision.entityId) {
+      setEditDecisionId(openDecision.entityId);
+    }
+  }, [currentUser]);
+
+  const interviewDraftKey = currentUser?.userId && editInterviewId
+    ? buildSessionDraftKey(currentUser.userId, 'admin:application-interview', 'edit', editInterviewId)
+    : null;
+  const decisionDraftKey = currentUser?.userId && editDecisionId
+    ? buildSessionDraftKey(currentUser.userId, 'admin:application-decision', 'edit', editDecisionId)
+    : null;
+
+  const interviewDraft = useSessionDraft({
+    key: interviewDraftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: { interviewForm: { date: '', time: '16:00', meetingUrl: '' } },
+    defaultOpen: false,
+    validation: { readiness: 'VALID' },
+    isDirty: (d) => d.interviewForm.date.trim().length > 0 || d.interviewForm.meetingUrl.trim().length > 0
+  });
+
+  const decisionDraft = useSessionDraft({
+    key: decisionDraftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: { decisionForm: { status: 'accepted' as 'accepted' | 'rejected', reason: '' } },
+    defaultOpen: false,
+    validation: { readiness: 'VALID' },
+    isDirty: (d) => d.decisionForm.reason.trim().length > 0
+  });
+
+  const interviewModal = editInterviewId ? applications.find(a => a.id === editInterviewId) ?? null : null;
+  const setInterviewModal = (app: StudentApplication | null) => {
+    if (app) {
+      setEditInterviewId(app.id);
+      interviewDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:application-interview', 'edit', app.id));
+    } else {
+      setEditInterviewId(null);
+      interviewDraft.setOpen(false);
+    }
+  };
+  const interviewForm = interviewDraft.data.interviewForm;
+  const setInterviewForm = (v: any) => interviewDraft.setData(p => ({ ...p, interviewForm: typeof v === 'function' ? v(p.interviewForm) : v }));
+
+  const decisionModal = editDecisionId ? applications.find(a => a.id === editDecisionId) ?? null : null;
+  const setDecisionModal = (app: StudentApplication | null) => {
+    if (app) {
+      setEditDecisionId(app.id);
+      decisionDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:application-decision', 'edit', app.id));
+    } else {
+      setEditDecisionId(null);
+      decisionDraft.setOpen(false);
+    }
+  };
+  const decisionForm = decisionDraft.data.decisionForm;
+  const setDecisionForm = (v: any) => decisionDraft.setData(p => ({ ...p, decisionForm: typeof v === 'function' ? v(p.decisionForm) : v }));
 
   const getApplicationStatusLabel = (status: StudentApplication['status']) => {
     switch (status) {
@@ -3687,7 +3742,8 @@ function ApplicationsTab({
   };
 
   const openInterview = (app: StudentApplication) => {
-    setInterviewModal(app);
+    setEditInterviewId(app.id);
+    interviewDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:application-interview', 'edit', app.id));
     setInterviewForm({ date: '', time: '16:00', meetingUrl: '' });
     setInterviewError('');
   };
@@ -3725,11 +3781,13 @@ function ApplicationsTab({
       ? { kind: 'warning', text: result.emailWarning }
       : { kind: 'success', text: t('admin.applications.interviewModal.successNotice', 'تم حفظ موعد المقابلة وإرسال البريد للطالب.') });
     setInterviewModal(null);
+    interviewDraft.clearDraft();
     setInterviewError('');
   };
 
   const openDecision = (app: StudentApplication, status: 'accepted' | 'rejected') => {
-    setDecisionModal(app);
+    setEditDecisionId(app.id);
+    decisionDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:application-decision', 'edit', app.id));
     setDecisionForm({ status, reason: '' });
     setDecisionError('');
   };
@@ -3753,6 +3811,7 @@ function ApplicationsTab({
       ? { kind: 'warning', text: result.emailWarning }
       : { kind: 'success', text: t('admin.applications.decisionModal.successNotice', 'تم حفظ القرار وإرسال البريد للطالب.') });
     setDecisionModal(null);
+    decisionDraft.clearDraft();
   };
 
   const retryEmail = async (
@@ -3876,8 +3935,10 @@ function ApplicationsTab({
         </div>
       </div>
 
-      <Modal open={!!interviewModal} onClose={() => setInterviewModal(null)} title={t('admin.applications.interviewModal.title', 'جدولة مقابلة شخصية')} maxWidth="max-w-lg">
-        {interviewModal && (
+      <Modal open={!!interviewModal} onClose={interviewDraft.requestClose || (() => setInterviewModal(null))} title={t('admin.applications.interviewModal.title', 'جدولة مقابلة شخصية')} maxWidth="max-w-lg">
+        {interviewDraft.isDecisionOpen ? (
+          <UnsavedDraftDecision onContinue={interviewDraft.continueEditing} onKeep={interviewDraft.keepDraftAndClose} onDiscard={interviewDraft.discardDraftAndClose} />
+        ) : interviewModal ? (
           <form onSubmit={submitInterview} className="space-y-4">
             <div className="rounded-xl bg-navy-50 p-3 text-sm">
               <span className="font-bold text-navy-900">{interviewModal.name}</span>
@@ -3921,18 +3982,20 @@ function ApplicationsTab({
               <p className="mt-1 text-xs text-gray-400">{t('admin.applications.interviewModal.urlHint', 'أدخل رابط الجلسة الافتراضية للمقابلة.')}</p>
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <button type="button" disabled={applicationActionBusy} onClick={() => setInterviewModal(null)} className="btn-ghost">{t('admin.applications.interviewModal.cancel', 'إلغاء')}</button>
+              <button type="button" disabled={applicationActionBusy} onClick={interviewDraft.requestClose || (() => setInterviewModal(null))} className="btn-ghost">{t('admin.applications.interviewModal.cancel', 'إلغاء')}</button>
               <button type="submit" disabled={applicationActionBusy} className="btn-primary disabled:cursor-not-allowed disabled:opacity-60">
                 {applicationActionBusy ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
                 {applicationActionBusy ? t('admin.applications.interviewModal.saving', 'جارٍ الحفظ...') : t('admin.applications.interviewModal.submit', 'تأكيد وجدولة')}
               </button>
             </div>
           </form>
-        )}
+        ) : null}
       </Modal>
 
-      <Modal open={!!decisionModal} onClose={() => setDecisionModal(null)} title={decisionForm.status === 'accepted' ? t('admin.applications.decisionModal.acceptTitle', 'تأكيد القبول النهائي') : t('admin.applications.decisionModal.rejectTitle', 'رفض الطلب')} maxWidth="max-w-md">
-        {decisionModal && (
+      <Modal open={!!decisionModal} onClose={decisionDraft.requestClose || (() => setDecisionModal(null))} title={decisionForm.status === 'accepted' ? t('admin.applications.decisionModal.acceptTitle', 'تأكيد القبول النهائي') : t('admin.applications.decisionModal.rejectTitle', 'رفض الطلب')} maxWidth="max-w-md">
+        {decisionDraft.isDecisionOpen ? (
+          <UnsavedDraftDecision onContinue={decisionDraft.continueEditing} onKeep={decisionDraft.keepDraftAndClose} onDiscard={decisionDraft.discardDraftAndClose} />
+        ) : decisionModal ? (
           <form onSubmit={submitDecision} className="space-y-4">
             <div className={`rounded-xl p-3 text-sm ${decisionForm.status === 'accepted' ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
               <span className="font-bold">{decisionModal.name}</span>
@@ -3954,7 +4017,7 @@ function ApplicationsTab({
               </div>
             )}
             <div className="flex justify-end gap-2 pt-2">
-              <button type="button" disabled={applicationActionBusy} onClick={() => setDecisionModal(null)} className="btn-ghost">{t('admin.applications.decisionModal.cancel', 'إلغاء')}</button>
+              <button type="button" disabled={applicationActionBusy} onClick={decisionDraft.requestClose || (() => setDecisionModal(null))} className="btn-ghost">{t('admin.applications.decisionModal.cancel', 'إلغاء')}</button>
               <button type="submit" disabled={applicationActionBusy} className={`${decisionForm.status === 'accepted' ? 'inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-600/20 transition-all hover:bg-emerald-700 active:scale-[0.98]' : 'inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-rose-600/20 transition-all hover:bg-rose-700 active:scale-[0.98]'} disabled:cursor-not-allowed disabled:opacity-60`}>
                 {applicationActionBusy
                   ? <><RefreshCw className="h-4 w-4 animate-spin" />{t('admin.applications.decisionModal.saving', 'جارٍ الحفظ...')}</>
@@ -3964,7 +4027,7 @@ function ApplicationsTab({
               </button>
             </div>
           </form>
-        )}
+        ) : null}
       </Modal>
     </div>
   );
