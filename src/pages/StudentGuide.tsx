@@ -557,7 +557,7 @@ const saveContact = async (e: React.FormEvent) => {
       <div className="container-app py-10">
         <SiteEditBanner pageId="guide" />
         <GuideSuggestionCallout />
-        <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
+        <div className="grid min-w-0 gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
           {/* Sidebar */}
           <aside className="lg:sticky lg:top-24 lg:self-start">
             <div className="card overflow-hidden p-2">
@@ -574,11 +574,13 @@ const saveContact = async (e: React.FormEvent) => {
                             : 'text-gray-600 hover:bg-gray-50'
                         }`}
                       >
-                        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${activeSectionId === section.id ? 'bg-white/20' : section.bg}`}>
-                          <Icon className={`h-4 w-4 ${activeSectionId === section.id ? 'text-white' : section.color}`} />
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${activeSectionId === section.id ? 'bg-white/20' : section.bg}`}>
+                          <Icon className={`h-4 w-4 shrink-0 ${activeSectionId === section.id ? 'text-white' : section.color}`} />
                         </div>
-                        {section.label}
-                        {activeSectionId === section.id && <ChevronLeft className="mr-auto h-4 w-4" />}
+                        <span className="dynamic-text-safe min-w-0 flex-1 text-start">
+                          {section.label}
+                        </span>
+                        {activeSectionId === section.id && <ChevronLeft className="mr-auto h-4 w-4 shrink-0" />}
                       </button>
                       {isPresidentOrMedia && (
                         <div className="absolute left-2 top-1/2 flex -translate-y-1/2 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -673,16 +675,16 @@ const saveContact = async (e: React.FormEvent) => {
           </aside>
 
           {/* Content */}
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             {/* Section header */}
             <div className="card overflow-hidden">
               <div className={`flex items-center gap-4 ${activeSection.bg} p-6`}>
-                <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow ${activeSection.color}`}>
+                <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white shadow ${activeSection.color}`}>
                   <ActiveIcon className="h-7 w-7" />
                 </div>
-                <div>
-                  <h2 className="text-xl font-extrabold text-navy-900">{activeSection.title}</h2>
-                  <p className="mt-1 text-sm leading-relaxed text-gray-600">{activeSection.intro}</p>
+                <div className="min-w-0 flex-1">
+                  <h2 className="dynamic-text-safe text-xl font-extrabold text-navy-900">{activeSection.title}</h2>
+                  <p className="dynamic-text-safe mt-1 text-sm leading-relaxed text-gray-600">{activeSection.intro}</p>
                 </div>
               </div>
             </div>
@@ -724,19 +726,21 @@ const saveContact = async (e: React.FormEvent) => {
                     </button>
                   </div>
                 )}
-                <div className="flex items-start gap-3">
+                <div className="flex min-w-0 items-start gap-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-navy-800 text-sm font-bold text-white">
                     {idx + 1}
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-base font-bold text-navy-900">{item.heading}</h3>
-                    <p className="mt-1 text-sm leading-relaxed text-gray-600"><SmartClickableText text={item.body} /></p>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="dynamic-text-safe text-base font-bold text-navy-900">{item.heading}</h3>
+                    <p className="dynamic-text-safe mt-1 min-w-0 text-sm leading-relaxed text-gray-600 [&_a]:break-all"><SmartClickableText text={item.body} /></p>
                     {item.tips.length > 0 && (
                       <ul className="mt-3 space-y-2">
                         {item.tips.map((tip, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
+                          <li key={i} className="flex min-w-0 items-start gap-2 text-sm text-gray-600">
                             <div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold-500" />
-                            <SmartClickableText text={tip} />
+                            <span className="dynamic-text-safe min-w-0 flex-1 [&_a]:break-all">
+                              <SmartClickableText text={tip} />
+                            </span>
                           </li>
                         ))}
                       </ul>
@@ -746,9 +750,12 @@ const saveContact = async (e: React.FormEvent) => {
                         href={item.documentUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-3 inline-flex items-center gap-2 rounded-lg bg-navy-50 px-3 py-2 text-sm font-semibold text-navy-700 hover:bg-navy-100"
+                        className="mt-3 inline-flex min-w-0 max-w-full items-center gap-2 rounded-lg bg-navy-50 px-3 py-2 text-sm font-semibold text-navy-700 hover:bg-navy-100"
                       >
-                        <Download className="h-4 w-4" /> {item.documentLabel?.trim() || 'تحميل الملف'}
+                        <Download className="h-4 w-4 shrink-0" />
+                        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
+                          {item.documentLabel?.trim() || 'تحميل الملف'}
+                        </span>
                       </a>
                     )}
                   </div>
