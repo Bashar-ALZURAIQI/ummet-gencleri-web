@@ -225,7 +225,7 @@ const assertStudentSidebarContracts = (student) => {
   assert.equal((student.match(/<SidebarLayout\b/g) ?? []).length, 1, 'expected one student sidebar shell');
 
   const sidebarContent = student.slice(sidebarStart, sidebarEnd);
-  assert.match(sidebarContent, /items=\{studentTabs\}[\s\S]*?activeId=\{tab\}[\s\S]*?onSelect=\{setTab\}/);
+  assert.match(sidebarContent, /items=\{studentTabs\}[\s\S]*?activeId=\{tab\}[\s\S]*?onSelect=\{handleTabSelect\}/);
   assert.match(sidebarContent, /<ApplicationBanner\b/);
   assert.match(sidebarContent, /<PushNotificationControl\b/);
   assert.doesNotMatch(sidebarContent, /<Modal\b/);

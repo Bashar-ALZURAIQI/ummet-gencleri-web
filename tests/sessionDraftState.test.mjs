@@ -223,14 +223,14 @@ test('test_requestClose_during_decision_never_discards_data', () => {
 });
 
 test('test_hook_rebinds_when_key_changes', () => {
-  assert.ok(hookSource.includes('useEffect(() => {') && hookSource.includes('[options.key, options.userId]'), 'Should rebind on key change');
+  assert.ok(hookSource.includes('if (prevKeyRef.current !== options.key || prevUserIdRef.current !== options.userId)'), 'Should rebind on key change');
   assert.ok(hookSource.includes('machineRef.current = new SessionDraftStateMachine'), 'Should instantiate new machine');
 });
 
 test('test_key_change_does_not_write_previous_entity_data', () => {
-  assert.ok(hookSource.includes('if (prevKey !== options.key'), 'Should prevent leaking data on key change');
+  assert.ok(hookSource.includes('prevKeyRef.current !== options.key'), 'Should prevent leaking data on key change');
 });
 
 test('test_create_edit_create_key_switches_are_isolated', () => {
-  assert.ok(hookSource.includes('setState(machineRef.current.getState())'), 'Should sync state immediately');
+  assert.ok(hookSource.includes('setState(currentState)'), 'Should sync state immediately');
 });

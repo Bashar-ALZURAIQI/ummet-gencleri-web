@@ -245,7 +245,7 @@ test('16. Existing SidebarLayout navigation behavior remains unchanged', async (
 
   assert.match(code, /<SidebarLayout<StudentPortalTabId>/);
   assert.match(code, /activeId=\{tab\}/);
-  assert.match(code, /onSelect=\{setTab\}/);
+  assert.match(code, /onSelect=\{handleTabSelect\}/);
 });
 
 test('17. Existing RTL/LTR behavior remains unchanged', async () => {

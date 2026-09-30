@@ -19,7 +19,7 @@ import { resolvePublicBrandName } from '../domain/publicBrand';
 import { getAcademicYearPresentation } from '../domain/academicYearPresentation';
 import { getExecutiveSectionLabel, getExecutiveRoleLabel } from '../domain/executivePresentation';
 import { useSessionDraft } from '../hooks/useSessionDraft';
-import { findOpenSessionDraft, buildSessionDraftKey } from '../domain/sessionDraft';
+import { buildSessionDraftKey } from '../domain/sessionDraft';
 import { useMemo } from 'react';
 
 const STUDENT_TAB_ICONS = {
@@ -52,17 +52,19 @@ export default function StudentDashboard() {
     contactMessagesLoading,
     contactMessagesError,
   } = useApp();
-  const [tab, setTab] = useState<StudentPortalTabId>('activities');
+  // removed
 type SuggestionDraftData = { title: string; body: string; category: string; targetRole: string; };
   const defaultDraftData: SuggestionDraftData = useMemo(() => ({ title: '', body: '', category: '', targetRole: '' }), []);
 
-  const draftKey = currentStudent?.id
-    ? buildSessionDraftKey(currentStudent.id, 'student:suggestion', 'create')
+  const draftOwnerId = currentUser?.userId ?? currentStudent?.id ?? null;
+
+  const draftKey = draftOwnerId
+    ? buildSessionDraftKey(draftOwnerId, 'student:suggestion', 'create')
     : null;
 
   const draft = useSessionDraft<SuggestionDraftData>({
     key: draftKey,
-    userId: currentStudent?.id ?? null,
+    userId: draftOwnerId,
     defaultData: defaultDraftData,
     validation: 'valid',
     baselineFingerprint: 'create',
@@ -72,15 +74,20 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
   const form = draft.data;
   const setForm = (updater: React.SetStateAction<SuggestionDraftData>) => draft.setData(updater);
 
-  useEffect(() => {
-    if (currentStudent?.id) {
-      const openDraft = findOpenSessionDraft(currentStudent.id, 'student:suggestion');
-      if (openDraft) {
-        setTab('suggestions');
+  const [tab, setTab] = useState<StudentPortalTabId>(() => 
+    draft.ui?.activeTab === 'suggestions' ? 'suggestions' : 'activities'
+  );
+
+  const handleTabSelect = (nextTab: StudentPortalTabId) => {
+    setTab(nextTab);
+    if (nextTab === 'suggestions') {
+      draft.setUi(prev => ({ ...prev, activeTab: 'suggestions' }));
+    } else {
+      if (!draft.dirty && !draft.restoredFromStorage) {
+        draft.setUi(prev => ({ ...prev, activeTab: undefined }));
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  };
   const [invalid, setInvalid] = useState<string[]>([]);
   const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -188,7 +195,8 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
       setSubmitError(t('suggestionsV2.suggestionSubmitFailure', 'Failed to submit suggestion.'));
       return;
     }
-    setForm({ title: '', body: '', category: '', targetRole: '' });
+    draft.clearDraft();
+    draft.setUi(prev => ({ ...prev, activeTab: undefined }));
     setSent(true);
     setTimeout(() => setSent(false), 4000);
   };
@@ -198,7 +206,7 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
       <SidebarLayout<StudentPortalTabId>
         items={studentTabs}
         activeId={tab}
-        onSelect={setTab}
+        onSelect={handleTabSelect}
         title={t('student.sidebarTitle', 'أقسام الطالب')}
       >
         <div className="space-y-6">

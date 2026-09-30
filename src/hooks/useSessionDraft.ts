@@ -20,6 +20,7 @@ export interface UseSessionDraftResult<T> {
   setData: React.Dispatch<React.SetStateAction<T>>;
   open: boolean;
   setOpen: (open: boolean) => void;
+  openTarget: (targetKey: string | null) => void;
   ui: SessionDraftUiState;
   setUi: React.Dispatch<React.SetStateAction<SessionDraftUiState>>;
   dirty: boolean;
@@ -42,35 +43,46 @@ export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessi
   }
 
   const [state, setState] = useState(() => machineRef.current!.getState());
+  const pendingOpenKeyRef = useRef<string | null>(null);
 
   const syncState = useCallback(() => {
     setState(machineRef.current!.getState());
   }, []);
 
-  // Watch for key or userId changes (E1: rebind when key changes)
+  let currentState = state;
+
   const prevKeyRef = useRef(options.key);
   const prevUserIdRef = useRef(options.userId);
-  useEffect(() => {
-    const prevKey = prevKeyRef.current;
-    if (prevKey !== options.key || prevUserIdRef.current !== options.userId) {
-      if (machineRef.current) {
-        machineRef.current.flush();
-      }
-      prevKeyRef.current = options.key;
-      prevUserIdRef.current = options.userId;
-      const envelope = options.key ? loadSessionDraft<T>(options.key) : null;
-      machineRef.current = new SessionDraftStateMachine(options, envelope);
-      setState(machineRef.current.getState());
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options.key, options.userId]);
 
-  // Sync config options (including validation) with machine
+  if (prevKeyRef.current !== options.key || prevUserIdRef.current !== options.userId) {
+    if (machineRef.current) {
+      machineRef.current.flush();
+    }
+    prevKeyRef.current = options.key;
+    prevUserIdRef.current = options.userId;
+    const envelope = options.key ? loadSessionDraft<T>(options.key) : null;
+    machineRef.current = new SessionDraftStateMachine(options, envelope);
+    
+    if (pendingOpenKeyRef.current === options.key) {
+      machineRef.current.setOpen(true);
+    }
+    pendingOpenKeyRef.current = null;
+    currentState = machineRef.current.getState();
+    setState(currentState);
+  }
+
+  // Sync config options (including validation) with machine.
+  // Each option field is listed individually to avoid re-running when the
+  // caller passes a freshly-created options object on every render (which
+  // would cause an infinite update loop if the whole object were a dep).
+
   useEffect(() => {
     if (machineRef.current) {
-      machineRef.current.updateConfig(options);
-      setState(machineRef.current.getState());
+      if (machineRef.current.updateConfig(options)) {
+        setState(machineRef.current.getState());
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     options.key,
     options.userId,
@@ -82,7 +94,7 @@ export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessi
     options.isDirty
   ]);
 
-  // Lifecycle flush
+  // Lifecycle flush — intentionally runs once; machineRef is always current.
   useEffect(() => {
     const handlePageHide = () => {
       machineRef.current?.flush();
@@ -101,7 +113,6 @@ export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessi
       window.removeEventListener('pagehide', handlePageHide);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setData = useCallback((action: React.SetStateAction<T>) => {
@@ -145,25 +156,30 @@ export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessi
     syncState();
   }, [syncState]);
 
+  const openTarget = useCallback((targetKey: string | null) => {
+    pendingOpenKeyRef.current = targetKey;
+  }, []);
+
   const clearDraft = useCallback(() => {
     machineRef.current!.clearDraft();
     syncState();
   }, [syncState]);
 
   return {
-    data: state.data,
+    data: currentState.data,
     setData,
-    open: state.open,
+    open: currentState.open,
     setOpen,
-    ui: state.ui,
+    openTarget,
+    ui: currentState.ui,
     setUi,
-    dirty: state.dirty,
-    isDecisionOpen: state.isDecisionOpen,
-    restoredFromStorage: state.restoredFromStorage,
+    dirty: currentState.dirty,
+    isDecisionOpen: currentState.isDecisionOpen,
+    restoredFromStorage: currentState.restoredFromStorage,
     requestClose,
     continueEditing,
     keepDraftAndClose,
     discardDraftAndClose,
-    clearDraft
+    clearDraft,
   };
 }

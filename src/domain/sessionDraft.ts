@@ -125,12 +125,14 @@ function isUnsupportedRuntimeValue(val: any): boolean {
   return false;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function isPlainObject(obj: any): boolean {
   if (typeof obj !== 'object' || obj === null) return false;
   const proto = Object.getPrototypeOf(obj);
   return proto === Object.prototype || proto === null;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ensureJsonSafe(value: any, seen: Set<any>): boolean {
   if (value === null) return true;
   if (typeof value === 'string' || typeof value === 'boolean' || (typeof value === 'number' && Number.isFinite(value))) {

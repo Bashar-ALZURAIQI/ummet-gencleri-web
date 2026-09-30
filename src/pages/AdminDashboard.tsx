@@ -2339,14 +2339,16 @@ function EventsTab({ events, currentUser }: {
       : events.filter((e) => ownedEventIds.has(e.id));
 
   const openAdd = () => {
+    const k = currentUser?.userId ? buildSessionDraftKey(currentUser.userId, 'admin:events', 'create') : null;
+    draft.openTarget(k);
     setEditId(null);
-    draft.setOpen(true);
     setModalOpen(true);
   };
 
   const openEdit = (e: UEvent) => {
+    const k = currentUser?.userId ? buildSessionDraftKey(currentUser.userId, 'admin:events', 'edit', e.id) : null;
+    draft.openTarget(k);
     setEditId(e.id);
-    draft.setOpen(true);
     setModalOpen(true);
   };
 
@@ -2659,7 +2661,7 @@ function NewsTab({ news, currentUser, submitSiteEdit }: {
 }) {
   const { t } = useTranslation();
   const repository = useCmsLocalizationRepository();
-  const { uploadManagedFile, savePublishedSiteTarget, refreshPublishedLocalizations } = useApp();
+  const { contentLoading, canEditSection, uploadManagedFile, savePublishedSiteTarget, refreshPublishedLocalizations } = useApp();
   const isPresident = currentUser?.role === 'PRESIDENT';
   const [modalOpen, setModalOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -2697,8 +2699,14 @@ function NewsTab({ news, currentUser, submitSiteEdit }: {
   }, [editId, news]);
 
   let validation: DraftEntityValidation = 'unknown';
-  if (editId) {
-    validation = news.some(n => n.id === editId) ? 'valid' : 'invalid';
+  if (contentLoading) {
+    validation = 'unknown';
+  } else if (editId) {
+    if (canEditSection('news')) {
+      validation = news.some(n => n.id === editId) ? 'valid' : 'invalid';
+    } else {
+      validation = 'invalid';
+    }
   } else {
     validation = 'valid';
   }
@@ -2774,14 +2782,16 @@ function NewsTab({ news, currentUser, submitSiteEdit }: {
   };
 
   const openAdd = () => {
+    const k = currentUser?.userId ? buildSessionDraftKey(currentUser.userId, 'admin:news', 'create') : null;
+    draft.openTarget(k);
     setEditId(null);
-    draft.setOpen(true);
     setModalOpen(true);
   };
 
   const openEdit = (n: NewsItem) => {
+    const k = currentUser?.userId ? buildSessionDraftKey(currentUser.userId, 'admin:news', 'edit', n.id) : null;
+    draft.openTarget(k);
     setEditId(n.id);
-    draft.setOpen(true);
     setModalOpen(true);
   };
 

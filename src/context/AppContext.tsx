@@ -2638,9 +2638,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     latestAuthEventRef.current = null;
     explicitLoginIntentEpochRef.current = null;
     const currentUserId = currentUser?.userId ?? currentStudent?.id;
-    if (currentUserId) {
-      clearSessionDraftsForUser(currentUserId);
-    }
+    const draftOwnerIdsToClear = new Set<string>();
+    if (currentUser?.userId) draftOwnerIdsToClear.add(currentUser.userId);
+    if (currentStudent?.id) draftOwnerIdsToClear.add(currentStudent.id);
+    draftOwnerIdsToClear.forEach(id => clearSessionDraftsForUser(id));
     setCurrentStudent(null);
     setCurrentUser(null);
     setAuthError(null);

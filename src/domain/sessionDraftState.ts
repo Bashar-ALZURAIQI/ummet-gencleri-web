@@ -67,17 +67,32 @@ export class SessionDraftStateMachine<T> {
     return { ...this.state };
   }
 
-  public updateConfig(newConfig: SessionDraftConfig<T>): void {
+  public updateConfig(newConfig: SessionDraftConfig<T>): boolean {
+    let stateChanged = false;
     this.config = newConfig;
     if (this.config.validation === 'invalid') {
-      this.state.open = false;
-      this.state.isDecisionOpen = false;
-      this.state.data = this.config.defaultData;
-      this.state.dirty = false;
       if (this.config.key) {
         removeSessionDraft(this.config.key);
       }
+      if (this.state.open || this.state.isDecisionOpen || this.state.dirty || JSON.stringify(this.state.data) !== JSON.stringify(this.config.defaultData)) {
+        this.state.open = false;
+        this.state.isDecisionOpen = false;
+        this.state.data = this.config.defaultData;
+        this.state.dirty = false;
+        stateChanged = true;
+      }
+    } else {
+      if (!this.state.dirty && JSON.stringify(this.state.data) !== JSON.stringify(this.config.defaultData)) {
+        this.state.data = this.config.defaultData;
+        stateChanged = true;
+      }
+      const newDirty = this.config.isDirty(this.state.data);
+      if (newDirty !== this.state.dirty) {
+        this.state.dirty = newDirty;
+        stateChanged = true;
+      }
     }
+    return stateChanged;
   }
 
   public updateData(newData: T): void {

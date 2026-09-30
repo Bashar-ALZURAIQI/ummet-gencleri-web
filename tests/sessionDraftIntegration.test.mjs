@@ -64,7 +64,7 @@ test('test_event_editor_uses_correct_feature_keys_and_validation_with_contentLoa
   assert.ok(source.includes("draft.clearDraft();"));
 
   // activeLocale wired to draft UI
-  assert.ok(source.includes("activeTab={draft.ui.activeLocale as any}"));
+  assert.ok(source.includes("activeTab={draft.ui.activeLocale}"));
   assert.ok(source.includes("onActiveTabChange={(t) => draft.setUi(prev => ({...prev, activeLocale: t as 'ar' | 'tr' | 'en'}))}"));
 
   // findOpenSessionDraft used
@@ -81,10 +81,10 @@ test('test_event_lifecycle_and_ui_bindings', () => {
   const source = fs.readFileSync(adminDashboardPath, 'utf8');
 
   // Event Add opening
-  assert.ok(source.includes("draft.setOpen(true)") && source.includes("setEditId(null)"), 'Event Add opening');
+  assert.ok(source.includes("draft.openTarget(") && source.includes("setEditId(null)"), 'Event Add opening');
   
   // Event Edit opening
-  assert.ok(source.includes("setEditId(e.id)") && source.includes("draft.setOpen(true)"), 'Event Edit opening');
+  assert.ok(source.includes("setEditId(e.id)") && source.includes("draft.openTarget("), 'Event Edit opening');
 
   // successful submit close
   assert.ok(source.includes("draft.clearDraft()"), 'successful submit clears exact draft');
