@@ -3966,23 +3966,43 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
     return r.authorId === currentUser?.email;
   };
 
-  const [planModal, setPlanModal] = useState(false);
-  const [editPlanId, setEditPlanId] = useState<string | null>(null);
+  const [editPlanId, setEditPlanId] = useState<string | 'create' | null>(null);
   const [invalid, setInvalid] = useState<string[]>([]);
-  const [planForm, setPlanForm] = useState({ title: '', description: '', quarter: '', owner: '', status: 'planned' as 'planned' | 'in-progress' | 'completed', progress: 0, committee: (myCommittee ?? 'presidency') as CommitteeId, pdfUrl: '' });
-  const [planTranslations, setPlanTranslations] = useState<Record<LocalizedCmsLocale, { title?: string; description?: string }>>({
-    tr: { title: '', description: '' },
-    en: { title: '', description: '' },
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const openPlan = findOpenSessionDraft<{ planForm: any; planTranslations: any }>(currentUser.userId, 'admin:plan');
+    if (openPlan && openPlan.envelope.open) {
+      setEditPlanId(openPlan.mode === 'create' ? 'create' : (openPlan.entityId ?? null));
+    }
+  }, [currentUser]);
+
+  const planDraftKey = currentUser && editPlanId
+    ? buildSessionDraftKey(currentUser.userId, 'admin:plan', editPlanId === 'create' ? 'create' : 'edit', editPlanId === 'create' ? undefined : editPlanId)
+    : null;
+
+  const planDraft = useSessionDraft({
+    key: planDraftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: {
+      planForm: { title: '', description: '', quarter: '', owner: currentUser?.name ?? '', status: 'planned' as 'planned' | 'in-progress' | 'completed', progress: 0, committee: (myCommittee ?? 'presidency') as CommitteeId, pdfUrl: '' },
+      planTranslations: { tr: { title: '', description: '' }, en: { title: '', description: '' } }
+    },
+    defaultOpen: false,
+    validation: { readiness: 'VALID' },
+    isDirty: (d) => d.planForm.title.trim().length > 0 || d.planForm.description.trim().length > 0
   });
 
+  const planModal = planDraft.open;
+  const setPlanModal = planDraft.setOpen;
+  const planForm = planDraft.data.planForm;
+  const setPlanForm = (v: any) => planDraft.setData(p => ({ ...p, planForm: typeof v === 'function' ? v(p.planForm) : v }));
+  const planTranslations = planDraft.data.planTranslations as Record<LocalizedCmsLocale, { title?: string; description?: string }>;
+  const setPlanTranslations = (v: any) => planDraft.setData(p => ({ ...p, planTranslations: typeof v === 'function' ? v(p.planTranslations) : v }));
+
   const openAddPlan = () => {
-    setEditPlanId(null);
-    setPlanForm({ title: '', description: '', quarter: '', owner: currentUser?.name ?? '', status: 'planned', progress: 0, committee: (myCommittee ?? 'presidency') as CommitteeId, pdfUrl: '' });
-    setPlanTranslations({
-      tr: { title: '', description: '' },
-      en: { title: '', description: '' },
-    });
-    setPlanModal(true);
+    setEditPlanId('create');
+    planDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:plan', 'create'));
   };
   const openEditPlan = (p: ReturnType<typeof useApp>['plans'][0]) => {
     setEditPlanId(p.id);
@@ -3991,7 +4011,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
       tr: { title: '', description: '' },
       en: { title: '', description: '' },
     });
-    setPlanModal(true);
+    planDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:plan', 'edit', p.id));
   };
   const savePlan = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4052,6 +4072,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
       }
     }
     setPlanModal(false);
+    planDraft.clearDraft();
   };
   const removePlan = async (id: string) => {
     if (!confirm(t('admin.plans.confirmDeletePlan', 'هل أنت متأكد من حذف هذه الخطة؟'))) return;
@@ -4060,22 +4081,42 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
     else setPlans(next);
   };
 
-  const [reportModal, setReportModal] = useState(false);
-  const [editReportId, setEditReportId] = useState<string | null>(null);
-  const [reportForm, setReportForm] = useState({ title: '', type: 'تقرير لجنة', period: '', date: '', summary: '', committee: (myCommittee ?? 'presidency') as CommitteeId, pdfUrl: '', isGeneral: false });
-  const [reportTranslations, setReportTranslations] = useState<Record<LocalizedCmsLocale, { title?: string; summary?: string; period?: string }>>({
-    tr: { title: '', summary: '', period: '' },
-    en: { title: '', summary: '', period: '' },
+  const [editReportId, setEditReportId] = useState<string | 'create' | null>(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const openReport = findOpenSessionDraft<{ reportForm: any; reportTranslations: any }>(currentUser.userId, 'admin:report');
+    if (openReport && openReport.envelope.open) {
+      setEditReportId(openReport.mode === 'create' ? 'create' : (openReport.entityId ?? null));
+    }
+  }, [currentUser]);
+
+  const reportDraftKey = currentUser && editReportId
+    ? buildSessionDraftKey(currentUser.userId, 'admin:report', editReportId === 'create' ? 'create' : 'edit', editReportId === 'create' ? undefined : editReportId)
+    : null;
+
+  const reportDraft = useSessionDraft({
+    key: reportDraftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: {
+      reportForm: { title: '', type: 'تقرير لجنة', period: '', date: new Date().toISOString().slice(0, 10), summary: '', committee: (myCommittee ?? 'presidency') as CommitteeId, pdfUrl: '', isGeneral: false },
+      reportTranslations: { tr: { title: '', summary: '', period: '' }, en: { title: '', summary: '', period: '' } }
+    },
+    defaultOpen: false,
+    validation: { readiness: 'VALID' },
+    isDirty: (d) => d.reportForm.title.trim().length > 0 || d.reportForm.summary.trim().length > 0
   });
 
+  const reportModal = reportDraft.open;
+  const setReportModal = reportDraft.setOpen;
+  const reportForm = reportDraft.data.reportForm;
+  const setReportForm = (v: any) => reportDraft.setData(p => ({ ...p, reportForm: typeof v === 'function' ? v(p.reportForm) : v }));
+  const reportTranslations = reportDraft.data.reportTranslations as Record<LocalizedCmsLocale, { title?: string; summary?: string; period?: string }>;
+  const setReportTranslations = (v: any) => reportDraft.setData(p => ({ ...p, reportTranslations: typeof v === 'function' ? v(p.reportTranslations) : v }));
+
   const openAddReport = () => {
-    setEditReportId(null);
-    setReportForm({ title: '', type: 'تقرير لجنة', period: '', date: new Date().toISOString().slice(0, 10), summary: '', committee: (myCommittee ?? 'presidency') as CommitteeId, pdfUrl: '', isGeneral: false });
-    setReportTranslations({
-      tr: { title: '', summary: '', period: '' },
-      en: { title: '', summary: '', period: '' },
-    });
-    setReportModal(true);
+    setEditReportId('create');
+    reportDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:report', 'create'));
   };
   const openEditReport = (r: ReturnType<typeof useApp>['reports'][0]) => {
     setEditReportId(r.id);
@@ -4084,7 +4125,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
       tr: { title: '', summary: '', period: '' },
       en: { title: '', summary: '', period: '' },
     });
-    setReportModal(true);
+    reportDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:report', 'edit', r.id));
   };
   const saveReport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -4145,6 +4186,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
       }
     }
     setReportModal(false);
+    reportDraft.clearDraft();
   };
   const removeReport = async (id: string) => {
     if (!confirm(t('admin.plans.confirmDeleteReport', 'هل أنت متأكد من حذف هذا التقرير؟'))) return;
@@ -4253,7 +4295,10 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
       </div>
 
       {/* Plan Modal */}
-      <Modal open={planModal} onClose={() => setPlanModal(false)} title={editPlanId ? t('admin.plans.planModal.editTitle', 'تعديل الخطة') : t('admin.plans.planModal.addTitle', 'إضافة خطة إدارية')} maxWidth="max-w-lg">
+      <Modal open={planModal} onClose={planDraft.requestClose || (() => setPlanModal(false))} title={editPlanId ? t('admin.plans.planModal.editTitle', 'تعديل الخطة') : t('admin.plans.planModal.addTitle', 'إضافة خطة إدارية')} maxWidth="max-w-lg">
+        {planDraft.isDecisionOpen ? (
+          <UnsavedDraftDecision onContinue={planDraft.continueEditing} onKeep={planDraft.keepDraftAndClose} onDiscard={planDraft.discardDraftAndClose} />
+        ) : (
         <form onSubmit={savePlan} className="space-y-4">
           <div>
             <label className="label-field">{t('admin.plans.planModal.committeeLabel', 'اللجنة / المكتب التابع')} <RequiredMark /></label>
@@ -4349,14 +4394,18 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
             </div>
           </CmsEntityTranslationTabs>
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setPlanModal(false)} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
+            <button type="button" onClick={planDraft.requestClose || (() => setPlanModal(false))} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
             <button type="submit" className="btn-primary"><CheckCircle2 className="h-4 w-4" /> {editPlanId ? t('admin.plans.planModal.saveChanges', 'حفظ التعديلات') : t('admin.plans.planModal.add', 'إضافة')}</button>
           </div>
         </form>
+        )}
       </Modal>
 
       {/* Report Modal */}
-      <Modal open={reportModal} onClose={() => setReportModal(false)} title={editReportId ? t('admin.plans.reportModal.editTitle', 'تعديل التقرير') : t('admin.plans.reportModal.addTitle', 'إضافة تقرير')} maxWidth="max-w-lg">
+      <Modal open={reportModal} onClose={reportDraft.requestClose || (() => setReportModal(false))} title={editReportId ? t('admin.plans.reportModal.editTitle', 'تعديل التقرير') : t('admin.plans.reportModal.addTitle', 'إضافة تقرير')} maxWidth="max-w-lg">
+        {reportDraft.isDecisionOpen ? (
+          <UnsavedDraftDecision onContinue={reportDraft.continueEditing} onKeep={reportDraft.keepDraftAndClose} onDiscard={reportDraft.discardDraftAndClose} />
+        ) : (
         <form onSubmit={saveReport} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -4449,10 +4498,11 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
             </div>
           </CmsEntityTranslationTabs>
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setReportModal(false)} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
+            <button type="button" onClick={reportDraft.requestClose || (() => setReportModal(false))} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
             <button type="submit" className="btn-primary"><CheckCircle2 className="h-4 w-4" /> {editReportId ? t('admin.plans.reportModal.saveChanges', 'حفظ التعديلات') : t('admin.plans.reportModal.add', 'إضافة')}</button>
           </div>
         </form>
+        )}
       </Modal>
 
       {/* View Report Modal */}
