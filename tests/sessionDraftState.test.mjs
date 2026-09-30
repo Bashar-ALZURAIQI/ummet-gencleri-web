@@ -386,10 +386,11 @@ const studentDashSource = fs.readFileSync(path.resolve('src/pages/StudentDashboa
 test('test_event_success_does_not_recreate_draft_after_clear', () => {
   // The event success path must call clearDraft() then close modal,
   // NOT call draft.setOpen(false) or draft.setUi() after clearDraft().
-  const clearIdx = adminDashSource.indexOf("draft.clearDraft();\n    setModalOpen(false);\n    setToast");
+  const normalizedSource = adminDashSource.replace(/\r\n/g, '\n');
+  const clearIdx = normalizedSource.indexOf("draft.clearDraft();\n    setModalOpen(false);\n    setToast");
   assert.ok(clearIdx !== -1, 'Event success: clearDraft() must be followed directly by setModalOpen (no draft mutation in between)');
   // Ensure no draft.setOpen follows clearDraft in event success
-  const snippet = adminDashSource.slice(clearIdx, clearIdx + 80);
+  const snippet = normalizedSource.slice(clearIdx, clearIdx + 80);
   assert.ok(!snippet.includes('draft.setOpen'), 'Event success path must not call draft.setOpen after clearDraft');
 });
 

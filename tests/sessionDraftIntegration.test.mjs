@@ -43,7 +43,7 @@ test('test_unsaved_draft_decision_uses_localization', () => {
 // Task 4: Event editor uses correct feature keys and validation with contentLoading
 test('test_event_editor_uses_correct_feature_keys_and_validation_with_contentLoading', () => {
   const adminDashboardPath = path.resolve('src/pages/AdminDashboard.tsx');
-  const source = fs.readFileSync(adminDashboardPath, 'utf8');
+  const source = fs.readFileSync(adminDashboardPath, 'utf8').replace(/\r\n/g, '\n');
 
   // admin:events create key and entity-scoped edit key
   assert.ok(source.includes("buildSessionDraftKey(currentUser.userId, 'admin:events', editId ? 'edit' : 'create', editId ?? undefined)"));
