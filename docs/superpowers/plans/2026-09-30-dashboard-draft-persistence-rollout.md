@@ -4,68 +4,48 @@
 
 **Goal:** Preserve eligible unsaved authored dashboard state across real tab/component unmounts and internal navigation for every authorized executive role using the existing user-scoped sessionStorage draft architecture.
 
-**Architecture:** Extend the existing Phase 1 SessionDraftService/useSessionDraft architecture to all eligible authenticated dashboard authoring surfaces while preserving current conditional dashboard mounting, role authorization, CMS translation behavior, and submit semantics.
+**Spec:** docs/superpowers/specs/2026-09-30-dashboard-draft-persistence-rollout-design.md
 
-**Tech Stack:** React, TypeScript, sessionStorage, existing i18n/CMS localization, existing Modal component, Node built-in test suite.
+## Full Dashboard Surface Inventory (Total: 26)
 
-**Spec:** docs/superpowers/specs/2026-09-29-session-draft-persistence-design.md
-
-## Global Constraints
-- **Scope Isolation:** Strictly `sessionStorage` by user ID and entity ID.
-- **Validation:** Asynchronous validation (VALID/INVALID/UNKNOWN) for edit modes.
-- **Navigation:** Preserves open drafts silently, no prompt on navigation.
-- **Form Submit:** Successful submit clears the exact draft; failure preserves it.
-- **Sensitive Data:** Auth secrets, raw Files must not be serialized.
-
-## Full Dashboard Surface Inventory
-
-| Surface | Component/File | Role(s) | Editable authored state | Classification | Draft feature key | Entity identity | Async validation requirement | Translations | File handling | Success-clear rule | Reason |
-|---------|----------------|---------|--------------------------|----------------|-------------------|-----------------|------------------------------|--------------|---------------|--------------------|--------|
-| Events Edit | `AdminDashboard.tsx` | Executives | Title, Desc | ALREADY_COVERED_PHASE1 | `admin:events` | Event ID | Yes | Yes | Retain URLs | Clears Draft | Phase 1 |
-| News Edit | `AdminDashboard.tsx` | Executives | Title, Desc | ALREADY_COVERED_PHASE1 | `admin:news` | News ID | Yes | Yes | Retain URLs | Clears Draft | Phase 1 |
-| Suggestion Compose | `StudentDashboard.tsx` | Student | Title, Body | ALREADY_COVERED_PHASE1 | `student:suggestion` | Create only | No | No | N/A | Clears Draft | Phase 1 |
-| Admin Reply (Stats/Suggestions) | `AdminDashboard.tsx` | Executives | `replyText` | PERSIST_DRAFT | `admin:suggestion-reply` | Suggestion ID | Yes (verify exist) | No | N/A | Clears Draft | Authored text loss |
-| Admin Inbox Reply | `AdminDashboard.tsx` | Executives | `replyText` | PERSIST_DRAFT | `admin:inbox-reply` | Message ID | Yes | No | N/A | Clears Draft | Authored text loss |
-| Board Member Add/Edit | `AdminDashboard.tsx` (BoardTab) | PRESIDENT | Member Details | PERSIST_DRAFT | `admin:board-member` | Member ID | Yes | Yes | Reselect | Clears Draft | Complex modal |
-| Board Head Edit | `AdminDashboard.tsx` (BoardTab) | PRESIDENT | Head Role | PERSIST_DRAFT | `admin:board-head` | Member ID | Yes | Yes | Reselect | Clears Draft | Complex modal |
-| Responsibility Edit | `AdminDashboard.tsx` (BoardTab) | PRESIDENT | Responsibility | PERSIST_DRAFT | `admin:board-resp` | Resp ID | Yes | Yes | N/A | Clears Draft | Complex modal |
-| Gallery Album Edit | `AdminDashboard.tsx` (GalleryTab)| Executives | Title, Desc | PERSIST_DRAFT | `admin:gallery-album`| Album ID | Yes | Yes | Retain URLs | Clears Draft | Long form |
-| Gallery Media Edit | `AdminDashboard.tsx` (GalleryTab)| Executives | Media Details | PERSIST_DRAFT | `admin:gallery-media`| Media ID | Yes | Yes | Retain URLs | Clears Draft | Long form |
-| Plans Modal | `AdminDashboard.tsx` (PlansTab)| Executives | Plan Text | PERSIST_DRAFT | `admin:plan` | Plan ID | Yes | Yes | Retain URLs | Clears Draft | Long form |
-| Reports Modal | `AdminDashboard.tsx` (PlansTab)| Executives | Report Text | PERSIST_DRAFT | `admin:report` | Report ID | Yes | Yes | Retain URLs | Clears Draft | Long form |
-| App Interview | `AdminDashboard.tsx` (ApplicationsTab) | PRESIDENT | Interview Info | PERSIST_DRAFT | `admin:app-interview`| App ID | Yes | No | N/A | Clears Draft | Important date/text |
-| Guide Suggestions Reply | `GuideSuggestionsPanel.tsx` | Executives | Response text | PERSIST_DRAFT | `admin:guide-reply` | Suggestion ID | Yes | No | N/A | Clears Draft | Authored text |
-| Site Edits Admin Panel | `SiteEditsPanel.tsx` | PRESIDENT | `revised` text | PERSIST_DRAFT | `admin:site-edit` | Edit ID | Yes | Yes | N/A | Clears Draft | Authored text revisions |
-| Internal Tasks | `InternalTaskCreationPanel.tsx` | Executives | Task Form | PERSIST_DRAFT | `admin:internal-task`| Create only | No | No | N/A | Clears Draft | Multi-step form |
-| Member Points | `MemberPointsAdminPanel.tsx` | Executives | Amount, Reason | PERSIST_DRAFT | `admin:member-points`| Create only | No | No | N/A | Clears Draft | Authored text |
-| Delete/Revoke Confs | multiple | multiple | N/A | NO_DRAFT_REQUIRED | N/A | N/A | N/A | N/A | N/A | N/A | Transient confirmation |
-| Profile Settings | `ProfileSettings.tsx` | All | Passwords/Sec | NO_DRAFT_REQUIRED | N/A | N/A | N/A | N/A | N/A | N/A | Security rule |
-| Translation Monitoring | `TranslationMonitoringTab.tsx`| Executives | N/A | NO_DRAFT_REQUIRED | N/A | N/A | N/A | N/A | N/A | N/A | Read-only |
-| Site Branding | `SiteBrandingPanel.tsx`| PRESIDENT | N/A | NO_DRAFT_REQUIRED | N/A | N/A | N/A | N/A | N/A | N/A | Immediate upload / No modal form |
-| Edits History | `EditsHistoryPanel.tsx`| Executives | N/A | NO_DRAFT_REQUIRED | N/A | N/A | N/A | N/A | N/A | N/A | Read-only |
-| Excuse Review | `ExcuseReviewPanel.tsx`| Executives | N/A | NO_DRAFT_REQUIRED | N/A | N/A | N/A | N/A | N/A | N/A | Read-only/Approve |
-| Task Dashboard | `TaskManagementDashboard.tsx`| Executives | N/A | NO_DRAFT_REQUIRED | N/A | N/A | N/A | N/A | N/A | N/A | Read-only |
-| Profile Edits | `ProfileEditsPanel.tsx`| PRESIDENT | N/A | NO_DRAFT_REQUIRED | N/A | N/A | N/A | N/A | N/A | N/A | Read-only/Approve |
-| Oversight Evaluation| `OversightEvaluationPanel.tsx`| Executives | N/A | NO_DRAFT_REQUIRED | N/A | N/A | N/A | N/A | N/A | N/A | Inline minimal actions |
-
-## Review Focus
-1. **Security Isolation:** Ensuring `admin:board-member` drafts never bleed into `admin:board-head` or another member's draft.
-2. **Translation Loss:** Guaranteeing `activeLocale` and intentionally empty CMS translation arrays are restored identically across unmounts.
-3. **Async Race Conditions:** Keeping stale drafts alive via the `UNKNOWN` validation state until authoritative ownership loading resolves.
-4. **File Pickers:** Confirming `draft.ui.fileReselectionRequired` successfully resets local input fields instead of attempting serialization.
-5. **Inline Forms:** Managing persistence on inline components (like `InternalTaskCreationPanel`) which lack a strict `modalOpen` state wrapper.
+| Surface | Classification | Draft feature key | Entity identity | Exact Authorization Policy |
+|---------|----------------|-------------------|-----------------|----------------------------|
+| Events Edit | ALREADY_COVERED_PHASE1 | `admin:events` | Event ID | `isLeadershipRole(currentUser.role)` |
+| News Edit | ALREADY_COVERED_PHASE1 | `admin:news` | News ID | `canEditSection('news')` |
+| Suggestion Compose | ALREADY_COVERED_PHASE1 | `student:suggestion` | Create only | `!!currentUser` (Student) |
+| Admin Reply (Stats/Suggestions) | PERSIST_DRAFT | `admin:suggestion-reply` | Suggestion ID | `isLeadershipRole(currentUser.role) && canRespondToSuggestion(activeSuggestion)` |
+| Admin Inbox Reply | PERSIST_DRAFT | `admin:inbox-reply` | Message ID | `canAccessContactInbox(currentUser?.role)` |
+| Board Member Add/Edit | PERSIST_DRAFT | `admin:board-member` | Member ID / `create:${committeeId}` | `canEditSection('board')` |
+| Board Head Edit | PERSIST_DRAFT | `admin:board-head` | Member ID / `head:${committeeId}` | `canEditSection('board')` |
+| Responsibility Edit | PERSIST_DRAFT | `admin:board-resp` | Resp ID / `create:${committeeId}` | `canEditSection('board')` |
+| Gallery Album Edit | PERSIST_DRAFT | `admin:gallery-album`| Album ID | `isLeadershipRole(currentUser.role)` |
+| Gallery Media Edit | PERSIST_DRAFT | `admin:gallery-media`| Media ID / `create:${albumId}` | `isLeadershipRole(currentUser.role)` |
+| Plans Modal | PERSIST_DRAFT | `admin:plan` | Plan ID | `canEditSection('plans')` |
+| Reports Modal | PERSIST_DRAFT | `admin:report` | Report ID | `canEditSection('plans')` |
+| App Interview | PERSIST_DRAFT | `admin:app-interview`| App ID | `currentUser?.role === 'PRESIDENT'` |
+| Guide Suggestions Reply | PERSIST_DRAFT | `admin:guide-reply` | Suggestion ID | `canManageGuideSuggestions(currentUser?.role)` |
+| Site Edits Admin Panel | PERSIST_DRAFT | `admin:site-edit` | Edit ID | `currentUser?.role === 'PRESIDENT'` |
+| Profile Edits Admin Panel | PERSIST_DRAFT | `admin:profile-edit` | Edit ID | `currentUser?.role === 'PRESIDENT'` |
+| Internal Tasks | PERSIST_DRAFT | `admin:internal-task`| Create only | `canManageTasks(currentUser?.role)` |
+| Member Points | PERSIST_DRAFT | `admin:member-points`| Student ID / `create` | `canManageMemberPoints(currentUser?.role)` |
+| Profile General Form | PERSIST_DRAFT | `admin:profile-general`| User ID | `!!currentUser` |
+| Profile Password Form | NO_DRAFT_REQUIRED | N/A | N/A | Security excluded. |
+| Translation Monitoring | NO_DRAFT_REQUIRED | N/A | N/A | Read-only. |
+| Site Branding | NO_DRAFT_REQUIRED | N/A | N/A | Direct upload without authored form text. |
+| Edits History | NO_DRAFT_REQUIRED | N/A | N/A | Read-only. |
+| Excuse Review | NO_DRAFT_REQUIRED | N/A | N/A | Direct approve/reject, no drafted text. |
+| Task Dashboard | NO_DRAFT_REQUIRED | N/A | N/A | Direct select saves, no drafted text. |
+| Delete/Revoke Confs | NO_DRAFT_REQUIRED | N/A | N/A | Transient destructive confirmations. |
 
 ## Implementation Tasks
 
-### Task 1: Reusable Registry & Domain Helpers
+### Task 1: Domain Key Extensions
 **Files**
 - Modify `src/domain/sessionDraft.ts`
-- Modify `src/domain/sessionDraftState.ts`
 - Test `tests/sessionDraftService.test.mjs`
 
 **Interfaces**
-- Define exhaustive `FeatureKey` types mapping all Stage B features.
-- Provide a `createDraftContext` abstraction for inline vs modal handling.
+- Define exhaustive `FeatureKey` types mapping all Stage B features (e.g. `admin:suggestion-reply`, `admin:profile-general`).
 
 **Steps**
 - [ ] write failing test for exhaustive key union types
@@ -73,43 +53,43 @@
 - [ ] run relevant regressions
 - [ ] commit
 
-### Task 2: Inbox & Suggestion Reply Modals
+### Task 2: Admin Replies (Stats/Suggestions + Inbox)
 **Files**
 - Modify `src/pages/AdminDashboard.tsx`
-- Test `tests/adminRepliesIntegration.test.mjs` (create new)
+- Create `tests/adminRepliesIntegration.test.mjs`
 
 **Interfaces**
-- Hook `useSessionDraft` inside `ContactInboxTab` and `SuggestionsTab` components.
-- Pass `activeSuggestion.id` or `activeMessage.id` as entity keys.
+- Hook `useSessionDraft` inside `ContactInboxTab` and `SuggestionsTab`. Pass `activeSuggestion.id` or `activeMessage.id` as entity keys.
 
 **Steps**
 - [ ] write failing test for inbox draft retention on navigate
-- [ ] run and confirm expected failure
+- [ ] run and confirm RED
 - [ ] implement minimal behavior via `useSessionDraft`
-- [ ] rerun expected pass
+- [ ] rerun and confirm GREEN
 - [ ] write and run test for successful submit clearing draft
+- [ ] run relevant regression suite
 - [ ] commit
 
-### Task 3: Plans & Reports Modals
+### Task 3: Plans & Reports
 **Files**
 - Modify `src/pages/AdminDashboard.tsx`
-- Test `tests/plansReportsIntegration.test.mjs` (create new)
+- Create `tests/plansReportsIntegration.test.mjs`
 
 **Interfaces**
-- Hook `useSessionDraft` inside `PlansTab`.
-- Persist `CmsEntityTranslationTabs` fields safely.
+- Hook `useSessionDraft` inside `PlansTab`. Persist `CmsEntityTranslationTabs` fields safely.
 
 **Steps**
 - [ ] write failing test for translation retention on unmount
-- [ ] run and confirm expected failure
+- [ ] run and confirm RED
 - [ ] implement minimal behavior and ensure CMS empty strings are preserved
-- [ ] rerun expected pass
+- [ ] rerun and confirm GREEN
+- [ ] run relevant regression suite
 - [ ] commit
 
-### Task 4: Gallery Modals (Album & Media)
+### Task 4: Gallery Album & Media
 **Files**
 - Modify `src/pages/AdminDashboard.tsx`
-- Test `tests/galleryDraftIntegration.test.mjs` (create new)
+- Create `tests/galleryDraftIntegration.test.mjs`
 
 **Interfaces**
 - Separate keys: `admin:gallery-album` and `admin:gallery-media`.
@@ -117,61 +97,118 @@
 
 **Steps**
 - [ ] write failing test for separation of album vs media draft keys
+- [ ] run and confirm RED
 - [ ] implement draft restoration logic and file reset
-- [ ] run relevant regressions
+- [ ] rerun and confirm GREEN
+- [ ] run relevant regression suite
 - [ ] commit
 
-### Task 5: Board Forms (Member, Head, Resp)
+### Task 5: Board Forms
 **Files**
-- Modify `src/pages/AdminDashboard.tsx` (BoardTab)
-- Test `tests/boardDraftIntegration.test.mjs` (create new)
+- Modify `src/pages/AdminDashboard.tsx`
+- Create `tests/boardDraftIntegration.test.mjs`
 
 **Interfaces**
-- Drafts keyed strictly by Member/Role IDs.
-- Handle translations for Members/Responsibilities.
+- Handle drafts for Member, Head, and Responsibility modals.
+- Drafts keyed strictly by Member/Role IDs and target committee ID.
 
 **Steps**
 - [ ] write failing test verifying `board-member` draft doesn't open in `board-head`
+- [ ] run and confirm RED
 - [ ] implement isolated keys
-- [ ] run relevant regressions
+- [ ] rerun and confirm GREEN
+- [ ] run relevant regression suite
 - [ ] commit
 
-### Task 6: Applications Interview Modal
+### Task 6: Application Interview
 **Files**
-- Modify `src/pages/AdminDashboard.tsx` (ApplicationsTab)
-- Test `tests/applicationDraftIntegration.test.mjs` (create new)
+- Modify `src/pages/AdminDashboard.tsx`
+- Create `tests/applicationDraftIntegration.test.mjs`
 
 **Interfaces**
-- Map `interview` date/time inputs to draft state.
+- Map `interview` date/time inputs to draft state inside `ApplicationsTab`.
 
 **Steps**
 - [ ] write failing test for losing interview date on tab switch
+- [ ] run and confirm RED
 - [ ] implement minimal behavior
-- [ ] run relevant regressions
+- [ ] rerun and confirm GREEN
+- [ ] run relevant regression suite
 - [ ] commit
 
-### Task 7: Remaining Standalone Panels
+### Task 7: Standalone Authored Panels
 **Files**
 - Modify `src/components/InternalTaskCreationPanel.tsx`
 - Modify `src/components/MemberPointsAdminPanel.tsx`
 - Modify `src/components/SiteEditsPanel.tsx`
+- Modify `src/components/ProfileEditsPanel.tsx`
 - Modify `src/components/GuideSuggestionsPanel.tsx`
-- Test `tests/standalonePanelsDraft.test.mjs` (create new)
+- Create `tests/standalonePanelsDraft.test.mjs`
 
 **Interfaces**
-- Hook `useSessionDraft` for inline forms.
+- Hook `useSessionDraft` for inline forms. No abstraction (`createDraftContext`) is needed; use existing hook directly and allow implicit persistence on pagehide/unmount.
 
 **Steps**
 - [ ] write failing tests for each inline form losing state
-- [ ] implement state mapping without Modal abstraction
-- [ ] run relevant regressions
+- [ ] run and confirm RED
+- [ ] implement state mapping directly with `useSessionDraft`
+- [ ] rerun and confirm GREEN
+- [ ] run relevant regression suite
 - [ ] commit
 
-### Task 8: Verification & Acceptance
+### Task 8: Profile Settings General Form
 **Files**
-- Create `tests/acceptance/dashboardDraftAcceptance.md` for manual test tracking
+- Modify `src/components/ProfileSettings.tsx`
+- Create `tests/profileSettingsDraftIntegration.test.mjs`
+
+**Interfaces**
+- Extract ONLY name, contactEmail, phone, university, major, year, bio into `admin:profile-general` draft. 
+- Ensure raw File, passwords, and object URLs are never serialized.
+- Submit success clears draft, failure preserves it.
+- Authoritative refreshed profile must not overwrite a restored dirty draft.
 
 **Steps**
-- [ ] run full repository test suite
-- [ ] perform manual acceptance scenario matrix checks
+- [ ] write failing test for saving profile general fields across remounts
+- [ ] run and confirm RED
+- [ ] implement draft isolation for general form fields
+- [ ] rerun and confirm GREEN
+- [ ] run relevant regression suite
+- [ ] commit
+
+### Task 9: Cross-Role & Acceptance Coverage
+**Files**
+- Modify existing test suites or `tests/sessionDraftIntegration.test.mjs` as required.
+- Execute Manual Acceptance Matrix.
+
+**Steps**
+- [ ] execute manual acceptance matrix
 - [ ] finalize rollout branch for review
+
+## Manual Acceptance Matrix
+
+For each scenario, verify expected restoration, open/closed state, and storage behavior across unmount/navigation.
+
+1. President - Event create
+2. President - News create
+3. President - Gallery Album create
+4. Authorized executive - Gallery Album Edit
+5. President - Gallery Media
+6. Authorized executive - Plan
+7. Authorized executive - Report
+8. President - Board Head/Member/Responsibility
+9. President - Application interview
+10. Authorized inbox role - unsent Inbox reply
+11. Authorized suggestions role - administrative reply
+12. Guide Suggestions reply
+13. Internal Task inline form
+14. Member Points form including target isolation
+15. Profile General form
+16. Translation AR/TR/EN + active locale
+17. Keep Draft
+18. Discard Draft
+19. Failed submit
+20. Successful submit
+21. Logout same user
+22. Cross-user isolation
+23. Role/access revoked while draft exists
+24. Chrome -> another app -> Chrome in same browser session
