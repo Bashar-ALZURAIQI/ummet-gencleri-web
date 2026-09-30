@@ -789,15 +789,15 @@ const saveContact = async (e: React.FormEvent) => {
                       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-navy-100 text-navy-700">
                         <Icon className="h-5 w-5" />
                       </div>
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <div className="text-xs text-gray-400">{contact.label}</div>
                         {contact.type === 'phone' ? (
                           <a href={`tel:${contact.value.replace(/[^+\d]/g, '')}`} className="text-sm font-bold text-navy-900" dir="ltr">{contact.value}</a>
                         ) : (
-                          <a href={contact.value.startsWith('http') ? contact.value : `https://${contact.value}`} target="_blank" rel="noopener noreferrer" className="flex flex-col text-sm font-bold text-navy-900 underline decoration-navy-200 hover:text-navy-700">
+                          <a href={contact.value.startsWith('http') ? contact.value : `https://${contact.value}`} target="_blank" rel="noopener noreferrer" className="flex flex-col min-w-0 text-sm font-bold text-navy-900 underline decoration-navy-200 hover:text-navy-700">
                             <span className="truncate font-bold text-navy-900" dir="ltr">{contact.title || toGuideHost(contact.value) || contact.value}</span>
                             {toGuideHost(contact.value) && (
-                              <span className="text-xs font-medium text-gray-400 no-underline" dir="ltr">{toGuideHost(contact.value)}</span>
+                              <span className="truncate text-xs font-medium text-gray-400 no-underline" dir="ltr">{toGuideHost(contact.value)}</span>
                             )}
                           </a>
                         )}
