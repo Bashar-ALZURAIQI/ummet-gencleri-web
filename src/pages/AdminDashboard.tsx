@@ -2408,7 +2408,6 @@ function EventsTab({ events, currentUser }: {
       await refreshPublishedLocalizations();
     }
     draft.clearDraft();
-    draft.setOpen(false);
     setModalOpen(false);
     setToast({ id: Date.now(), type: 'success', text: t('admin.events.savedSuccess', 'تم حفظ الفعالية وإعدادات التسجيل الدائم.') });
   };
@@ -2818,7 +2817,6 @@ function NewsTab({ news, currentUser, submitSiteEdit }: {
           mediaNotice();
         }
         draft.clearDraft();
-        draft.setOpen(false);
         setModalOpen(false);
         return;
       }
@@ -2842,7 +2840,6 @@ function NewsTab({ news, currentUser, submitSiteEdit }: {
           mediaNotice();
         }
         draft.clearDraft();
-        draft.setOpen(false);
         setModalOpen(false);
         return;
       }
@@ -2861,7 +2858,6 @@ function NewsTab({ news, currentUser, submitSiteEdit }: {
       }
     }
     draft.clearDraft();
-    draft.setOpen(false);
     setModalOpen(false);
   };
 

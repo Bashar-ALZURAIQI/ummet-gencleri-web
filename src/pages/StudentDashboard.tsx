@@ -83,7 +83,9 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
     if (nextTab === 'suggestions') {
       draft.setUi(prev => ({ ...prev, activeTab: 'suggestions' }));
     } else {
-      if (!draft.dirty && !draft.restoredFromStorage) {
+      // Only write ui when there is actual draft state worth preserving;
+      // do NOT create an empty envelope just to record activeTab: undefined.
+      if ((draft.dirty || draft.restoredFromStorage) && draft.ui?.activeTab !== undefined) {
         draft.setUi(prev => ({ ...prev, activeTab: undefined }));
       }
     }
@@ -196,7 +198,6 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
       return;
     }
     draft.clearDraft();
-    draft.setUi(prev => ({ ...prev, activeTab: undefined }));
     setSent(true);
     setTimeout(() => setSent(false), 4000);
   };

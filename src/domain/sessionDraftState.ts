@@ -26,6 +26,13 @@ export interface SessionDraftConfig<T> {
 export class SessionDraftStateMachine<T> {
   private state: SessionDraftState<T>;
   private config: SessionDraftConfig<T>;
+  /**
+   * Set to true by clearDraft() to prevent subsequent persist() calls from
+   * recreating the draft that was just removed. Reset to false when the user
+   * performs a new meaningful editing action (setOpen, updateData, updateUi
+   * with non-trivial content).
+   */
+  private _cleared = false;
 
   constructor(config: SessionDraftConfig<T>, restoredEnvelope: SessionDraftEnvelope<T> | null) {
     this.config = config;
@@ -67,6 +74,11 @@ export class SessionDraftStateMachine<T> {
     return { ...this.state };
   }
 
+  /** Returns true if clearDraft() has been called and no new user action has reactivated persistence. */
+  public isCleared(): boolean {
+    return this._cleared;
+  }
+
   public updateConfig(newConfig: SessionDraftConfig<T>): boolean {
     let stateChanged = false;
     this.config = newConfig;
@@ -96,17 +108,22 @@ export class SessionDraftStateMachine<T> {
   }
 
   public updateData(newData: T): void {
+    this._cleared = false; // new user data — resume persistence
     this.state.data = newData;
     this.state.dirty = this.config.isDirty(newData);
     this.persist();
   }
 
   public updateUi(newUi: SessionDraftUiState): void {
+    this._cleared = false; // new user ui action — resume persistence
     this.state.ui = newUi;
     this.persist();
   }
 
   public setOpen(open: boolean): void {
+    if (open) {
+      this._cleared = false; // opening a draft is a new user intent — resume persistence
+    }
     this.state.open = open;
     this.persist();
   }
@@ -151,12 +168,27 @@ export class SessionDraftStateMachine<T> {
     }
   }
 
+  /**
+   * Called on successful submit. Fully resets in-memory state AND removes the
+   * storage key. Suspends persistence so that subsequent calls such as
+   * setOpen(false) or setUi(...) from the caller's success path do NOT
+   * recreate the draft that was just cleared.
+   *
+   * Persistence resumes automatically when a new meaningful user action
+   * occurs: setOpen(true), updateData(...), or updateUi(...).
+   */
   public clearDraft(): void {
+    this._cleared = true; // suspend persistence BEFORE touching state
     this.state.data = this.config.defaultData;
+    this.state.ui = this.config.initialUi ?? {};
+    this.state.open = false;
     this.state.dirty = false;
+    this.state.isDecisionOpen = false;
+    this.state.restoredFromStorage = false;
     if (this.config.key) {
       removeSessionDraft(this.config.key);
     }
+    // Do NOT call persist() — the key must remain absent.
   }
 
   public flush(): void {
@@ -164,6 +196,8 @@ export class SessionDraftStateMachine<T> {
   }
 
   private persist(): void {
+    // Guard: do not recreate a draft that was explicitly cleared.
+    if (this._cleared) return;
     if (!this.config.key || !this.config.userId || this.config.validation === 'invalid') return;
 
     const envelope: SessionDraftEnvelope<T> = {

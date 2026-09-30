@@ -86,9 +86,9 @@ test('test_event_lifecycle_and_ui_bindings', () => {
   // Event Edit opening
   assert.ok(source.includes("setEditId(e.id)") && source.includes("draft.openTarget("), 'Event Edit opening');
 
-  // successful submit close
+  // successful submit close — clearDraft() resets open=false internally; no separate setOpen call
   assert.ok(source.includes("draft.clearDraft()"), 'successful submit clears exact draft');
-  assert.ok(source.includes("draft.setOpen(false)"), 'successful submit closes modal');
+  assert.ok(!source.includes("draft.setOpen(false)"), 'successful submit must NOT call setOpen after clearDraft (would recreate draft)');
   
   // Cancel routed through requestClose
   assert.ok(source.includes("onClick={draft.requestClose}"), 'Cancel routed through requestClose');
