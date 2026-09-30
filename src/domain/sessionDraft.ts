@@ -1,3 +1,24 @@
+export type FeatureKey =
+  | 'admin:events'
+  | 'admin:news'
+  | 'student:suggestion'
+  | 'admin:suggestion-reply'
+  | 'admin:inbox-reply'
+  | 'admin:board-member'
+  | 'admin:board-head'
+  | 'admin:board-resp'
+  | 'admin:gallery-album'
+  | 'admin:gallery-media'
+  | 'admin:plan'
+  | 'admin:report'
+  | 'admin:app-interview'
+  | 'admin:guide-reply'
+  | 'admin:site-edit'
+  | 'admin:profile-edit'
+  | 'admin:internal-task'
+  | 'admin:member-points'
+  | 'admin:profile-general';
+
 export type SessionDraftUiState = {
   activeLocale?: 'ar' | 'tr' | 'en';
   activeTab?: string;
@@ -81,7 +102,7 @@ export function parseSessionDraftKey(key: string): ParsedSessionDraftKey | null 
 
 export function buildSessionDraftKey(
   userId: string,
-  feature: string,
+  feature: FeatureKey | (string & {}),
   mode: 'create' | 'edit',
   entityId?: string
 ): string {
@@ -263,7 +284,7 @@ export function clearSessionDraftsForUser(userId: string): void {
   }
 }
 
-export function findOpenSessionDraft<T>(userId: string, feature: string): LocatedSessionDraft<T> | null {
+export function findOpenSessionDraft<T>(userId: string, feature: FeatureKey | (string & {})): LocatedSessionDraft<T> | null {
   try {
     if (!isValidUserId(userId)) return null;
     const prefix = `draft:v1:${userId}:${feature}:`;

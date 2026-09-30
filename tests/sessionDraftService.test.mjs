@@ -403,3 +403,42 @@ test('test_findOpenSessionDraft_timestamp_tie_uses_deterministic_key_order', () 
   const win = findOpenSessionDraft('u1', 'feat');
   assert.strictEqual(win.key, k2);
 });
+
+// 8. FeatureKey Domain Contract
+test('test_FeatureKey_type_contains_all_approved_features', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const sourcePath = path.resolve('src/domain/sessionDraft.ts');
+  const source = fs.readFileSync(sourcePath, 'utf8');
+
+  // Verify the type definition exists
+  assert.ok(source.includes('export type FeatureKey ='), 'must export FeatureKey type');
+
+  const requiredFeatures = [
+    // Phase 1
+    "'admin:events'",
+    "'admin:news'",
+    "'student:suggestion'",
+    // Rollout
+    "'admin:suggestion-reply'",
+    "'admin:inbox-reply'",
+    "'admin:board-member'",
+    "'admin:board-head'",
+    "'admin:board-resp'",
+    "'admin:gallery-album'",
+    "'admin:gallery-media'",
+    "'admin:plan'",
+    "'admin:report'",
+    "'admin:app-interview'",
+    "'admin:guide-reply'",
+    "'admin:site-edit'",
+    "'admin:profile-edit'",
+    "'admin:internal-task'",
+    "'admin:member-points'",
+    "'admin:profile-general'",
+  ];
+
+  for (const feature of requiredFeatures) {
+    assert.ok(source.includes(feature), `FeatureKey must include ${feature}`);
+  }
+});
