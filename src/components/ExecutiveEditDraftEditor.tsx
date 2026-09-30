@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Save } from 'lucide-react';
@@ -7,13 +6,16 @@ import {
   type ExecutiveContentSnapshot,
 } from '../domain/executiveEditWorkflow';
 
+interface StatItem { label: string; value: string; }
+interface MemberItem { name: string; position: string; }
+
 interface ExecutiveEditDraftEditorProps {
   snapshot: ExecutiveContentSnapshot;
   busy?: boolean;
   onCancel: () => void;
   onSubmit: (snapshot: ExecutiveContentSnapshot) => Promise<void> | void;
-  draftData?: { responsibilities: string, stats: any[], members: any[] };
-  setDraftData?: React.Dispatch<React.SetStateAction<{ responsibilities: string, stats: any[], members: any[] }>>;
+  draftData?: { responsibilities: string, stats: StatItem[], members: MemberItem[] };
+  setDraftData?: React.Dispatch<React.SetStateAction<{ responsibilities: string, stats: StatItem[], members: MemberItem[] }>>;
 }
 
 export default function ExecutiveEditDraftEditor({
@@ -32,8 +34,8 @@ export default function ExecutiveEditDraftEditor({
   const defaultMembers = snapshot.members.map((item) => ({ name: item.name, position: item.position }));
 
   const [localResponsibilities, setLocalResponsibilities] = useState(defaultResponsibilities);
-  const [localStats, setLocalStats] = useState(defaultStats);
-  const [localMembers, setLocalMembers] = useState(defaultMembers);
+  const [localStats, setLocalStats] = useState<StatItem[]>(defaultStats);
+  const [localMembers, setLocalMembers] = useState<MemberItem[]>(defaultMembers);
 
   const responsibilities = draftData ? draftData.responsibilities : localResponsibilities;
   const setResponsibilities = draftData && setDraftData 
@@ -42,12 +44,12 @@ export default function ExecutiveEditDraftEditor({
 
   const stats = draftData ? draftData.stats : localStats;
   const setStats = draftData && setDraftData
-    ? (updater: any) => setDraftData(p => ({ ...p, stats: typeof updater === 'function' ? updater(p.stats) : updater }))
+    ? (updater: StatItem[] | ((prev: StatItem[]) => StatItem[])) => setDraftData(p => ({ ...p, stats: typeof updater === 'function' ? updater(p.stats) : updater }))
     : setLocalStats;
 
   const members = draftData ? draftData.members : localMembers;
   const setMembers = draftData && setDraftData
-    ? (updater: any) => setDraftData(p => ({ ...p, members: typeof updater === 'function' ? updater(p.members) : updater }))
+    ? (updater: MemberItem[] | ((prev: MemberItem[]) => MemberItem[])) => setDraftData(p => ({ ...p, members: typeof updater === 'function' ? updater(p.members) : updater }))
     : setLocalMembers;
 
   const [error, setError] = useState<string | null>(null);

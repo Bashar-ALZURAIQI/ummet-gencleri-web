@@ -1147,12 +1147,17 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
   useEffect(() => {
     if (!currentUser) return;
     const openMember = findOpenSessionDraft<{ memberForm: any; translations: any; studentSearch: string; memberAvatarAsset: any }>(currentUser.userId, 'admin:board-member');
-    if (openMember && openMember.envelope.open && openMember.entityId) {
-      const parts = openMember.entityId.split(':');
+    if (openMember && openMember.envelope.open) {
       if (openMember.mode === 'create') {
-        setEditMemberId({ committeeId: openMember.entityId as CommitteeId, memberId: 'create' });
-      } else if (parts.length === 2) {
-        setEditMemberId({ committeeId: parts[0] as CommitteeId, memberId: parts[1] });
+        // For create, committeeId is not in the key - stored in draft value
+        // We cannot restore the committee context from the key alone
+        setEditMemberId({ committeeId: '' as CommitteeId, memberId: 'create' });
+      } else if (openMember.entityId) {
+        // edit: compound entityId encoded as committeeId.memberId (dot separator)
+        const parts = openMember.entityId.split('.');
+        if (parts.length === 2) {
+          setEditMemberId({ committeeId: parts[0] as CommitteeId, memberId: parts[1] });
+        }
       }
     }
   }, [currentUser]);
@@ -1162,7 +1167,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
         currentUser.userId,
         'admin:board-member',
         editMemberId.memberId === 'create' ? 'create' : 'edit',
-        editMemberId.memberId === 'create' ? editMemberId.committeeId : `${editMemberId.committeeId}:${editMemberId.memberId}`
+        editMemberId.memberId === 'create' ? undefined : `${editMemberId.committeeId}.${editMemberId.memberId}`
       )
     : null;
 
@@ -1176,7 +1181,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
       translations: { tr: { position: '' }, en: { position: '' } }
     },
     defaultOpen: false,
-    validation: 'valid',
+    validation: 'unknown',
     isDirty: (d) => d.memberForm.studentId.trim().length > 0 || d.memberForm.position.trim().length > 0 || d.memberForm.photo.trim().length > 0
   });
 
@@ -1201,7 +1206,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
 
   const openAddMember = (committeeId: CommitteeId) => {
     setEditMemberId({ committeeId, memberId: 'create' });
-    memberDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-member', 'create', committeeId));
+    memberDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-member', 'create'));
   };
   const openEditMember = (committeeId: CommitteeId, m: CommitteeMember) => {
     setEditMemberId({ committeeId, memberId: m.id });
@@ -1209,7 +1214,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
     setMemberAvatarAsset(null);
     setStudentSearch(m.name);
     setStudentDropdownOpen(false);
-    memberDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-member', 'edit', `${committeeId}:${m.id}`));
+    memberDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-member', 'edit', `${committeeId}.${m.id}`));
   };
   const resolveTargetUserId = () => {
     const selected = students.find((student) => student.id === memberForm.studentId);
@@ -1332,12 +1337,13 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
     if (!currentUser) return;
     const openHead = findOpenSessionDraft<{ headForm: any, translations: any }>(currentUser.userId, 'admin:board-head');
     if (openHead && openHead.envelope.open && openHead.entityId) {
-      setHeadCommittee(openHead.entityId.split(':')[1] as CommitteeId);
+      // entityId for head is just committeeId (dot-free string) - no prefix
+      setHeadCommittee(openHead.entityId as CommitteeId);
     }
   }, [currentUser]);
 
   const headDraftKey = currentUser && headCommittee
-    ? buildSessionDraftKey(currentUser.userId, 'admin:board-head', 'edit', `head:${headCommittee}`)
+    ? buildSessionDraftKey(currentUser.userId, 'admin:board-head', 'edit', headCommittee)
     : null;
 
   const headDraft = useSessionDraft({
@@ -1348,7 +1354,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
       translations: { tr: {}, en: {} }
     },
     defaultOpen: false,
-    validation: 'valid',
+    validation: 'unknown',
     isDirty: (d) => d.headForm.name.trim().length > 0 || d.headForm.bio.trim().length > 0 || d.headForm.email.trim().length > 0
   });
 
@@ -1362,7 +1368,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
   const openHead = (c: typeof committees[0]) => {
     if (c.head?.id !== currentUser?.userId) return;
     setHeadCommittee(c.id);
-    headDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-head', 'edit', `head:${c.id}`));
+    headDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-head', 'edit', c.id));
     setHeadForm({ name: c.head?.name ?? '', role: c.head?.role ?? '', bio: c.head?.bio ?? '', photo: c.head?.photo ?? '', email: currentUser.contactEmail ?? '', phone: c.head?.phone ?? '', university: c.head?.university ?? '', major: c.head?.major ?? '', year: c.head?.year ?? '' });
   };
   const saveHead = async (e: React.FormEvent) => {
@@ -1400,9 +1406,14 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
     if (openResp && openResp.envelope.open && openResp.entityId) {
       const parts = openResp.entityId.split(':');
       if (openResp.mode === 'create') {
-        setRespTarget({ committeeId: openResp.entityId as CommitteeId, idx: -1 });
-      } else if (parts.length === 2) {
-        setRespTarget({ committeeId: parts[0] as CommitteeId, idx: parseInt(parts[1], 10) });
+        // committeeId is in draft value for create - use a safe default
+        setRespTarget({ committeeId: '' as CommitteeId, idx: -1 });
+      } else if (openResp.entityId) {
+        // edit: compound entityId is committeeId.idx (dot separator)
+        const parts = openResp.entityId.split('.');
+        if (parts.length === 2) {
+          setRespTarget({ committeeId: parts[0] as CommitteeId, idx: parseInt(parts[1], 10) });
+        }
       }
     }
   }, [currentUser]);
@@ -1412,7 +1423,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
         currentUser.userId,
         'admin:board-resp',
         respTarget.idx === -1 ? 'create' : 'edit',
-        respTarget.idx === -1 ? respTarget.committeeId : `${respTarget.committeeId}:${respTarget.idx}`
+        respTarget.idx === -1 ? undefined : `${respTarget.committeeId}.${respTarget.idx}`
       )
     : null;
 
@@ -1424,7 +1435,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
       translations: { tr: {}, en: {} }
     },
     defaultOpen: false,
-    validation: 'valid',
+    validation: 'unknown',
     isDirty: (d) => d.respText.trim().length > 0
   });
 
@@ -1437,13 +1448,13 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
 
   const openAddResp = (committeeId: CommitteeId) => {
     setRespTarget({ committeeId, idx: -1 });
-    respDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-resp', 'create', committeeId));
+    respDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-resp', 'create'));
     setRespText('');
   };
   const openEditResp = (committeeId: CommitteeId, idx: number) => {
     const c = committees.find((x) => x.id === committeeId);
     setRespTarget({ committeeId, idx });
-    respDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-resp', 'edit', `${committeeId}:${idx}`));
+    respDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-resp', 'edit', `${committeeId}.${idx}`));
     setRespText(c?.responsibilities[idx] || '');
   };
   const saveResp = (e: React.FormEvent) => {
@@ -1883,12 +1894,16 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
   useEffect(() => {
     if (!currentUser) return;
     const openMedia = findOpenSessionDraft<{ mediaForm: any }>(currentUser.userId, 'admin:gallery-media');
-    if (openMedia && openMedia.envelope.open && openMedia.entityId) {
-      const parts = openMedia.entityId.split(':');
+    if (openMedia && openMedia.envelope.open) {
       if (openMedia.mode === 'create') {
-        setEditMediaId({ albumId: openMedia.entityId, mediaId: 'create' });
-      } else if (parts.length === 2) {
-        setEditMediaId({ albumId: parts[0], mediaId: parts[1] });
+        // albumId not in key for create - stored in draft value; cannot restore album context from key alone
+        setEditMediaId({ albumId: '', mediaId: 'create' });
+      } else if (openMedia.entityId) {
+        // edit: compound entityId encoded as albumId.mediaId (dot separator)
+        const parts = openMedia.entityId.split('.');
+        if (parts.length === 2) {
+          setEditMediaId({ albumId: parts[0], mediaId: parts[1] });
+        }
       }
     }
   }, [currentUser]);
@@ -1898,7 +1913,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
         currentUser.userId,
         'admin:gallery-media',
         editMediaId.mediaId === 'create' ? 'create' : 'edit',
-        editMediaId.mediaId === 'create' ? editMediaId.albumId : `${editMediaId.albumId}:${editMediaId.mediaId}`
+        editMediaId.mediaId === 'create' ? undefined : `${editMediaId.albumId}.${editMediaId.mediaId}`
       )
     : null;
 
@@ -2094,7 +2109,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
 
   const openAddMedia = (album: GalleryAlbum) => {
     setEditMediaId({ albumId: album.id, mediaId: 'create' });
-    mediaDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:gallery-media', 'create', album.id));
+    mediaDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:gallery-media', 'create'));
   };
 
   const openEditMedia = (album: GalleryAlbum, m: GalleryMedia) => {
@@ -2102,7 +2117,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
     setMediaForm({
       type: m.type, source: m.type === 'video' && /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)/i.test(m.url) ? 'external' : 'upload', url: m.url, thumbnail: m.thumbnail ?? '', caption: m.caption ?? '', photoUrl: m.photoUrl ?? '',
     });
-    mediaDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:gallery-media', 'edit', `${album.id}:${m.id}`));
+    mediaDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:gallery-media', 'edit', `${album.id}.${m.id}`));
   };
 
   const saveMedia = async (e: React.FormEvent) => {

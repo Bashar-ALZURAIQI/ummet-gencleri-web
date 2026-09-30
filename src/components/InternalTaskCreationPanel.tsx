@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ClipboardCheck, Plus } from 'lucide-react';
@@ -20,7 +19,7 @@ export default function InternalTaskCreationPanel() {
     deadline: '',
   });
 
-  const draftKey = currentUser?.userId ? buildSessionDraftKey(currentUser.userId, 'admin:internal-task', 'create', 'task') : null;
+  const draftKey = currentUser?.userId ? buildSessionDraftKey(currentUser.userId, 'admin:internal-task', 'create') : null;
 
   const panelDraft = useSessionDraft({
     key: draftKey,
@@ -31,8 +30,9 @@ export default function InternalTaskCreationPanel() {
     isDirty: (d) => JSON.stringify(d) !== JSON.stringify(buildForm())
   });
 
+  type TaskForm = ReturnType<typeof buildForm>;
   const form = panelDraft.data;
-  const setForm = (v: any) => panelDraft.setData(p => typeof v === 'function' ? v(p) : { ...p, ...v });
+  const setForm = (v: TaskForm | ((p: TaskForm) => TaskForm)) => panelDraft.setData(p => typeof v === 'function' ? v(p) : { ...p, ...v });
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
 

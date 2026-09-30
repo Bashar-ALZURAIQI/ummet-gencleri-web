@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, X, Pencil, ClipboardCheck, Inbox, AlertCircle } from 'lucide-react';
@@ -36,7 +35,7 @@ export default function ProfileEditsPanel() {
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'PRESIDENT') return;
-    const openDraft = findOpenSessionDraft<{ responsibilities: string, stats: any[], members: any[] }>(currentUser.userId, 'admin:profile-edit');
+    const openDraft = findOpenSessionDraft<{ responsibilities: string, stats: {label: string; value: string}[], members: {name: string; position: string}[] }>(currentUser.userId, 'admin:profile-edit');
     if (openDraft && openDraft.envelope.open && openDraft.entityId) {
       const edit = pendingProfileEdits?.find(e => e.id === openDraft.entityId && e.status === 'PENDING_APPROVAL');
       if (edit && !editing) {

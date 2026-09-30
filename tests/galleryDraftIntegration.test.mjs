@@ -20,7 +20,7 @@ test('test_gallery_media_session_draft', () => {
   const source = fs.readFileSync(adminDashboardPath, 'utf8').replace(/\r\n/g, '\n');
 
   assert.ok(source.includes("buildSessionDraftKey("), 'Must build media edit key');
-  assert.ok(source.includes("editMediaId.albumId : `${editMediaId.albumId}:${editMediaId.mediaId}`"), 'Must serialize album and media id together');
+  assert.ok(source.includes("`${editMediaId.albumId}.${editMediaId.mediaId}`"), 'Must serialize album and media id together with dot');
   assert.ok(source.includes("mediaDraft.clearDraft()"), 'Media submit success must clear draft');
   assert.ok(source.includes("mediaForm.url.startsWith('blob:')"), 'Must detect un-uploaded blob URL for media url');
 });

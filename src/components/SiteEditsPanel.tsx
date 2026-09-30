@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { useState } from 'react';
 import { Check, X, Pencil, Inbox, Save, ClipboardCheck, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -76,7 +75,7 @@ export default function SiteEditsPanel() {
   });
 
   const revised = draft.data.revised;
-  const setRevised = (updater: any) => draft.setData(p => ({ ...p, revised: typeof updater === 'function' ? updater(p.revised) : updater }));
+  const setRevised = (updater: Record<string, string> | ((prev: Record<string, string>) => Record<string, string>)) => draft.setData(p => ({ ...p, revised: typeof updater === 'function' ? updater(p.revised) : updater }));
 
   const [busyId, setBusyId] = useState<string | null>(null);
 

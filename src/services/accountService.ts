@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import type { Session } from '@supabase/supabase-js';
 import type { UserRole } from '../data/mockData.ts';
 import {

@@ -23,6 +23,7 @@ export default function MemberPointsAdminPanel({ role }: { role: string }) {
   
   useEffect(() => {
     if (!currentUser || members.length === 0) return;
+    if (!canMutateMemberPoints(role)) return; // do not restore for unauthorized role
     const openDraft = findOpenSessionDraft<{ amount: string, reason: string, requestId: string }>(currentUser.userId, 'admin:member-points');
     if (openDraft && openDraft.envelope.open && openDraft.entityId) {
       const member = members.find(m => m.studentId === openDraft.entityId);
@@ -30,10 +31,10 @@ export default function MemberPointsAdminPanel({ role }: { role: string }) {
         setSelected(member);
       }
     }
-  }, [currentUser, members, selected]);
+  }, [currentUser, members, selected, role]);
 
   const draftKey = currentUser && selected
-    ? buildSessionDraftKey(currentUser.userId, 'admin:member-points', 'create', selected.studentId)
+    ? buildSessionDraftKey(currentUser.userId, 'admin:member-points', 'edit', selected.studentId)
     : null;
 
   const draft = useSessionDraft({
@@ -41,7 +42,9 @@ export default function MemberPointsAdminPanel({ role }: { role: string }) {
     userId: currentUser?.userId ?? null,
     defaultData: { amount: '', reason: '', requestId: '' },
     defaultOpen: false,
-    validation: 'valid',
+    validation: canMutateMemberPoints(role) && !loading && selected != null
+      ? (members.find(m => m.studentId === selected.studentId) ? 'valid' : 'invalid')
+      : loading ? 'unknown' : 'invalid',
     isDirty: (d) => d.amount.trim() !== '' || d.reason.trim() !== ''
   });
 
@@ -76,7 +79,7 @@ export default function MemberPointsAdminPanel({ role }: { role: string }) {
 
   const open = (member: MemberPointsRow) => {
     setSelected(member);
-    draft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:member-points', 'create', member.studentId));
+    draft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:member-points', 'edit', member.studentId));
     draft.setData(prev => prev.requestId ? prev : { ...prev, requestId: crypto.randomUUID() });
   };
 
