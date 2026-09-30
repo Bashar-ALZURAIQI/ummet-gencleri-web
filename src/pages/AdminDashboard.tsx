@@ -1740,26 +1740,86 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
       ? galleryAlbums
       : galleryAlbums.filter((a) => ownedAlbumIds.has(a.id));
 
-  const [albumModalOpen, setAlbumModalOpen] = useState(false);
-  const [editingAlbum, setEditingAlbum] = useState<GalleryAlbum | null>(null);
-  const [albumForm, setAlbumForm] = useState({
-    title: '', categoryId: '', date: new Date().toISOString().slice(0, 10),
-    location: '', coverImage: '', description: '',
+  const [editAlbumId, setEditAlbumId] = useState<string | 'create' | null>(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const openAlbum = findOpenSessionDraft<{ albumForm: any; translations: any }>(currentUser.userId, 'admin:gallery-album');
+    if (openAlbum && openAlbum.envelope.open) {
+      setEditAlbumId(openAlbum.mode === 'create' ? 'create' : (openAlbum.entityId ?? null));
+    }
+  }, [currentUser]);
+
+  const albumDraftKey = currentUser && editAlbumId
+    ? buildSessionDraftKey(currentUser.userId, 'admin:gallery-album', editAlbumId === 'create' ? 'create' : 'edit', editAlbumId === 'create' ? undefined : editAlbumId)
+    : null;
+
+  const albumDraft = useSessionDraft({
+    key: albumDraftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: {
+      albumForm: { title: '', categoryId: '', date: new Date().toISOString().slice(0, 10), location: '', coverImage: '', description: '' },
+      translations: { tr: { title: '', location: '', description: '' }, en: { title: '', location: '', description: '' } }
+    },
+    defaultOpen: false,
+    validation: { readiness: 'VALID' },
+    isDirty: (d) => d.albumForm.title.trim().length > 0 || d.albumForm.description.trim().length > 0 || d.albumForm.location.trim().length > 0 || d.albumForm.coverImage.trim().length > 0
   });
-  const [translations, setTranslations] = useState<Record<LocalizedCmsLocale, { title?: string; location?: string; description?: string }>>({
-    tr: { title: '', location: '', description: '' },
-    en: { title: '', location: '', description: '' },
-  });
+
+  const albumModalOpen = albumDraft.open;
+  const setAlbumModalOpen = albumDraft.setOpen;
+  const albumForm = albumDraft.data.albumForm;
+  const setAlbumForm = (v: any) => albumDraft.setData(p => ({ ...p, albumForm: typeof v === 'function' ? v(p.albumForm) : v }));
+  const translations = albumDraft.data.translations as Record<LocalizedCmsLocale, { title?: string; location?: string; description?: string }>;
+  const setTranslations = (v: any) => albumDraft.setData(p => ({ ...p, translations: typeof v === 'function' ? v(p.translations) : v }));
+
+  const editingAlbum = editAlbumId === 'create' ? null : (galleryAlbums.find(a => a.id === editAlbumId) ?? null);
 
   const ownsEditingGalleryAlbum = Boolean(editingAlbum && ownedAlbumIds.has(editingAlbum.id));
   const canPublishEditingGalleryAlbum = Boolean(isPresident || ownsEditingGalleryAlbum);
 
-  const [mediaAlbum, setMediaAlbum] = useState<GalleryAlbum | null>(null);
-  const [mediaModalOpen, setMediaModalOpen] = useState(false);
-  const [editingMedia, setEditingMedia] = useState<GalleryMedia | null>(null);
-  const [mediaForm, setMediaForm] = useState({
-    type: 'photo' as 'photo' | 'video', source: 'upload' as 'upload' | 'external', url: '', thumbnail: '', caption: '', photoUrl: '',
+  const [editMediaId, setEditMediaId] = useState<{ albumId: string, mediaId: string | 'create' } | null>(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const openMedia = findOpenSessionDraft<{ mediaForm: any }>(currentUser.userId, 'admin:gallery-media');
+    if (openMedia && openMedia.envelope.open && openMedia.entityId) {
+      const parts = openMedia.entityId.split(':');
+      if (openMedia.mode === 'create') {
+        setEditMediaId({ albumId: openMedia.entityId, mediaId: 'create' });
+      } else if (parts.length === 2) {
+        setEditMediaId({ albumId: parts[0], mediaId: parts[1] });
+      }
+    }
+  }, [currentUser]);
+
+  const mediaDraftKey = currentUser && editMediaId
+    ? buildSessionDraftKey(
+        currentUser.userId,
+        'admin:gallery-media',
+        editMediaId.mediaId === 'create' ? 'create' : 'edit',
+        editMediaId.mediaId === 'create' ? editMediaId.albumId : `${editMediaId.albumId}:${editMediaId.mediaId}`
+      )
+    : null;
+
+  const mediaDraft = useSessionDraft({
+    key: mediaDraftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: {
+      mediaForm: { type: 'photo' as 'photo' | 'video', source: 'upload' as 'upload' | 'external', url: '', thumbnail: '', caption: '', photoUrl: '' }
+    },
+    defaultOpen: false,
+    validation: { readiness: 'VALID' },
+    isDirty: (d) => d.mediaForm.caption.trim().length > 0 || d.mediaForm.url.trim().length > 0
   });
+
+  const mediaModalOpen = mediaDraft.open;
+  const setMediaModalOpen = mediaDraft.setOpen;
+  const mediaForm = mediaDraft.data.mediaForm;
+  const setMediaForm = (v: any) => mediaDraft.setData(p => ({ ...p, mediaForm: typeof v === 'function' ? v(p.mediaForm) : v }));
+
+  const mediaAlbum = editMediaId ? (galleryAlbums.find(a => a.id === editMediaId.albumId) ?? null) : null;
+  const editingMedia = editMediaId && editMediaId.mediaId !== 'create' ? (mediaAlbum?.media.find(m => m.id === editMediaId.mediaId) ?? null) : null;
 
   const [invalid, setInvalid] = useState<string[]>([]);
   const localizationRepo = useCmsLocalizationRepository();
@@ -1790,20 +1850,12 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
   const catLabel = (id: string) => (localizedCategories[id] || galleryCategories.find((c) => c.id === id)?.label) ?? id;
 
   const openAddAlbum = () => {
-    setEditingAlbum(null);
-    setAlbumForm({
-      title: '', categoryId: galleryCategories[0]?.id ?? '', date: new Date().toISOString().slice(0, 10),
-      location: '', coverImage: '', description: '',
-    });
-    setTranslations({
-      tr: { title: '', location: '', description: '' },
-      en: { title: '', location: '', description: '' },
-    });
-    setAlbumModalOpen(true);
+    setEditAlbumId('create');
+    albumDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:gallery-album', 'create'));
   };
 
   const openEditAlbum = (album: GalleryAlbum) => {
-    setEditingAlbum(album);
+    setEditAlbumId(album.id);
     setAlbumForm({
       title: album.title, categoryId: album.categoryId, date: album.date,
       location: album.location, coverImage: album.coverImage, description: album.description,
@@ -1812,12 +1864,16 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
       tr: { title: '', location: '', description: '' },
       en: { title: '', location: '', description: '' },
     });
-    setAlbumModalOpen(true);
+    albumDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:gallery-album', 'edit', album.id));
   };
 
   const saveAlbum = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateRequired(albumForm, ['title', 'categoryId', 'date', 'location', 'coverImage', 'description'], setInvalid)) return;
+    if (albumForm.coverImage.startsWith('blob:')) {
+      setInvalid(prev => Array.from(new Set([...prev, 'coverImage'])));
+      return;
+    }
     if (editingAlbum) {
       const next = galleryAlbums.map((a) => a.id === editingAlbum.id ? { ...a, ...albumForm } : a);
       let saved;
@@ -1893,6 +1949,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
       }
     }
     setAlbumModalOpen(false);
+    albumDraft.clearDraft();
   };
 
   const deleteAlbum = async (id: string) => {
@@ -1936,19 +1993,16 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
   };
 
   const openAddMedia = (album: GalleryAlbum) => {
-    setMediaAlbum(album);
-    setEditingMedia(null);
-    setMediaForm({ type: 'photo', source: 'upload', url: '', thumbnail: '', caption: '', photoUrl: '' });
-    setMediaModalOpen(true);
+    setEditMediaId({ albumId: album.id, mediaId: 'create' });
+    mediaDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:gallery-media', 'create', album.id));
   };
 
   const openEditMedia = (album: GalleryAlbum, m: GalleryMedia) => {
-    setMediaAlbum(album);
-    setEditingMedia(m);
+    setEditMediaId({ albumId: album.id, mediaId: m.id });
     setMediaForm({
       type: m.type, source: m.type === 'video' && /^https?:\/\/(?:www\.)?(?:youtube\.com|youtu\.be|vimeo\.com)/i.test(m.url) ? 'external' : 'upload', url: m.url, thumbnail: m.thumbnail ?? '', caption: m.caption ?? '', photoUrl: m.photoUrl ?? '',
     });
-    setMediaModalOpen(true);
+    mediaDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:gallery-media', 'edit', `${album.id}:${m.id}`));
   };
 
   const saveMedia = async (e: React.FormEvent) => {
@@ -1958,6 +2012,11 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
       ? ['url', 'thumbnail', 'caption']
       : ['url', 'caption', 'photoUrl'];
     if (!validateRequired(mediaForm, mediaFields, setInvalid)) return;
+    if (mediaForm.url.startsWith('blob:') || mediaForm.thumbnail.startsWith('blob:')) {
+      if (mediaForm.url.startsWith('blob:')) setInvalid(prev => Array.from(new Set([...prev, 'url'])));
+      if (mediaForm.thumbnail.startsWith('blob:')) setInvalid(prev => Array.from(new Set([...prev, 'thumbnail'])));
+      return;
+    }
     const applyMedia = (album: GalleryAlbum): GalleryAlbum => {
       if (editingMedia) {
         const media = album.media.map((m) => m.id === editingMedia.id
@@ -2002,6 +2061,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
     }
     setMediaAlbum((prev) => (prev ? { ...prev, ...applyMedia(prev) } : prev));
     setMediaModalOpen(false);
+    mediaDraft.clearDraft();
   };
 
   const deleteMedia = async (album: GalleryAlbum, mediaId: string) => {
@@ -2101,7 +2161,10 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
       )}
 
       {/* Album modal */}
-      <Modal open={albumModalOpen} onClose={() => setAlbumModalOpen(false)} title={editingAlbum ? t('admin.gallery.albumModal.editTitle', 'تعديل الألبوم') : t('admin.gallery.albumModal.addTitle', 'إضافة ألبوم جديد')} maxWidth="max-w-lg">
+      <Modal open={albumModalOpen} onClose={albumDraft.requestClose || (() => setAlbumModalOpen(false))} title={editingAlbum ? t('admin.gallery.albumModal.editTitle', 'تعديل الألبوم') : t('admin.gallery.albumModal.addTitle', 'إضافة ألبوم جديد')} maxWidth="max-w-lg">
+        {albumDraft.isDecisionOpen ? (
+          <UnsavedDraftDecision onContinue={albumDraft.continueEditing} onKeep={albumDraft.keepDraftAndClose} onDiscard={albumDraft.discardDraftAndClose} />
+        ) : (
         <form onSubmit={saveAlbum} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
@@ -2190,14 +2253,19 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setAlbumModalOpen(false)} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
+            <button type="button" onClick={albumDraft.requestClose || (() => setAlbumModalOpen(false))} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
             <button type="submit" className="btn-primary"><Save className="h-4 w-4" /> {editingAlbum ? t('admin.gallery.albumModal.saveChanges', 'حفظ التعديلات') : t('admin.gallery.albumModal.add', 'إضافة')}</button>
           </div>
         </form>
+        )}
       </Modal>
 
       {/* Media modal */}
-      <Modal open={mediaModalOpen} onClose={() => setMediaModalOpen(false)} title={editingMedia ? t('admin.gallery.mediaModal.editTitle', 'تعديل وسائط') : t('admin.gallery.mediaModal.addTitle', 'إضافة وسائط — {{album}}', { album: mediaAlbum?.title ?? '' })} maxWidth="max-w-md">
+      <Modal open={mediaModalOpen} onClose={mediaDraft.requestClose || (() => setMediaModalOpen(false))} title={editingMedia ? t('admin.gallery.mediaModal.editTitle', 'تعديل وسائط') : t('admin.gallery.mediaModal.addTitle', 'إضافة وسائط — {{album}}', { album: mediaAlbum?.title ?? '' })} maxWidth="max-w-md">
+        {mediaDraft.isDecisionOpen ? (
+          <UnsavedDraftDecision onContinue={mediaDraft.continueEditing} onKeep={mediaDraft.keepDraftAndClose} onDiscard={mediaDraft.discardDraftAndClose} />
+        ) : (
+          <>
         {mediaAlbum && mediaAlbum.media.length > 0 && !editingMedia && (
           <div className="mb-4 grid max-h-48 grid-cols-3 gap-2 overflow-y-auto">
             {mediaAlbum.media.map((m) => (
@@ -2303,10 +2371,12 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setMediaModalOpen(false)} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
+            <button type="button" onClick={mediaDraft.requestClose || (() => setMediaModalOpen(false))} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
             <button type="submit" className="btn-primary"><Save className="h-4 w-4" /> {editingMedia ? t('admin.gallery.mediaModal.saveChanges', 'حفظ التعديلات') : t('admin.gallery.mediaModal.add', 'إضافة')}</button>
           </div>
         </form>
+        </>
+        )}
       </Modal>
     </div>
   );
