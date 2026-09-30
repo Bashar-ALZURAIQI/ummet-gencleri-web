@@ -1,4 +1,5 @@
 import { DEFAULT_SITE_CONTENT } from '../data/defaultSiteContent.ts';
+import { resolveInitialSiteContent } from '../domain/siteContentBootstrap.ts';
 import { studentSuggestionService } from '../services/studentSuggestionService.ts';
 import { createSuggestionStateIntegration } from '../domain/studentSuggestionRefreshGate.ts';
 import type { StudentSuggestion } from '../domain/studentSuggestionGateway.ts';
@@ -812,7 +813,7 @@ export interface ExecutiveEntry {
 }
 
 /** The live published content mirror — written under `app_site_content` on every change. */
-interface SiteContentBundle {
+export interface SiteContentBundle {
   siteContent?: SiteContent;
   aboutContent?: AboutContent;
   generalInfo?: GeneralInfo;
@@ -1132,15 +1133,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       : seedMembersFromCommittees(mockCommittees);
   });
   const [siteContent, setSiteContent] = useState<SiteContent>(() => {
+    let legacyRaw: string | null = null;
+    let bundle: SiteContentBundle | null = null;
     try {
       if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('ummet_site');
-        if (saved) return JSON.parse(saved) as SiteContent;
-        const bundle = safeParse<SiteContentBundle>(LS_SITE_CONTENT_KEY);
-        if (bundle?.siteContent) return bundle.siteContent;
+        legacyRaw = localStorage.getItem('ummet_site');
+        bundle = safeParse<SiteContentBundle>(LS_SITE_CONTENT_KEY) || null;
       }
     } catch { /* ignore */ }
-    return DEFAULT_SITE_CONTENT;
+    return resolveInitialSiteContent(legacyRaw, bundle, DEFAULT_SITE_CONTENT);
   });
 
   const [guideSections, setGuideSections] = useState<GuideSectionData[]>(() => {
@@ -1575,8 +1576,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void loadPublishedSiteContent<SiteContentBundle & Record<string, unknown>>()
       .then((result) => {
         if (!active) return;
-        setContentLoading(false);
         if (!result.ok) {
+          setContentLoading(false);
           setContentError('تعذر تحميل النسخة الرسمية؛ تُعرض آخر نسخة محلية للقراءة فقط.');
           return;
         }
@@ -1584,11 +1585,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (!result.data) {
           contentVersionRef.current = 0;
           setContentVersion(0);
+          setContentLoading(false);
           return;
         }
         contentVersionRef.current = result.data.version;
         setContentVersion(result.data.version);
         applyPublishedContentBundle(result.data.content);
+        setContentLoading(false);
       });
 
     return () => {

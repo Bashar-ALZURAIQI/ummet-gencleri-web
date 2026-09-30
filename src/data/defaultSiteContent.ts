@@ -17,7 +17,7 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
       primaryBtn: 'تصفح البرامج',
       secondaryBtn: 'تعرّف على الاتحاد',
       tertiaryBtn: 'الهيئة التنفيذية',
-      image: 'https://rscunkzvbsdbjzhnuria.supabase.co/storage/v1/object/public/gallery/site/11f9e6f2-828c-44a2-b05c-53400b3a9b9a/1278474e-180d-4c5c-9b50-22472fb26a39.jpg',
+      image: '',
       badge1: { value: '12', label: 'جائزة تكريم', icon: 'Award' },
       badge2: { value: '+38%', label: 'نمو سنوي', icon: 'TrendingUp' },
     },

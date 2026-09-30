@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { DEFAULT_SITE_CONTENT } from '../data/defaultSiteContent.ts';
 import { useTranslation } from 'react-i18next';
 import { resolvePublicBrandName } from '../domain/publicBrand';
 import { useTemporalBoundary } from '../hooks/useTemporalBoundary.ts';
@@ -37,10 +36,11 @@ const committeeIcons: Record<CommitteeId, LucideIcon> = {
 
 export default function HomePage() {
   const { t, i18n } = useTranslation();
-  const { news, events, setView, siteContent, contentLoading, currentUser, canEditSection } = useApp();
+  const { news, events, setView, siteContent, currentUser, canEditSection } = useApp();
   const [activeNews, setActiveNews] = useState<NewsItem | null>(null);
   const sc = siteContent;
-  const showHeroSkeleton = contentLoading && sc.hero.image === DEFAULT_SITE_CONTENT.hero.image;
+  const hasHeroImage = typeof sc.hero.image === 'string' && sc.hero.image.trim().length > 0;
+  const showHeroSkeleton = !hasHeroImage;
   const brandName = resolvePublicBrandName(i18n.language, sc.brand);
   const HeroBadgeOneIcon = iconMap[sc.hero.badge1.icon ?? 'Award'] || Award;
   const HeroBadgeTwoIcon = iconMap[sc.hero.badge2.icon ?? 'TrendingUp'] || TrendingUp;
