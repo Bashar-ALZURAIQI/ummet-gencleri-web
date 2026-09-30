@@ -79,8 +79,10 @@ export default function MemberPointsAdminPanel({ role }: { role: string }) {
 
   const open = (member: MemberPointsRow) => {
     setSelected(member);
-    draft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:member-points', 'edit', member.studentId));
-    draft.setData(prev => prev.requestId ? prev : { ...prev, requestId: crypto.randomUUID() });
+    draft.openTarget(
+      buildSessionDraftKey(currentUser!.userId, 'admin:member-points', 'edit', member.studentId),
+      { amount: '', reason: '', requestId: crypto.randomUUID() }
+    );
   };
 
   const submit = async (e: React.FormEvent) => {

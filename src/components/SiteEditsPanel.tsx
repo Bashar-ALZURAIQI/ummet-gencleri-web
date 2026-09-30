@@ -6,7 +6,7 @@ import type { PendingSiteEdit } from '../data/mockData';
 import Modal from './Modal';
 import { UnsavedDraftDecision } from './UnsavedDraftDecision';
 import { useSessionDraft } from '../hooks/useSessionDraft';
-import { buildSessionDraftKey, findOpenSessionDraft } from '../domain/sessionDraft';
+import { buildSessionDraftKey, findOpenSessionDraft, removeSessionDraft } from '../domain/sessionDraft';
 import { useEffect } from 'react';
 
 const fmtDate = (iso: string) => {
@@ -38,12 +38,15 @@ export default function SiteEditsPanel() {
     if (!currentUser || currentUser.role !== 'PRESIDENT') return;
     const openDraft = findOpenSessionDraft<{ revised: Record<string, string> }>(currentUser.userId, 'admin:site-edit');
     if (openDraft && openDraft.envelope.open && openDraft.entityId) {
+      if (editRequestsLoading) return;
       const edit = pendingSiteEdits?.find(e => e.id === openDraft.entityId && e.status === 'PENDING_PRESIDENT_APPROVAL');
-      if (edit && !editingEdit) {
-        setEditingEdit(edit);
+      if (edit) {
+        if (!editingEdit) setEditingEdit(edit);
+      } else {
+        removeSessionDraft(openDraft.key);
       }
     }
-  }, [currentUser, pendingSiteEdits, editingEdit]);
+  }, [currentUser, pendingSiteEdits, editingEdit, editRequestsLoading]);
 
   const buildDefaultData = () => {
     const init: Record<string, string> = {};
@@ -85,7 +88,9 @@ export default function SiteEditsPanel() {
 
   const openEdit = (edit: PendingSiteEdit) => {
     setEditingEdit(edit);
-    draft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:site-edit', 'edit', edit.id));
+    const init: Record<string, string> = {};
+    (edit.diffs ?? []).forEach((d, i) => { init[String(i)] = d.newValue; });
+    draft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:site-edit', 'edit', edit.id), { revised: init });
   };
 
   const saveRevised = async () => {

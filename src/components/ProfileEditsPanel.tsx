@@ -8,7 +8,7 @@ import ExecutiveEditDraftEditor from './ExecutiveEditDraftEditor';
 import Modal from './Modal';
 import { UnsavedDraftDecision } from './UnsavedDraftDecision';
 import { useSessionDraft } from '../hooks/useSessionDraft';
-import { buildSessionDraftKey, findOpenSessionDraft } from '../domain/sessionDraft';
+import { buildSessionDraftKey, findOpenSessionDraft, removeSessionDraft } from '../domain/sessionDraft';
 import { useEffect } from 'react';
 
 const fmtDate = (iso: string) => {
@@ -37,12 +37,15 @@ export default function ProfileEditsPanel() {
     if (!currentUser || currentUser.role !== 'PRESIDENT') return;
     const openDraft = findOpenSessionDraft<{ responsibilities: string, stats: {label: string; value: string}[], members: {name: string; position: string}[] }>(currentUser.userId, 'admin:profile-edit');
     if (openDraft && openDraft.envelope.open && openDraft.entityId) {
+      if (editRequestsLoading) return;
       const edit = pendingProfileEdits?.find(e => e.id === openDraft.entityId && e.status === 'PENDING_APPROVAL');
-      if (edit && !editing) {
-        setEditing(edit);
+      if (edit) {
+        if (!editing) setEditing(edit);
+      } else {
+        removeSessionDraft(openDraft.key);
       }
     }
-  }, [currentUser, pendingProfileEdits, editing]);
+  }, [currentUser, pendingProfileEdits, editing, editRequestsLoading]);
 
   const buildDefaultData = () => {
     if (!editing) return { responsibilities: '', stats: [], members: [] };
@@ -81,7 +84,13 @@ export default function ProfileEditsPanel() {
 
   const openEdit = (edit: PendingProfileEdit) => {
     setEditing(edit);
-    draft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:profile-edit', 'edit', edit.id));
+    const snapshot = edit.snapshot;
+    const initialData = {
+      responsibilities: snapshot.responsibilities.join('\n'),
+      stats: snapshot.stats.map(s => ({ ...s })),
+      members: snapshot.members.map(m => ({ name: m.name, position: m.position }))
+    };
+    draft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:profile-edit', 'edit', edit.id), initialData);
   };
 
   if (!currentUser || currentUser.role !== 'PRESIDENT') return null;

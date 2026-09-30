@@ -20,7 +20,7 @@ export interface UseSessionDraftResult<T> {
   setData: React.Dispatch<React.SetStateAction<T>>;
   open: boolean;
   setOpen: (open: boolean) => void;
-  openTarget: (targetKey: string | null) => void;
+  openTarget: (targetKey: string | null, initialData?: T) => void;
   ui: SessionDraftUiState;
   setUi: React.Dispatch<React.SetStateAction<SessionDraftUiState>>;
   dirty: boolean;
@@ -44,6 +44,8 @@ export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessi
 
   const [state, setState] = useState(() => machineRef.current!.getState());
   const pendingOpenKeyRef = useRef<string | null>(null);
+  const pendingInitialDataRef = useRef<T | undefined>(undefined);
+  const activeInitialDataRef = useRef<T | undefined>(undefined);
 
   const syncState = useCallback(() => {
     setState(machineRef.current!.getState());
@@ -61,15 +63,27 @@ export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessi
     prevKeyRef.current = options.key;
     prevUserIdRef.current = options.userId;
     const envelope = options.key ? loadSessionDraft<T>(options.key) : null;
-    machineRef.current = new SessionDraftStateMachine(options, envelope);
-    
+
+    if (pendingOpenKeyRef.current === options.key && pendingInitialDataRef.current !== undefined) {
+      activeInitialDataRef.current = pendingInitialDataRef.current;
+    } else {
+      activeInitialDataRef.current = undefined;
+    }
+
+    const effectiveDefaultData = activeInitialDataRef.current !== undefined ? activeInitialDataRef.current : options.defaultData;
+
+    machineRef.current = new SessionDraftStateMachine({ ...options, defaultData: effectiveDefaultData }, envelope);
+
     if (pendingOpenKeyRef.current === options.key) {
       machineRef.current.setOpen(true);
     }
     pendingOpenKeyRef.current = null;
+    pendingInitialDataRef.current = undefined;
     currentState = machineRef.current.getState();
     setState(currentState);
   }
+
+  const effectiveDefaultData = activeInitialDataRef.current !== undefined ? activeInitialDataRef.current : options.defaultData;
 
   // Sync config options (including validation) with machine.
   // Each option field is listed individually to avoid re-running when the
@@ -78,7 +92,7 @@ export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessi
 
   useEffect(() => {
     if (machineRef.current) {
-      if (machineRef.current.updateConfig(options)) {
+      if (machineRef.current.updateConfig({ ...options, defaultData: effectiveDefaultData })) {
         setState(machineRef.current.getState());
       }
     }
@@ -86,7 +100,7 @@ export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessi
   }, [
     options.key,
     options.userId,
-    options.defaultData,
+    effectiveDefaultData,
     options.defaultOpen,
     options.initialUi,
     options.validation,
@@ -156,8 +170,9 @@ export function useSessionDraft<T>(options: UseSessionDraftOptions<T>): UseSessi
     syncState();
   }, [syncState]);
 
-  const openTarget = useCallback((targetKey: string | null) => {
+  const openTarget = useCallback((targetKey: string | null, initialData?: T) => {
     pendingOpenKeyRef.current = targetKey;
+    pendingInitialDataRef.current = initialData;
   }, []);
 
   const clearDraft = useCallback(() => {
