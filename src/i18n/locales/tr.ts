@@ -1007,6 +1007,12 @@ const tr: TranslationSchema = {
       trip: 'Gezi',
       visit: 'Ziyaret',
     },
+    excuseModalTitle: 'Zorunlu Etkinlik Devamsızlık Mazereti',
+    excuseExplanation: 'Bu etkinlik zorunludur, bu nedenle kararınızı kaydetmeden önce devamsızlık mazeretinizi belirtmelisiniz.',
+    excuseLabel: 'Devamsızlık Mazereti',
+    excusePlaceholder: 'Mazeretinizi açıkça yazın...',
+    submitExcuse: 'Mazereti Gönder',
+    savingExcuse: 'Kaydediliyor...',
   },
   events: {
     categories: {

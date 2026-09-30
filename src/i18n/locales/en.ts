@@ -1007,6 +1007,12 @@ const en: TranslationSchema = {
       trip: 'Trip',
       visit: 'Visit',
     },
+    excuseModalTitle: 'Mandatory Activity Absence Excuse',
+    excuseExplanation: 'This activity is mandatory, so you must provide an excuse for your absence before saving your decision.',
+    excuseLabel: 'Absence Excuse',
+    excusePlaceholder: 'Write your excuse clearly...',
+    submitExcuse: 'Submit Excuse',
+    savingExcuse: 'Saving...',
   },
   events: {
     categories: {

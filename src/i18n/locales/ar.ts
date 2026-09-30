@@ -1009,6 +1009,12 @@ const ar = {
       trip: 'رحلة',
       visit: 'زيارات',
     },
+    excuseModalTitle: 'عذر عدم حضور النشاط الإلزامي',
+    excuseExplanation: 'هذا النشاط إلزامي، لذلك يجب توضيح عذر الغياب قبل حفظ قرارك.',
+    excuseLabel: 'عذر الغياب',
+    excusePlaceholder: 'اكتب العذر بوضوح...',
+    submitExcuse: 'إرسال العذر',
+    savingExcuse: 'جارٍ الحفظ...',
   },
   events: {
     categories: {

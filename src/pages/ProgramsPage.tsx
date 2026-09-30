@@ -866,7 +866,7 @@ const saveHeader = async (e: React.FormEvent) => {
         </form>
       </Modal>
 
-      <Modal open={Boolean(excuseActivity)} onClose={() => { if (!activityBusyId) setExcuseActivity(null); }} title="عذر عدم حضور النشاط الإلزامي" maxWidth="max-w-lg">
+      <Modal open={Boolean(excuseActivity)} onClose={() => { if (!activityBusyId) setExcuseActivity(null); }} title={t('programs.excuseModalTitle', 'عذر عدم حضور النشاط الإلزامي')} maxWidth="max-w-lg">
         <form
           onSubmit={async (event) => {
             event.preventDefault();
@@ -879,14 +879,14 @@ const saveHeader = async (e: React.FormEvent) => {
           }}
           className="space-y-4"
         >
-          <p className="text-sm leading-6 text-gray-600">هذا النشاط إلزامي، لذلك يجب توضيح عذر الغياب قبل حفظ قرارك.</p>
+          <p className="text-sm leading-6 text-gray-600">{t('programs.excuseExplanation', 'هذا النشاط إلزامي، لذلك يجب توضيح عذر الغياب قبل حفظ قرارك.')}</p>
           <div>
-            <label className="label-field">عذر الغياب <RequiredMark /></label>
-            <textarea value={excuseText} onChange={(event) => setExcuseText(event.target.value)} rows={5} maxLength={4000} className="input-field resize-none" placeholder="اكتب العذر بوضوح..." />
+            <label className="label-field">{t('programs.excuseLabel', 'عذر الغياب')} <RequiredMark /></label>
+            <textarea value={excuseText} onChange={(event) => setExcuseText(event.target.value)} rows={5} maxLength={4000} className="input-field resize-none" placeholder={t('programs.excusePlaceholder', 'اكتب العذر بوضوح...')} />
           </div>
           <div className="flex justify-end gap-2">
-            <button type="button" disabled={Boolean(activityBusyId)} onClick={() => setExcuseActivity(null)} className="btn-ghost">إلغاء</button>
-            <button type="submit" disabled={Boolean(activityBusyId)} className="btn-primary disabled:opacity-60">{activityBusyId ? 'جارٍ الحفظ...' : 'إرسال العذر'}</button>
+            <button type="button" disabled={Boolean(activityBusyId)} onClick={() => setExcuseActivity(null)} className="btn-ghost">{t('common.cancel', 'إلغاء')}</button>
+            <button type="submit" disabled={Boolean(activityBusyId)} className="btn-primary disabled:opacity-60">{activityBusyId ? t('programs.savingExcuse', 'جارٍ الحفظ...') : t('programs.submitExcuse', 'إرسال العذر')}</button>
           </div>
         </form>
       </Modal>
