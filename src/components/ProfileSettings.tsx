@@ -16,7 +16,7 @@ import {
 import { normalizeProfile } from '../utils/profileNormalize';
 import { getAcademicYearPresentation, ACADEMIC_YEAR_KEY_MAP } from '../domain/academicYearPresentation';
 import { useSessionDraft } from '../hooks/useSessionDraft';
-import { buildSessionDraftKey } from '../domain/sessionDraftState';
+import { buildSessionDraftKey } from '../domain/sessionDraft';
 import PasswordField from './PasswordField';
 import UserAvatar from './UserAvatar';
 
@@ -112,7 +112,7 @@ export default function ProfileSettings({
     userId: userId,
     defaultData: buildForm(),
     defaultOpen: true,
-    validation: { readiness: 'VALID' },
+    validation: 'valid',
     isDirty: (d) => JSON.stringify(d) !== JSON.stringify(buildForm())
   });
 

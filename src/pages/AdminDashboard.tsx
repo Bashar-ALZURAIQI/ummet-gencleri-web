@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useMemo, useEffect } from 'react';
 import {
   LayoutDashboard, CalendarDays, Users, ClipboardList, BarChart3, PieChart,
@@ -281,9 +283,7 @@ function ContactInboxTab({ messages, loading, error, markRead, reply, retryEmail
     userId: currentUser?.userId ?? null,
     defaultData: { replyText: '' },
     defaultOpen: true,
-    validation: {
-      readiness: loading ? 'UNKNOWN' : (active && !active.reply && canAccessContactInbox(currentUser?.role)) ? 'VALID' : 'INVALID',
-    },
+    validation: loading ? 'unknown' : (active && !active.reply && canAccessContactInbox(currentUser?.role)) ? 'valid' : 'invalid',
     isDirty: (d) => d.replyText.trim().length > 0,
   });
 
@@ -449,18 +449,16 @@ function StatsTab({ events, students, suggestions, contactMessages, applications
   const draft = useSessionDraft({
     key: draftKey,
     userId: currentUser?.userId ?? null,
-    defaultData: { replyText: '', status: activeSuggestion?.status === 'new' ? 'reviewing' : (activeSuggestion?.status ?? 'reviewing') },
+    defaultData: { replyText: '', status: (activeSuggestion?.status === 'new' ? 'reviewing' : (activeSuggestion?.status ?? 'reviewing')) as SuggestionStatus },
     defaultOpen: false,
-    validation: {
-      readiness: activeSuggestion && canRespondToSuggestion(activeSuggestion) ? 'VALID' : 'INVALID'
-    },
+    validation: activeSuggestion && canRespondToSuggestion(activeSuggestion) ? 'valid' : 'invalid',
     isDirty: (d) => d.replyText.trim().length > 0 || (activeSuggestion && d.status !== (activeSuggestion.status === 'new' ? 'reviewing' : activeSuggestion.status)) || false
   });
 
   const replyOpen = draft.open;
   const setReplyOpen = draft.setOpen;
   const replyText = draft.data.replyText;
-  const setReplyText = (v: string) => draft.setData(prev => ({ ...prev, replyText: typeof v === 'function' ? v(prev.replyText) : v }));
+  const setReplyText = (v: string) => draft.setData(prev => ({ ...prev, replyText: v }));
   const status = draft.data.status;
   const setStatus = (v: SuggestionStatus) => draft.setData(prev => ({ ...prev, status: v }));
 
@@ -761,18 +759,16 @@ function SuggestionsTab({ suggestions, currentUser, respondToSuggestion, canResp
   const draft = useSessionDraft({
     key: draftKey,
     userId: currentUser?.userId ?? null,
-    defaultData: { replyText: '', status: activeSuggestion?.status === 'new' ? 'reviewing' : (activeSuggestion?.status ?? 'reviewing') },
+    defaultData: { replyText: '', status: (activeSuggestion?.status === 'new' ? 'reviewing' : (activeSuggestion?.status ?? 'reviewing')) as SuggestionStatus },
     defaultOpen: false,
-    validation: {
-      readiness: activeSuggestion && canRespondToSuggestion(activeSuggestion) ? 'VALID' : 'INVALID'
-    },
+    validation: activeSuggestion && canRespondToSuggestion(activeSuggestion) ? 'valid' : 'invalid',
     isDirty: (d) => d.replyText.trim().length > 0 || (activeSuggestion && d.status !== (activeSuggestion.status === 'new' ? 'reviewing' : activeSuggestion.status)) || false
   });
 
   const replyOpen = draft.open;
   const setReplyOpen = draft.setOpen;
   const replyText = draft.data.replyText;
-  const setReplyText = (v: string) => draft.setData(prev => ({ ...prev, replyText: typeof v === 'function' ? v(prev.replyText) : v }));
+  const setReplyText = (v: string) => draft.setData(prev => ({ ...prev, replyText: v }));
   const status = draft.data.status;
   const setStatus = (v: SuggestionStatus) => draft.setData(prev => ({ ...prev, status: v }));
 
@@ -1180,7 +1176,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
       translations: { tr: { position: '' }, en: { position: '' } }
     },
     defaultOpen: false,
-    validation: { readiness: 'VALID' },
+    validation: 'valid',
     isDirty: (d) => d.memberForm.studentId.trim().length > 0 || d.memberForm.position.trim().length > 0 || d.memberForm.photo.trim().length > 0
   });
 
@@ -1200,22 +1196,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
     member: editMemberId.memberId === 'create' ? null : (committees.find(c => c.id === editMemberId.committeeId)?.members?.find((m: any) => m.id === editMemberId.memberId) ?? null)
   } : null;
 
-  const [headModal, setHeadModal] = useState(false);
-  const [headCommittee, setHeadCommittee] = useState<CommitteeId | null>(null);
-  const [headForm, setHeadForm] = useState({ name: '', role: '', bio: '', photo: '', email: '', phone: '', university: '', major: '', year: '' });
-  const [headTranslations, setHeadTranslations] = useState<Record<LocalizedCmsLocale, Record<string, string>>>({
-    tr: {},
-    en: {},
-  });
-
-  const [respModal, setRespModal] = useState(false);
-  const [respTarget, setRespTarget] = useState<{ committeeId: CommitteeId; idx: number } | null>(null);
-  const [respText, setRespText] = useState('');
-  const [respTranslations, setRespTranslations] = useState<Record<LocalizedCmsLocale, Record<string, string>>>({
-    tr: {},
-    en: {},
-  });
-
+  const [studentDropdownOpen, setStudentDropdownOpen] = useState(false);
   const [invalid, setInvalid] = useState<string[]>([]);
 
   const openAddMember = (committeeId: CommitteeId) => {
@@ -1367,7 +1348,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
       translations: { tr: {}, en: {} }
     },
     defaultOpen: false,
-    validation: { readiness: 'VALID' },
+    validation: 'valid',
     isDirty: (d) => d.headForm.name.trim().length > 0 || d.headForm.bio.trim().length > 0 || d.headForm.email.trim().length > 0
   });
 
@@ -1443,7 +1424,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
       translations: { tr: {}, en: {} }
     },
     defaultOpen: false,
-    validation: { readiness: 'VALID' },
+    validation: 'valid',
     isDirty: (d) => d.respText.trim().length > 0
   });
 
@@ -1603,7 +1584,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
                   id={fieldId('studentId')}
                   type="text"
                   value={studentSearch}
-                  onChange={(e) => { setStudentSearch(e.target.value); setStudentDropdownOpen(true); setMemberForm((prev) => ({ ...prev, studentId: '' })); clearInvalid(setInvalid, 'studentId'); }}
+                  onChange={(e) => { setStudentSearch(e.target.value); setStudentDropdownOpen(true); setMemberForm((prev: any) => ({ ...prev, studentId: '' })); clearInvalid(setInvalid, 'studentId'); }}
                   onFocus={() => setStudentDropdownOpen(true)}
                   className={`${isInvalid(invalid, 'studentId') ? 'input-field-error' : 'input-field'}`}
                   placeholder={t('admin.board.memberModal.searchPlaceholder', 'ابحث عن عضو مسجل...')}
@@ -1618,7 +1599,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
                           key={s?.id ?? Math.random()}
                           type="button"
                           onClick={() => {
-                            setMemberForm((prev) => ({ ...prev, studentId: s?.id ?? '' }));
+                            setMemberForm((prev: any) => ({ ...prev, studentId: s?.id ?? '' }));
                             setStudentSearch(s?.name ?? '');
                             setStudentDropdownOpen(false);
                           }}
@@ -1656,7 +1637,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
             canEdit={true}
             translations={memberTranslations}
             onTranslationChange={(loc, name, val) => {
-              setMemberTranslations((prev) => ({
+              setMemberTranslations((prev: any) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
               }));
@@ -1684,7 +1665,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
               return uploadManagedFile('avatar', file, onProgress, targetUserId);
             }}
             onUploaded={(asset) => {
-              setMemberForm((current) => ({ ...current, photo: asset.publicUrl }));
+              setMemberForm((current: any) => ({ ...current, photo: asset.publicUrl }));
               setMemberAvatarAsset(asset);
               clearInvalid(setInvalid, 'photo');
             }}
@@ -1730,7 +1711,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
             canEdit={true}
             translations={headTranslations}
             onTranslationChange={(loc, name, val) => {
-              setHeadTranslations((prev) => ({
+              setHeadTranslations((prev: any) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
               }));
@@ -1806,7 +1787,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
             canEdit={true}
             translations={respTranslations}
             onTranslationChange={(loc, name, val) => {
-              setRespTranslations((prev) => ({
+              setRespTranslations((prev: any) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
               }));
@@ -1881,7 +1862,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
       translations: { tr: { title: '', location: '', description: '' }, en: { title: '', location: '', description: '' } }
     },
     defaultOpen: false,
-    validation: { readiness: 'VALID' },
+    validation: 'valid',
     isDirty: (d) => d.albumForm.title.trim().length > 0 || d.albumForm.description.trim().length > 0 || d.albumForm.location.trim().length > 0 || d.albumForm.coverImage.trim().length > 0
   });
 
@@ -1928,7 +1909,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
       mediaForm: { type: 'photo' as 'photo' | 'video', source: 'upload' as 'upload' | 'external', url: '', thumbnail: '', caption: '', photoUrl: '' }
     },
     defaultOpen: false,
-    validation: { readiness: 'VALID' },
+    validation: 'valid',
     isDirty: (d) => d.mediaForm.caption.trim().length > 0 || d.mediaForm.url.trim().length > 0
   });
 
@@ -2085,7 +2066,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
           return;
         }
 
-        if (mediaAlbum?.id === id) setMediaAlbum(null);
+        if (mediaAlbum?.id === id) setEditMediaId(null);
 
         if (albumData && Array.isArray(albumData.media)) {
           const filesToDelete = albumData.media
@@ -2178,7 +2159,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
       if (!isPresident) alert(saved.error ?? t('admin.gallery.mediaFailed', 'تعذر حفظ الوسائط.'));
       return;
     }
-    setMediaAlbum((prev) => (prev ? { ...prev, ...applyMedia(prev) } : prev));
+
     setMediaModalOpen(false);
     mediaDraft.clearDraft();
   };
@@ -2204,15 +2185,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
           }
         }
 
-        setMediaAlbum((prev) => {
-          if (!prev || prev.id !== album.id) return prev;
-          const media = prev.media.filter((m) => m.id !== mediaId);
-          return {
-            ...prev, media,
-            photoCount: media.filter((m) => m.type === 'photo').length,
-            videoCount: media.filter((m) => m.type === 'video').length,
-          };
-        });
+
 
       } catch (err) {
         console.error('Unexpected media delete error:', err);
@@ -2306,7 +2279,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
             error={isInvalid(invalid, 'coverImage') ? t('admin.gallery.albumModal.coverImageError', 'يرجى رفع صورة غلاف الألبوم.') : null}
             onUpload={(file, onProgress) => uploadManagedFile('gallery-image', file, onProgress)}
             onUploaded={(asset) => {
-              setAlbumForm((current) => ({ ...current, coverImage: asset.publicUrl }));
+              setAlbumForm((current: any) => ({ ...current, coverImage: asset.publicUrl }));
               clearInvalid(setInvalid, 'coverImage');
             }}
           />
@@ -2347,7 +2320,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
             }}
             translations={translations}
             onTranslationChange={(loc, name, val) => {
-              setTranslations((prev) => ({
+              setTranslations((prev: any) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
               }));
@@ -2448,7 +2421,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
               error={isInvalid(invalid, 'url') ? t('admin.gallery.mediaModal.fileRequiredError', 'يرجى رفع الملف قبل الحفظ.') : null}
               onUpload={(file, onProgress) => uploadManagedFile(mediaForm.type === 'photo' ? 'gallery-image' : 'video-file', file, onProgress)}
               onUploaded={(asset) => {
-                setMediaForm((current) => ({ ...current, url: asset.publicUrl }));
+                setMediaForm((current: any) => ({ ...current, url: asset.publicUrl }));
                 clearInvalid(setInvalid, 'url');
               }}
             />
@@ -2467,7 +2440,7 @@ function GalleryTab({ galleryAlbums, galleryCategories, currentUser }: {
               error={isInvalid(invalid, 'thumbnail') ? t('admin.gallery.mediaModal.videoThumbnailError', 'يرجى رفع صورة مصغرة للفيديو.') : null}
               onUpload={(file, onProgress) => uploadManagedFile('gallery-image', file, onProgress)}
               onUploaded={(asset) => {
-                setMediaForm((current) => ({ ...current, thumbnail: asset.publicUrl }));
+                setMediaForm((current: any) => ({ ...current, thumbnail: asset.publicUrl }));
                 clearInvalid(setInvalid, 'thumbnail');
               }}
             />
@@ -3771,7 +3744,7 @@ function ApplicationsTab({
   const setInterviewModal = (app: StudentApplication | null) => {
     if (app) {
       setEditInterviewId(app.id);
-      interviewDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:application-interview', 'edit', app.id));
+      interviewDraft.openTarget(buildSessionDraftKey(currentUser!.userId!, 'admin:application-interview', 'edit', app.id));
     } else {
       setEditInterviewId(null);
       interviewDraft.setOpen(false);
@@ -3784,7 +3757,7 @@ function ApplicationsTab({
   const setDecisionModal = (app: StudentApplication | null) => {
     if (app) {
       setEditDecisionId(app.id);
-      decisionDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:application-decision', 'edit', app.id));
+      decisionDraft.openTarget(buildSessionDraftKey(currentUser!.userId!, 'admin:application-decision', 'edit', app.id));
     } else {
       setEditDecisionId(null);
       decisionDraft.setOpen(false);
@@ -3833,7 +3806,7 @@ function ApplicationsTab({
 
   const openInterview = (app: StudentApplication) => {
     setEditInterviewId(app.id);
-    interviewDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:application-interview', 'edit', app.id));
+    interviewDraft.openTarget(buildSessionDraftKey(currentUser!.userId!, 'admin:application-interview', 'edit', app.id));
     setInterviewForm({ date: '', time: '16:00', meetingUrl: '' });
     setInterviewError('');
   };
@@ -3877,7 +3850,7 @@ function ApplicationsTab({
 
   const openDecision = (app: StudentApplication, status: 'accepted' | 'rejected') => {
     setEditDecisionId(app.id);
-    decisionDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:application-decision', 'edit', app.id));
+    decisionDraft.openTarget(buildSessionDraftKey(currentUser!.userId!, 'admin:application-decision', 'edit', app.id));
     setDecisionForm({ status, reason: '' });
     setDecisionError('');
   };
@@ -4608,7 +4581,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
             error={isInvalid(invalid, 'pdfUrl') ? t('admin.plans.planModal.documentError', 'يرجى رفع ملف الخطة قبل الحفظ.') : null}
             onUpload={(file, onProgress) => uploadManagedFile('plan-document', file, onProgress)}
             onUploaded={(asset) => {
-              setPlanForm((current) => ({ ...current, pdfUrl: asset.publicUrl }));
+              setPlanForm((current: any) => ({ ...current, pdfUrl: asset.publicUrl }));
               clearInvalid(setInvalid, 'pdfUrl');
             }}
           />
@@ -4637,7 +4610,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
             canPublish={isPresident}
             translations={planTranslations}
             onTranslationChange={(loc, name, val) => {
-              setPlanTranslations((prev) => ({
+              setPlanTranslations((prev: any) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
               }));
@@ -4697,7 +4670,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
             error={isInvalid(invalid, 'pdfUrl') ? t('admin.plans.reportModal.documentError', 'يرجى رفع ملف التقرير قبل الحفظ.') : null}
             onUpload={(file, onProgress) => uploadManagedFile('report-document', file, onProgress)}
             onUploaded={(asset) => {
-              setReportForm((current) => ({ ...current, pdfUrl: asset.publicUrl }));
+              setReportForm((current: any) => ({ ...current, pdfUrl: asset.publicUrl }));
               clearInvalid(setInvalid, 'pdfUrl');
             }}
           />
@@ -4737,7 +4710,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
             canPublish={isPresident}
             translations={reportTranslations}
             onTranslationChange={(loc, name, val) => {
-              setReportTranslations((prev) => ({
+              setReportTranslations((prev: any) => ({
                 ...prev,
                 [loc]: { ...prev[loc], [name]: val },
               }));

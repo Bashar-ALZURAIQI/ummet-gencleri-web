@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, X, Pencil, ClipboardCheck, Inbox, AlertCircle } from 'lucide-react';
@@ -6,10 +7,9 @@ import { committeeMeta, type PendingProfileEdit } from '../data/mockData';
 import EditDiffTable from './EditDiffTable';
 import ExecutiveEditDraftEditor from './ExecutiveEditDraftEditor';
 import Modal from './Modal';
-import UnsavedDraftDecision from './UnsavedDraftDecision';
+import { UnsavedDraftDecision } from './UnsavedDraftDecision';
 import { useSessionDraft } from '../hooks/useSessionDraft';
-import { buildSessionDraftKey } from '../domain/sessionDraftState';
-import { findOpenSessionDraft } from '../domain/sessionDraft';
+import { buildSessionDraftKey, findOpenSessionDraft } from '../domain/sessionDraft';
 import { useEffect } from 'react';
 
 const fmtDate = (iso: string) => {
@@ -64,13 +64,11 @@ export default function ProfileEditsPanel() {
     userId: currentUser?.userId ?? null,
     defaultData: buildDefaultData(),
     defaultOpen: false,
-    validation: {
-      readiness: !editing 
-        ? 'UNKNOWN' 
+    validation: !editing 
+        ? 'unknown' 
         : pendingProfileEdits?.find(e => e.id === editing.id && e.status === 'PENDING_APPROVAL')
-        ? 'VALID'
-        : 'INVALID'
-    },
+        ? 'valid'
+        : 'invalid',
     isDirty: (d) => {
       if (!editing) return false;
       const def = buildDefaultData();

@@ -4,11 +4,10 @@ import { AlertTriangle, Plus, RefreshCw, RotateCcw } from 'lucide-react';
 import Modal from './Modal';
 import TransientToast, { type ToastMessage } from './TransientToast';
 import UserAvatar from './UserAvatar';
-import UnsavedDraftDecision from './UnsavedDraftDecision';
-import { useApp } from '../contexts/AppContext';
+import { UnsavedDraftDecision } from './UnsavedDraftDecision';
+import { useApp } from '../context/AppContext';
 import { useSessionDraft } from '../hooks/useSessionDraft';
-import { buildSessionDraftKey } from '../domain/sessionDraftState';
-import { findOpenSessionDraft } from '../domain/sessionDraft';
+import { buildSessionDraftKey, findOpenSessionDraft } from '../domain/sessionDraft';
 import type { EconomySeason, MemberPointsRow } from '../domain/internalEconomyTypes.ts';
 import { canMutateMemberPoints, tierPresentation } from '../domain/phaseThreeEconomy.ts';
 import { adjustMemberPoints, endEconomySeason, loadActiveEconomySeason, loadMemberPoints } from '../services/phaseThreeEconomyService.ts';
@@ -42,7 +41,7 @@ export default function MemberPointsAdminPanel({ role }: { role: string }) {
     userId: currentUser?.userId ?? null,
     defaultData: { amount: '', reason: '', requestId: '' },
     defaultOpen: false,
-    validation: { readiness: 'VALID' },
+    validation: 'valid',
     isDirty: (d) => d.amount.trim() !== '' || d.reason.trim() !== ''
   });
 

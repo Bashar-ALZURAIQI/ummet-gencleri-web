@@ -9,7 +9,7 @@ test('test_contact_inbox_uses_session_draft', () => {
 
   assert.ok(source.includes("buildSessionDraftKey(currentUser.userId, 'admin:inbox-reply', 'edit', active.id)"), 'ContactInboxTab must use admin:inbox-reply draft key');
   assert.ok(source.includes("draft.clearDraft()"), 'Inbox reply success must clear draft');
-  assert.ok(source.includes("loading ? 'UNKNOWN' : (active && !active.reply && canAccessContactInbox(currentUser?.role)) ? 'VALID' : 'INVALID'"), 'Inbox draft validation should respect loading and reply status');
+  assert.ok(source.includes("loading ? 'unknown' : (active && !active.reply && canAccessContactInbox(currentUser?.role)) ? 'valid' : 'invalid'"), 'Inbox draft validation should respect loading and reply status');
 });
 
 test('test_stats_and_suggestions_use_session_draft', () => {

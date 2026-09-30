@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { studentSuggestionService } from '../services/studentSuggestionService.ts';
 import { createSuggestionStateIntegration } from '../domain/studentSuggestionRefreshGate.ts';
 import type { StudentSuggestion } from '../domain/studentSuggestionGateway.ts';

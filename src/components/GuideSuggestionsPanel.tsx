@@ -10,7 +10,7 @@ import {
 } from '../services/guideSuggestionService.ts';
 import { useApp } from '../context/AppContext.tsx';
 import { useSessionDraft } from '../hooks/useSessionDraft';
-import { buildSessionDraftKey } from '../domain/sessionDraftState';
+import { buildSessionDraftKey } from '../domain/sessionDraft';
 
 type Filter = 'ALL' | GuideSuggestionStatus;
 
@@ -35,7 +35,7 @@ export default function GuideSuggestionsPanel({ role }: { role: string | null | 
     userId: currentUser?.userId ?? null,
     defaultData: { filter: 'ALL' as Filter, query: '' },
     defaultOpen: true,
-    validation: { readiness: 'VALID' },
+    validation: 'valid',
     isDirty: () => true
   });
   

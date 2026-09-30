@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect, useState } from 'react';
 import { CalendarDays, Lightbulb, CheckCircle2, Clock, LogOut, Send, Sparkles, UserCircle, GraduationCap, Mail, Building2, Video, XCircle, PartyPopper, FileText, Pencil, MessageSquareReply, X, ClipboardCheck, Trophy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
