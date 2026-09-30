@@ -1345,12 +1345,44 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
     setCommittees((prev) => prev.map((c) => c.id === committeeId ? { ...c, members: (Array.isArray(c.members) ? c.members : []).filter((m) => m.id !== memberId) } : c));
   };
 
+  const [headCommittee, setHeadCommittee] = useState<CommitteeId | null>(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const openHead = findOpenSessionDraft<{ headForm: any, translations: any }>(currentUser.userId, 'admin:board-head');
+    if (openHead && openHead.envelope.open && openHead.entityId) {
+      setHeadCommittee(openHead.entityId.split(':')[1] as CommitteeId);
+    }
+  }, [currentUser]);
+
+  const headDraftKey = currentUser && headCommittee
+    ? buildSessionDraftKey(currentUser.userId, 'admin:board-head', 'edit', `head:${headCommittee}`)
+    : null;
+
+  const headDraft = useSessionDraft({
+    key: headDraftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: {
+      headForm: { name: '', role: '', bio: '', photo: '', email: '', phone: '', university: '', major: '', year: '' },
+      translations: { tr: {}, en: {} }
+    },
+    defaultOpen: false,
+    validation: { readiness: 'VALID' },
+    isDirty: (d) => d.headForm.name.trim().length > 0 || d.headForm.bio.trim().length > 0 || d.headForm.email.trim().length > 0
+  });
+
+  const headModal = headDraft.open;
+  const setHeadModal = headDraft.setOpen;
+  const headForm = headDraft.data.headForm;
+  const setHeadForm = (v: any) => headDraft.setData(p => ({ ...p, headForm: typeof v === 'function' ? v(p.headForm) : v }));
+  const headTranslations = headDraft.data.translations as Record<LocalizedCmsLocale, Record<string, string>>;
+  const setHeadTranslations = (v: any) => headDraft.setData(p => ({ ...p, translations: typeof v === 'function' ? v(p.translations) : v }));
+
   const openHead = (c: typeof committees[0]) => {
     if (c.head?.id !== currentUser?.userId) return;
     setHeadCommittee(c.id);
-    setHeadTranslations({ tr: {}, en: {} });
+    headDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-head', 'edit', `head:${c.id}`));
     setHeadForm({ name: c.head?.name ?? '', role: c.head?.role ?? '', bio: c.head?.bio ?? '', photo: c.head?.photo ?? '', email: currentUser.contactEmail ?? '', phone: c.head?.phone ?? '', university: c.head?.university ?? '', major: c.head?.major ?? '', year: c.head?.year ?? '' });
-    setHeadModal(true);
   };
   const saveHead = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1373,23 +1405,65 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
         return;
       }
       setHeadModal(false);
+      headDraft.clearDraft();
     } catch {
       alert(t('admin.board.headModal.saveFailed', 'تعذر حفظ الملف الشخصي. حاول مرة أخرى.'));
     }
   };
 
+  const [respTarget, setRespTarget] = useState<{ committeeId: CommitteeId; idx: number } | null>(null);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const openResp = findOpenSessionDraft<{ respText: string, translations: any }>(currentUser.userId, 'admin:board-resp');
+    if (openResp && openResp.envelope.open && openResp.entityId) {
+      const parts = openResp.entityId.split(':');
+      if (openResp.mode === 'create') {
+        setRespTarget({ committeeId: openResp.entityId as CommitteeId, idx: -1 });
+      } else if (parts.length === 2) {
+        setRespTarget({ committeeId: parts[0] as CommitteeId, idx: parseInt(parts[1], 10) });
+      }
+    }
+  }, [currentUser]);
+
+  const respDraftKey = currentUser && respTarget
+    ? buildSessionDraftKey(
+        currentUser.userId,
+        'admin:board-resp',
+        respTarget.idx === -1 ? 'create' : 'edit',
+        respTarget.idx === -1 ? respTarget.committeeId : `${respTarget.committeeId}:${respTarget.idx}`
+      )
+    : null;
+
+  const respDraft = useSessionDraft({
+    key: respDraftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: {
+      respText: '',
+      translations: { tr: {}, en: {} }
+    },
+    defaultOpen: false,
+    validation: { readiness: 'VALID' },
+    isDirty: (d) => d.respText.trim().length > 0
+  });
+
+  const respModal = respDraft.open;
+  const setRespModal = respDraft.setOpen;
+  const respText = respDraft.data.respText;
+  const setRespText = (v: any) => respDraft.setData(p => ({ ...p, respText: typeof v === 'function' ? v(p.respText) : v }));
+  const respTranslations = respDraft.data.translations as Record<LocalizedCmsLocale, Record<string, string>>;
+  const setRespTranslations = (v: any) => respDraft.setData(p => ({ ...p, translations: typeof v === 'function' ? v(p.translations) : v }));
+
   const openAddResp = (committeeId: CommitteeId) => {
     setRespTarget({ committeeId, idx: -1 });
-    setRespTranslations({ tr: {}, en: {} });
+    respDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-resp', 'create', committeeId));
     setRespText('');
-    setRespModal(true);
   };
   const openEditResp = (committeeId: CommitteeId, idx: number) => {
     const c = committees.find((x) => x.id === committeeId);
     setRespTarget({ committeeId, idx });
-    setRespTranslations({ tr: {}, en: {} });
+    respDraft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:board-resp', 'edit', `${committeeId}:${idx}`));
     setRespText(c?.responsibilities[idx] || '');
-    setRespModal(true);
   };
   const saveResp = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1404,6 +1478,7 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
       return { ...c, responsibilities: items };
     }));
     setRespModal(false);
+    respDraft.clearDraft();
   };
   const removeResp = (committeeId: CommitteeId, idx: number) => {
     if (!confirm(t('admin.board.confirmDeleteResp', 'حذف هذا البند؟'))) return;
@@ -1625,7 +1700,10 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
       </Modal>
 
       {/* Head modal */}
-      <Modal open={headModal} onClose={() => setHeadModal(false)} title={t('admin.board.headModal.title', 'تعديل بيانات المسؤول الكاملة')} maxWidth="max-w-md">
+      <Modal open={headModal} onClose={headDraft.requestClose || (() => setHeadModal(false))} title={t('admin.board.headModal.title', 'تعديل بيانات المسؤول الكاملة')} maxWidth="max-w-md">
+        {headDraft.isDecisionOpen ? (
+          <UnsavedDraftDecision onContinue={headDraft.continueEditing} onKeep={headDraft.keepDraftAndClose} onDiscard={headDraft.discardDraftAndClose} />
+        ) : (
         <form onSubmit={saveHead} className="space-y-4">
           <div>
             <label className="label-field">{t('admin.board.headModal.fullName', 'الاسم الكامل')} <RequiredMark /></label>
@@ -1698,14 +1776,18 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
             </select>
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setHeadModal(false)} className="btn-ghost">{t('admin.board.headModal.cancel', 'إلغاء')}</button>
+            <button type="button" onClick={headDraft.requestClose || (() => setHeadModal(false))} className="btn-ghost">{t('admin.board.headModal.cancel', 'إلغاء')}</button>
             <button type="submit" className="btn-primary"><Save className="h-4 w-4" /> {t('admin.board.headModal.save', 'حفظ')}</button>
           </div>
         </form>
+        )}
       </Modal>
 
       {/* Responsibility modal */}
-      <Modal open={respModal} onClose={() => setRespModal(false)} title={respTarget?.idx && respTarget.idx >= 0 ? t('admin.board.respModal.editTitle', 'تعديل البند') : t('admin.board.respModal.addTitle', 'إضافة بند جديد')} maxWidth="max-w-md">
+      <Modal open={respModal} onClose={respDraft.requestClose || (() => setRespModal(false))} title={respTarget?.idx && respTarget.idx >= 0 ? t('admin.board.respModal.editTitle', 'تعديل البند') : t('admin.board.respModal.addTitle', 'إضافة بند جديد')} maxWidth="max-w-md">
+        {respDraft.isDecisionOpen ? (
+          <UnsavedDraftDecision onContinue={respDraft.continueEditing} onKeep={respDraft.keepDraftAndClose} onDiscard={respDraft.discardDraftAndClose} />
+        ) : (
         <form onSubmit={saveResp} className="space-y-4">
           <CmsEntityTranslationTabs
             target="committees"
@@ -1736,10 +1818,11 @@ function BoardTab({ committees, setCommittees, students, currentUser, updateBoar
             </div>
           </CmsEntityTranslationTabs>
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => setRespModal(false)} className="btn-ghost">{t('admin.board.respModal.cancel', 'إلغاء')}</button>
+            <button type="button" onClick={respDraft.requestClose || (() => setRespModal(false))} className="btn-ghost">{t('admin.board.respModal.cancel', 'إلغاء')}</button>
             <button type="submit" className="btn-primary"><Save className="h-4 w-4" /> {t('admin.board.respModal.save', 'حفظ')}</button>
           </div>
         </form>
+        )}
       </Modal>
 
     </div>
@@ -3269,18 +3352,7 @@ function MembersTab({ members, currentUser, transferMemberRole, revokeExecutiveA
   removeMember: ReturnType<typeof useApp>['removeMember'];
 }) {
   const { t } = useTranslation();
-  
-  const panelDraftKey = currentUser?.userId ? buildSessionDraftKey(currentUser.userId, 'admin:members-panel', 'edit', 'tab') : null;
-  const panelDraft = useSessionDraft({
-    key: panelDraftKey,
-    userId: currentUser?.userId ?? null,
-    defaultData: { search: '' },
-    defaultOpen: true,
-    validation: { readiness: 'VALID' },
-    isDirty: () => true
-  });
-  const search = panelDraft.data.search;
-  const setSearch = (s: string) => panelDraft.setData(p => ({ ...p, search: s }));
+  const [search, setSearch] = useState('');
 
   const [roleModal, setRoleModal] = useState<ReturnType<typeof useApp>['members'][0] | null>(null);
   const [removeCandidate, setRemoveCandidate] = useState<ReturnType<typeof useApp>['members'][0] | null>(null);
@@ -3640,31 +3712,24 @@ function ApplicationsTab({
   retryApplicationEmailNotification,
 }: {
   applications: StudentApplication[];
-  currentUser: { role: string | null } | null;
+  currentUser: { userId?: string; role: string | null } | null;
   scheduleInterview: (id: string, interview: InterviewInfo) => Promise<{ ok: boolean; error?: string; emailWarning?: string }>;
   decideApplication: (id: string, status: 'accepted' | 'rejected', rejectionReason?: string) => Promise<{ ok: boolean; error?: string; emailWarning?: string }>;
   applicationEmailNotifications: ApplicationEmailNotification[];
   retryApplicationEmailNotification: (applicationId: string, eventType: ApplicationEmailEventType) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const { t } = useTranslation();
-  
-  const panelDraftKey = currentUser?.userId ? buildSessionDraftKey(currentUser.userId, 'admin:applications-panel', 'edit', 'tab') : null;
-  const panelDraft = useSessionDraft({
-    key: panelDraftKey,
-    userId: currentUser?.userId ?? null,
-    defaultData: { search: '', statusFilter: 'all' },
-    defaultOpen: true,
-    validation: { readiness: 'VALID' },
-    isDirty: () => true
-  });
-  const search = panelDraft.data.search;
-  const setSearch = (s: string) => panelDraft.setData(p => ({ ...p, search: s }));
-  const statusFilter = panelDraft.data.statusFilter;
-  const setStatusFilter = (s: string) => panelDraft.setData(p => ({ ...p, statusFilter: s }));
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const [editInterviewId, setEditInterviewId] = useState<string | null>(null);
   const [editDecisionId, setEditDecisionId] = useState<string | null>(null);
-
+  const [invalid, setInvalid] = useState<string[]>([]);
+  const [interviewError, setInterviewError] = useState('');
+  const [decisionError, setDecisionError] = useState('');
+  const [applicationActionBusy, setApplicationActionBusy] = useState(false);
+  const [applicationNotice, setApplicationNotice] = useState<{ kind: 'success' | 'warning' | 'error', text: string } | null>(null);
+  const [retryingNotificationId, setRetryingNotificationId] = useState<string | null>(null);
   useEffect(() => {
     if (!currentUser?.userId) return;
     const openInterview = findOpenSessionDraft<{ interviewForm: any }>(currentUser.userId, 'admin:application-interview');
@@ -3689,7 +3754,7 @@ function ApplicationsTab({
     userId: currentUser?.userId ?? null,
     defaultData: { interviewForm: { date: '', time: '16:00', meetingUrl: '' } },
     defaultOpen: false,
-    validation: { readiness: 'VALID' },
+    validation: 'valid',
     isDirty: (d) => d.interviewForm.date.trim().length > 0 || d.interviewForm.meetingUrl.trim().length > 0
   });
 
@@ -3698,7 +3763,7 @@ function ApplicationsTab({
     userId: currentUser?.userId ?? null,
     defaultData: { decisionForm: { status: 'accepted' as 'accepted' | 'rejected', reason: '' } },
     defaultOpen: false,
-    validation: { readiness: 'VALID' },
+    validation: 'valid',
     isDirty: (d) => d.decisionForm.reason.trim().length > 0
   });
 
@@ -3960,7 +4025,7 @@ function ApplicationsTab({
         </div>
       </div>
 
-      <Modal open={!!interviewModal} onClose={interviewDraft.requestClose || (() => setInterviewModal(null))} title={t('admin.applications.interviewModal.title', 'جدولة مقابلة شخصية')} maxWidth="max-w-lg">
+      <Modal open={interviewDraft.open} onClose={interviewDraft.requestClose || (() => setInterviewModal(null))} title={t('admin.applications.interviewModal.title', 'جدولة مقابلة شخصية')} maxWidth="max-w-lg">
         {interviewDraft.isDecisionOpen ? (
           <UnsavedDraftDecision onContinue={interviewDraft.continueEditing} onKeep={interviewDraft.keepDraftAndClose} onDiscard={interviewDraft.discardDraftAndClose} />
         ) : interviewModal ? (
@@ -4017,7 +4082,7 @@ function ApplicationsTab({
         ) : null}
       </Modal>
 
-      <Modal open={!!decisionModal} onClose={decisionDraft.requestClose || (() => setDecisionModal(null))} title={decisionForm.status === 'accepted' ? t('admin.applications.decisionModal.acceptTitle', 'تأكيد القبول النهائي') : t('admin.applications.decisionModal.rejectTitle', 'رفض الطلب')} maxWidth="max-w-md">
+      <Modal open={decisionDraft.open} onClose={decisionDraft.requestClose || (() => setDecisionModal(null))} title={decisionForm.status === 'accepted' ? t('admin.applications.decisionModal.acceptTitle', 'تأكيد القبول النهائي') : t('admin.applications.decisionModal.rejectTitle', 'رفض الطلب')} maxWidth="max-w-md">
         {decisionDraft.isDecisionOpen ? (
           <UnsavedDraftDecision onContinue={decisionDraft.continueEditing} onKeep={decisionDraft.keepDraftAndClose} onDiscard={decisionDraft.discardDraftAndClose} />
         ) : decisionModal ? (
@@ -4183,7 +4248,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
       planTranslations: { tr: { title: '', description: '' }, en: { title: '', description: '' } }
     },
     defaultOpen: false,
-    validation: { readiness: 'VALID' },
+    validation: 'valid',
     isDirty: (d) => d.planForm.title.trim().length > 0 || d.planForm.description.trim().length > 0
   });
 
@@ -4297,7 +4362,7 @@ function PlansTab({ plans, setPlans, reports, setReports, currentUser }: {
       reportTranslations: { tr: { title: '', summary: '', period: '' }, en: { title: '', summary: '', period: '' } }
     },
     defaultOpen: false,
-    validation: { readiness: 'VALID' },
+    validation: 'valid',
     isDirty: (d) => d.reportForm.title.trim().length > 0 || d.reportForm.summary.trim().length > 0
   });
 

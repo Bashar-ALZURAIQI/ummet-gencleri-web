@@ -105,7 +105,7 @@ export default function ProfileSettings({
   });
 
   const userId = profile.userId ?? profile.id ?? null;
-  const draftKey = userId ? buildSessionDraftKey(userId, 'settings:profile', 'edit', 'form') : null;
+  const draftKey = userId ? buildSessionDraftKey(userId, 'admin:profile-general', 'edit', 'form') : null;
   
   const profileDraft = useSessionDraft({
     key: draftKey,

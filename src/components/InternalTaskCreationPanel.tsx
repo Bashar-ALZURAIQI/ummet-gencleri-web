@@ -4,16 +4,34 @@ import { ClipboardCheck, Plus } from 'lucide-react';
 import RequiredMark from './RequiredMark';
 import TransientToast, { type ToastMessage } from './TransientToast';
 import { createInternalTask } from '../services/internalEconomyService';
+import { useApp } from '../contexts/AppContext';
+import { useSessionDraft } from '../hooks/useSessionDraft';
+import { buildSessionDraftKey } from '../domain/sessionDraftState';
 
 export default function InternalTaskCreationPanel() {
   const { t } = useTranslation();
-  const [form, setForm] = useState({
+  const { currentUser } = useApp();
+  const buildForm = () => ({
     title: '',
     description: '',
     pointsReward: 10,
     requiredStudents: 1,
     deadline: '',
   });
+
+  const draftKey = currentUser?.userId ? buildSessionDraftKey(currentUser.userId, 'admin:internal-task', 'create', 'task') : null;
+
+  const panelDraft = useSessionDraft({
+    key: draftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: buildForm(),
+    defaultOpen: true,
+    validation: { readiness: 'VALID' },
+    isDirty: (d) => JSON.stringify(d) !== JSON.stringify(buildForm())
+  });
+
+  const form = panelDraft.data;
+  const setForm = (v: any) => panelDraft.setData(p => typeof v === 'function' ? v(p) : { ...p, ...v });
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
@@ -44,8 +62,8 @@ export default function InternalTaskCreationPanel() {
       setToast({ id: Date.now(), type: 'error', text: result.error.message });
       return;
     }
-    setForm({ title: '', description: '', pointsReward: 10, requiredStudents: 1, deadline: '' });
     setToast({ id: Date.now(), type: 'success', text: t('admin.tasks.creation.successToast', 'تم إنشاء المهمة التطوعية وحفظها في قاعدة البيانات.') });
+    panelDraft.clearDraft();
   };
 
   return (

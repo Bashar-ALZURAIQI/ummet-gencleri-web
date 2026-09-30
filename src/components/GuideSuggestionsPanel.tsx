@@ -9,6 +9,8 @@ import {
   type GuideSuggestion,
 } from '../services/guideSuggestionService.ts';
 import { useApp } from '../context/AppContext.tsx';
+import { useSessionDraft } from '../hooks/useSessionDraft';
+import { buildSessionDraftKey } from '../domain/sessionDraftState';
 
 type Filter = 'ALL' | GuideSuggestionStatus;
 
@@ -23,11 +25,25 @@ const ALL_STATUSES: GuideSuggestionStatus[] = ['PENDING', 'REVIEWING', 'IMPLEMEN
 
 export default function GuideSuggestionsPanel({ role }: { role: string | null | undefined }) {
   const { t } = useTranslation();
-  const { refreshWorkloadCounts } = useApp();
+  const { refreshWorkloadCounts, currentUser } = useApp();
   const authorized = canManageGuideSuggestions(role);
   const [suggestions, setSuggestions] = useState<GuideSuggestion[]>([]);
-  const [filter, setFilter] = useState<Filter>('ALL');
-  const [query, setQuery] = useState('');
+  
+  const draftKey = currentUser?.userId ? buildSessionDraftKey(currentUser.userId, 'admin:guide-suggestions', 'edit', 'tab') : null;
+  const draft = useSessionDraft({
+    key: draftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: { filter: 'ALL' as Filter, query: '' },
+    defaultOpen: true,
+    validation: { readiness: 'VALID' },
+    isDirty: () => true
+  });
+  
+  const filter = draft.data.filter;
+  const setFilter = (v: Filter) => draft.setData(p => ({ ...p, filter: v }));
+  const query = draft.data.query;
+  const setQuery = (v: string) => draft.setData(p => ({ ...p, query: v }));
+
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState('');

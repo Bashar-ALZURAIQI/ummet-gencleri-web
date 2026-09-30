@@ -6,6 +6,11 @@ import { committeeMeta, type PendingProfileEdit } from '../data/mockData';
 import EditDiffTable from './EditDiffTable';
 import ExecutiveEditDraftEditor from './ExecutiveEditDraftEditor';
 import Modal from './Modal';
+import UnsavedDraftDecision from './UnsavedDraftDecision';
+import { useSessionDraft } from '../hooks/useSessionDraft';
+import { buildSessionDraftKey } from '../domain/sessionDraftState';
+import { findOpenSessionDraft } from '../domain/sessionDraft';
+import { useEffect } from 'react';
 
 const fmtDate = (iso: string) => {
   try {
@@ -29,6 +34,59 @@ export default function ProfileEditsPanel() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editing, setEditing] = useState<PendingProfileEdit | null>(null);
 
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'PRESIDENT') return;
+    const openDraft = findOpenSessionDraft<{ responsibilities: string, stats: any[], members: any[] }>(currentUser.userId, 'admin:profile-edit');
+    if (openDraft && openDraft.envelope.open && openDraft.entityId) {
+      const edit = pendingProfileEdits?.find(e => e.id === openDraft.entityId && e.status === 'PENDING_APPROVAL');
+      if (edit && !editing) {
+        setEditing(edit);
+      }
+    }
+  }, [currentUser, pendingProfileEdits, editing]);
+
+  const buildDefaultData = () => {
+    if (!editing) return { responsibilities: '', stats: [], members: [] };
+    const snapshot = editing.snapshot;
+    return {
+      responsibilities: snapshot.responsibilities.join('\n'),
+      stats: snapshot.stats.map(s => ({ ...s })),
+      members: snapshot.members.map(m => ({ name: m.name, position: m.position }))
+    };
+  };
+
+  const draftKey = currentUser && editing
+    ? buildSessionDraftKey(currentUser.userId, 'admin:profile-edit', 'edit', editing.id)
+    : null;
+
+  const draft = useSessionDraft({
+    key: draftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: buildDefaultData(),
+    defaultOpen: false,
+    validation: {
+      readiness: !editing 
+        ? 'UNKNOWN' 
+        : pendingProfileEdits?.find(e => e.id === editing.id && e.status === 'PENDING_APPROVAL')
+        ? 'VALID'
+        : 'INVALID'
+    },
+    isDirty: (d) => {
+      if (!editing) return false;
+      const def = buildDefaultData();
+      return (
+        d.responsibilities !== def.responsibilities ||
+        JSON.stringify(d.stats) !== JSON.stringify(def.stats) ||
+        JSON.stringify(d.members) !== JSON.stringify(def.members)
+      );
+    }
+  });
+
+  const openEdit = (edit: PendingProfileEdit) => {
+    setEditing(edit);
+    draft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:profile-edit', 'edit', edit.id));
+  };
+
   if (!currentUser || currentUser.role !== 'PRESIDENT') return null;
 
   const pending = (pendingProfileEdits ?? []).filter((e) => e?.status === 'PENDING_APPROVAL');
@@ -47,7 +105,10 @@ export default function ProfileEditsPanel() {
     setBusyId(editing.id);
     try {
       const result = await approveProfileEditWithChanges(editing.id, snapshot, t('admin.profileEdits.presidentRevisedNote', 'اعتمد الرئيس نسخة منقحة من الطلب.'));
-      if (result.ok) setEditing(null);
+      if (result.ok) {
+        setEditing(null);
+        draft.clearDraft();
+      }
     } finally {
       setBusyId(null);
     }
@@ -113,7 +174,7 @@ export default function ProfileEditsPanel() {
                       {t('admin.profileEdits.approve', 'موافقة')}
                     </button>
                     <button
-                      onClick={() => setEditing(edit)}
+                      onClick={() => openEdit(edit)}
                       disabled={busyId !== null}
                       className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-sky-700 disabled:opacity-50"
                     >
@@ -136,19 +197,23 @@ export default function ProfileEditsPanel() {
         </div>
       )}
       <Modal
-        open={editing !== null}
-        onClose={() => busyId === null && setEditing(null)}
+        open={draft.open}
+        onClose={draft.requestClose || (() => setEditing(null))}
         title={t('admin.profileEdits.editModalTitle', 'تعديل الطلب قبل الموافقة')}
         maxWidth="max-w-3xl"
       >
-        {editing && (
+        {draft.isDecisionOpen ? (
+          <UnsavedDraftDecision onContinue={draft.continueEditing} onKeep={draft.keepDraftAndClose} onDiscard={draft.discardDraftAndClose} />
+        ) : editing ? (
           <ExecutiveEditDraftEditor
             snapshot={editing.snapshot}
             busy={busyId === editing.id}
-            onCancel={() => setEditing(null)}
+            onCancel={draft.requestClose || (() => setEditing(null))}
             onSubmit={approveEdited}
+            draftData={draft.data}
+            setDraftData={draft.setData}
           />
-        )}
+        ) : null}
       </Modal>
     </div>
   );

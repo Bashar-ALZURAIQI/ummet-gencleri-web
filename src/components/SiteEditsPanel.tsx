@@ -4,6 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import type { PendingSiteEdit } from '../data/mockData';
 import Modal from './Modal';
+import UnsavedDraftDecision from './UnsavedDraftDecision';
+import { useSessionDraft } from '../hooks/useSessionDraft';
+import { buildSessionDraftKey } from '../domain/sessionDraftState';
+import { findOpenSessionDraft } from '../domain/sessionDraft';
+import { useEffect } from 'react';
 
 const fmtDate = (iso: string) => {
   try {
@@ -29,7 +34,52 @@ export default function SiteEditsPanel() {
     editRequestsError,
   } = useApp();
   const [editingEdit, setEditingEdit] = useState<PendingSiteEdit | null>(null);
-  const [revised, setRevised] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'PRESIDENT') return;
+    const openDraft = findOpenSessionDraft<{ revised: Record<string, string> }>(currentUser.userId, 'admin:site-edit');
+    if (openDraft && openDraft.envelope.open && openDraft.entityId) {
+      const edit = pendingSiteEdits?.find(e => e.id === openDraft.entityId && e.status === 'PENDING_PRESIDENT_APPROVAL');
+      if (edit && !editingEdit) {
+        setEditingEdit(edit);
+      }
+    }
+  }, [currentUser, pendingSiteEdits, editingEdit]);
+
+  const buildDefaultData = () => {
+    const init: Record<string, string> = {};
+    if (editingEdit) {
+      (editingEdit.diffs ?? []).forEach((d, i) => { init[String(i)] = d.newValue; });
+    }
+    return { revised: init };
+  };
+
+  const draftKey = currentUser && editingEdit
+    ? buildSessionDraftKey(currentUser.userId, 'admin:site-edit', 'edit', editingEdit.id)
+    : null;
+
+  const draft = useSessionDraft({
+    key: draftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: buildDefaultData(),
+    defaultOpen: false,
+    validation: {
+      readiness: !editingEdit 
+        ? 'UNKNOWN' 
+        : pendingSiteEdits?.find(e => e.id === editingEdit.id && e.status === 'PENDING_PRESIDENT_APPROVAL')
+        ? 'VALID'
+        : 'INVALID'
+    },
+    isDirty: (d) => {
+      if (!editingEdit) return false;
+      const def = buildDefaultData().revised;
+      return Object.keys(d.revised).some(k => d.revised[k] !== def[k]);
+    }
+  });
+
+  const revised = draft.data.revised;
+  const setRevised = (updater: any) => draft.setData(p => ({ ...p, revised: typeof updater === 'function' ? updater(p.revised) : updater }));
+
   const [busyId, setBusyId] = useState<string | null>(null);
 
   if (!currentUser || currentUser.role !== 'PRESIDENT') return null;
@@ -37,10 +87,8 @@ export default function SiteEditsPanel() {
   const pending = (pendingSiteEdits ?? []).filter((e) => e?.status === 'PENDING_PRESIDENT_APPROVAL');
 
   const openEdit = (edit: PendingSiteEdit) => {
-    const init: Record<string, string> = {};
-    (edit.diffs ?? []).forEach((d, i) => { init[String(i)] = d.newValue; });
-    setRevised(init);
     setEditingEdit(edit);
+    draft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:site-edit', 'edit', edit.id));
   };
 
   const saveRevised = async () => {
@@ -51,7 +99,10 @@ export default function SiteEditsPanel() {
     setBusyId(editingEdit.id);
     const result = await approveSiteEditWithChanges(editingEdit.id, diffs);
     setBusyId(null);
-    if (result.ok) setEditingEdit(null);
+    if (result.ok) {
+      setEditingEdit(null);
+      draft.clearDraft();
+    }
   };
 
   const decide = async (id: string, decision: 'approve' | 'reject') => {
@@ -165,12 +216,14 @@ export default function SiteEditsPanel() {
 
       {/* Edit-then-approve modal */}
       <Modal
-        open={!!editingEdit}
-        onClose={() => setEditingEdit(null)}
+        open={draft.open}
+        onClose={draft.requestClose || (() => setEditingEdit(null))}
         title={t('admin.siteEdits.editModalTitle', 'تعديل ثم اعتماد: {{section}}', { section: editingEdit?.sectionLabel ?? '' })}
         maxWidth="max-w-2xl"
       >
-        {editingEdit && (
+        {draft.isDecisionOpen ? (
+          <UnsavedDraftDecision onContinue={draft.continueEditing} onKeep={draft.keepDraftAndClose} onDiscard={draft.discardDraftAndClose} />
+        ) : editingEdit ? (
           <div className="space-y-4">
             <p className="rounded-xl border border-gold-200 bg-gold-50 p-3 text-xs leading-relaxed text-gold-800">
               {t('admin.siteEdits.editInstructions', 'عدّل القيم المقترحة ثم اعتمدها لتُنشر فورًا على الموقع. الحقول غير قابلة للتعديل تظهر للاطلاع فقط.')}
@@ -198,7 +251,7 @@ export default function SiteEditsPanel() {
               </div>
             ))}
             <div className="flex flex-wrap justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setEditingEdit(null)} className="btn-ghost">
+              <button type="button" onClick={draft.requestClose || (() => setEditingEdit(null))} className="btn-ghost">
                 <X className="h-4 w-4" /> {t('common.cancel', 'إلغاء')}
               </button>
               <button
@@ -217,7 +270,7 @@ export default function SiteEditsPanel() {
               </p>
             )}
           </div>
-        )}
+        ) : null}
       </Modal>
     </div>
   );

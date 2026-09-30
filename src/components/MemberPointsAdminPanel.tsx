@@ -4,6 +4,11 @@ import { AlertTriangle, Plus, RefreshCw, RotateCcw } from 'lucide-react';
 import Modal from './Modal';
 import TransientToast, { type ToastMessage } from './TransientToast';
 import UserAvatar from './UserAvatar';
+import UnsavedDraftDecision from './UnsavedDraftDecision';
+import { useApp } from '../contexts/AppContext';
+import { useSessionDraft } from '../hooks/useSessionDraft';
+import { buildSessionDraftKey } from '../domain/sessionDraftState';
+import { findOpenSessionDraft } from '../domain/sessionDraft';
 import type { EconomySeason, MemberPointsRow } from '../domain/internalEconomyTypes.ts';
 import { canMutateMemberPoints, tierPresentation } from '../domain/phaseThreeEconomy.ts';
 import { adjustMemberPoints, endEconomySeason, loadActiveEconomySeason, loadMemberPoints } from '../services/phaseThreeEconomyService.ts';
@@ -14,9 +19,39 @@ export default function MemberPointsAdminPanel({ role }: { role: string }) {
   const [season, setSeason] = useState<EconomySeason | null>(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<MemberPointsRow | null>(null);
-  const [amount, setAmount] = useState('');
-  const [reason, setReason] = useState('');
-  const [requestId, setRequestId] = useState<string | null>(null);
+  
+  const { currentUser } = useApp();
+  
+  useEffect(() => {
+    if (!currentUser || members.length === 0) return;
+    const openDraft = findOpenSessionDraft<{ amount: string, reason: string, requestId: string }>(currentUser.userId, 'admin:member-points');
+    if (openDraft && openDraft.envelope.open && openDraft.entityId) {
+      const member = members.find(m => m.studentId === openDraft.entityId);
+      if (member && !selected) {
+        setSelected(member);
+      }
+    }
+  }, [currentUser, members, selected]);
+
+  const draftKey = currentUser && selected
+    ? buildSessionDraftKey(currentUser.userId, 'admin:member-points', 'create', selected.studentId)
+    : null;
+
+  const draft = useSessionDraft({
+    key: draftKey,
+    userId: currentUser?.userId ?? null,
+    defaultData: { amount: '', reason: '', requestId: '' },
+    defaultOpen: false,
+    validation: { readiness: 'VALID' },
+    isDirty: (d) => d.amount.trim() !== '' || d.reason.trim() !== ''
+  });
+
+  const amount = draft.data.amount;
+  const setAmount = (v: string) => draft.setData(p => ({ ...p, amount: v }));
+  const reason = draft.data.reason;
+  const setReason = (v: string) => draft.setData(p => ({ ...p, reason: v }));
+  const requestId = draft.data.requestId;
+
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
@@ -42,15 +77,8 @@ export default function MemberPointsAdminPanel({ role }: { role: string }) {
 
   const open = (member: MemberPointsRow) => {
     setSelected(member);
-    setAmount('');
-    setReason('');
-    setRequestId(crypto.randomUUID());
-  };
-
-  const close = () => {
-    if (busy) return;
-    setSelected(null);
-    setRequestId(null);
+    draft.openTarget(buildSessionDraftKey(currentUser!.userId, 'admin:member-points', 'create', member.studentId));
+    draft.setData(prev => prev.requestId ? prev : { ...prev, requestId: crypto.randomUUID() });
   };
 
   const submit = async (e: React.FormEvent) => {
@@ -69,7 +97,7 @@ export default function MemberPointsAdminPanel({ role }: { role: string }) {
       return;
     }
     setSelected(null);
-    setRequestId(null);
+    draft.clearDraft();
     notify('success', t('admin.memberPoints.adjustmentSuccess', 'تم حفظ حركة النقاط في السجل المالي.'));
     await refresh();
   };
@@ -165,7 +193,10 @@ export default function MemberPointsAdminPanel({ role }: { role: string }) {
           </tbody>
         </table>
       </div>
-      <Modal open={!!selected} onClose={close} title={t('admin.memberPoints.modal.title', 'تعديل نقاط {{name}}', { name: selected?.studentName ?? '' })}>
+      <Modal open={draft.open} onClose={draft.requestClose || (() => setSelected(null))} title={t('admin.memberPoints.modal.title', 'تعديل نقاط {{name}}', { name: selected?.studentName ?? '' })}>
+        {draft.isDecisionOpen ? (
+          <UnsavedDraftDecision onContinue={draft.continueEditing} onKeep={draft.keepDraftAndClose} onDiscard={draft.discardDraftAndClose} />
+        ) : (
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="label-field">{t('admin.memberPoints.modal.amountLabel', 'القيمة الموقعة')}</label>
@@ -176,10 +207,11 @@ export default function MemberPointsAdminPanel({ role }: { role: string }) {
             <textarea className="input-field min-h-28" value={reason} onChange={(e) => setReason(e.target.value)} required minLength={3} />
           </div>
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={close} className="btn-secondary">{t('common.cancel', 'إلغاء')}</button>
+            <button type="button" onClick={draft.requestClose || (() => setSelected(null))} className="btn-secondary">{t('common.cancel', 'إلغاء')}</button>
             <button disabled={busy} className="btn-primary">{busy ? t('admin.memberPoints.modal.savingButton', 'جارٍ الحفظ...') : t('admin.memberPoints.modal.saveButton', 'حفظ الحركة')}</button>
           </div>
         </form>
+        )}
       </Modal>
     </section>
   );

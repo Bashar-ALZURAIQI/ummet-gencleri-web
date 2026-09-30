@@ -11,18 +11,43 @@ interface ExecutiveEditDraftEditorProps {
   busy?: boolean;
   onCancel: () => void;
   onSubmit: (snapshot: ExecutiveContentSnapshot) => Promise<void> | void;
+  draftData?: { responsibilities: string, stats: any[], members: any[] };
+  setDraftData?: React.Dispatch<React.SetStateAction<{ responsibilities: string, stats: any[], members: any[] }>>;
 }
 
 export default function ExecutiveEditDraftEditor({
   snapshot,
   busy = false,
-  onCancel,
   onSubmit,
+  draftData,
+  setDraftData,
 }: ExecutiveEditDraftEditorProps) {
   const { t } = useTranslation();
-  const [responsibilities, setResponsibilities] = useState(snapshot.responsibilities.join('\n'));
-  const [stats, setStats] = useState(snapshot.stats.map((item) => ({ ...item })));
-  const [members, setMembers] = useState(snapshot.members.map((item) => ({ name: item.name, position: item.position })));
+  
+  // Use draftData if available, otherwise local state
+  const defaultResponsibilities = snapshot.responsibilities.join('\n');
+  const defaultStats = snapshot.stats.map((item) => ({ ...item }));
+  const defaultMembers = snapshot.members.map((item) => ({ name: item.name, position: item.position }));
+
+  const [localResponsibilities, setLocalResponsibilities] = useState(defaultResponsibilities);
+  const [localStats, setLocalStats] = useState(defaultStats);
+  const [localMembers, setLocalMembers] = useState(defaultMembers);
+
+  const responsibilities = draftData ? draftData.responsibilities : localResponsibilities;
+  const setResponsibilities = draftData && setDraftData 
+    ? (val: string) => setDraftData(p => ({ ...p, responsibilities: val }))
+    : setLocalResponsibilities;
+
+  const stats = draftData ? draftData.stats : localStats;
+  const setStats = draftData && setDraftData
+    ? (updater: any) => setDraftData(p => ({ ...p, stats: typeof updater === 'function' ? updater(p.stats) : updater }))
+    : setLocalStats;
+
+  const members = draftData ? draftData.members : localMembers;
+  const setMembers = draftData && setDraftData
+    ? (updater: any) => setDraftData(p => ({ ...p, members: typeof updater === 'function' ? updater(p.members) : updater }))
+    : setLocalMembers;
+
   const [error, setError] = useState<string | null>(null);
 
   const submit = async (event: React.FormEvent) => {
