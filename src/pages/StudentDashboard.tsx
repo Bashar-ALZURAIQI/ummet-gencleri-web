@@ -186,6 +186,7 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
     if (!validateRequired(form, ['title', 'targetRole', 'category', 'body'], setInvalid)) return;
     setSubmitting(true);
     setSubmitError(null);
+    setRefreshPending(false);
     const result = await submitSuggestion({
       targetRole: form.targetRole,
       category: form.category,
@@ -198,8 +199,13 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
       return;
     }
     draft.clearDraft();
-    setSent(true);
-    setTimeout(() => setSent(false), 4000);
+    if (result.refreshPending) {
+      setRefreshPending(true);
+    } else {
+      setRefreshPending(false);
+      setSent(true);
+      setTimeout(() => setSent(false), 4000);
+    }
   };
 
   return (
@@ -354,6 +360,12 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
                 <div className="mt-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700 animate-fade-in-fast">
                   <XCircle className="h-4 w-4" />
                   {submitError}
+                </div>
+              )}
+              {refreshPending && (
+                <div className="mt-4 flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-semibold text-sky-700 animate-fade-in-fast">
+                  <CheckCircle2 className="h-4 w-4" />
+                  {t('suggestionsV2.suggestionSavedRefreshDelayed', 'Your suggestion has been saved! It may take a few moments to appear below.')}
                 </div>
               )}
               <form onSubmit={submitSuggestionLocal} className="mt-4 space-y-3">

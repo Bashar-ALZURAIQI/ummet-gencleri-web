@@ -41,6 +41,11 @@ test('STUDENT SUBMIT FAILURE AND SUCCESS CONTRACTS in StudentDashboard', async (
   );
   assert.match(
     submitBlock,
+    /setRefreshPending\(false\)/,
+    'Must clear refresh pending state before submit'
+  );
+  assert.match(
+    submitBlock,
     /if \(!result\.ok\)/,
     'Must check result.ok explicitly'
   );
@@ -64,8 +69,23 @@ test('STUDENT SUBMIT FAILURE AND SUCCESS CONTRACTS in StudentDashboard', async (
   );
   assert.match(
     afterErrorCheck,
+    /if \(result\.refreshPending\)/,
+    'Must check if refresh is pending'
+  );
+  assert.match(
+    afterErrorCheck,
+    /setRefreshPending\(true\)/,
+    'Must set refresh pending state to true'
+  );
+  assert.match(
+    afterErrorCheck,
+    /setRefreshPending\(false\)/,
+    'Must set refresh pending state to false on normal success'
+  );
+  assert.match(
+    afterErrorCheck,
     /setSent\(true\)/,
-    'Must show success only after confirming ok'
+    'Must show success only after confirming ok and not pending'
   );
 });
 

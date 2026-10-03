@@ -415,7 +415,7 @@ test('test_student_success_does_not_recreate_draft', () => {
   // Use CRLF-agnostic search by checking indexOf with both endings
   const clearIdx = studentDashSource.indexOf('draft.clearDraft();') ;
   assert.ok(clearIdx !== -1, 'Student: clearDraft() must exist in success path');
-  const snippet = studentDashSource.slice(clearIdx, clearIdx + 120).replace(/\r\n/g, '\n');
+  const snippet = studentDashSource.slice(clearIdx, clearIdx + 250).replace(/\r\n/g, '\n');
   assert.ok(snippet.includes('setSent(true)'), 'Student success: setSent must follow clearDraft');
   assert.ok(!snippet.includes('draft.setUi'), 'Student success path must not call draft.setUi after clearDraft');
 });
