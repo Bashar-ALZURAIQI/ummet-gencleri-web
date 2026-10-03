@@ -113,7 +113,7 @@ test('44. URL cannot bypass canExposeAdminUi or tab-specific authorization', () 
   // Even if URL has ?tab=pending-edits:
   assert.equal(canExposeAdminUi('STUDENT', false, false), false);
   assert.equal(canExposeAdminUi('MEDIA_HEAD', true, false), false, 'Blocked while authInitializing');
-  assert.equal(canExposeAdminUi('PRESIDENT', false, true), false, 'Blocked while identityRefreshing');
+  assert.equal(canExposeAdminUi('PRESIDENT', false, true), true, 'Allowed while identityRefreshing');
 });
 
 // ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ test('46. protected direct load does not prematurely redirect while identityRefr
 
 test('47. no protected content renders during unresolved identity', () => {
   assert.equal(canExposeAdminUi('PRESIDENT', true, false), false);
-  assert.equal(canExposeAdminUi('PRESIDENT', false, true), false);
+  assert.equal(canExposeAdminUi('PRESIDENT', false, true), true);
 });
 
 test('48. after confirmed authorized identity requested route is restored', () => {

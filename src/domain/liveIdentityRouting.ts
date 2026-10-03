@@ -17,10 +17,10 @@ export function routeAfterConfirmedIdentityRefresh<T extends string>(
 export function canExposeAdminUi(
   role: UserRole | null | undefined,
   authInitializing: boolean,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   identityRefreshing: boolean,
 ): boolean {
   return !authInitializing
-    && !identityRefreshing
     && role !== null
     && role !== undefined
     && isLeadershipRole(role);

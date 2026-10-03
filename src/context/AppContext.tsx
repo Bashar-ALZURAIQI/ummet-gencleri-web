@@ -1017,10 +1017,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const currentUserId = currentUser?.userId;
+  const currentUserRole = currentUser?.role;
+
   // Poll
   useEffect(() => {
-    if (!currentUser) return;
-    const auth = { epoch: latestAuthEventRef.current?.epoch ?? 0, userId: currentUser.userId, role: currentUser.role };
+    if (!currentUserId || !currentUserRole) return;
+    const auth = { epoch: latestAuthEventRef.current?.epoch ?? 0, userId: currentUserId, role: currentUserRole };
     const cancel = createVisibilityRefreshPolling({
       requestRefresh: () => suggestionsIntegration.performRefresh(auth),
 
@@ -1030,7 +1033,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       cancel();
       suggestionsIntegration.clear();
     };
-  }, [currentUser, suggestionsIntegration]);
+  }, [currentUserId, currentUserRole, suggestionsIntegration]);
 
   const setPasswordRecoveryGate = useCallback((gate: PasswordRecoveryGate) => {
     passwordRecoveryGateRef.current = gate;
@@ -2147,8 +2150,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     clearConfirmedAuthOwnership();
     identitySubscriptionGeneration.invalidateAll();
     const refreshEpoch = authEpoch.beginEvent();
-    setCurrentStudent(null);
-    setCurrentUser(null);
     setIdentityRefreshing(true);
 
     if (refreshEpoch === null) {

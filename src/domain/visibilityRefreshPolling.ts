@@ -33,17 +33,32 @@ export function createVisibilityRefreshPolling(options: {
   const requestRefresh = options.requestRefresh;
   let isDisposed = false;
 
+  let inFlight = false;
+
+  const runRefresh = async () => {
+    if (inFlight) return;
+    inFlight = true;
+    try {
+      const res = requestRefresh() as unknown;
+      if (res && typeof (res as Record<string, unknown>).then === 'function') {
+        await (res as Promise<void>);
+      }
+    } finally {
+      inFlight = false;
+    }
+  };
+
   const intervalCallback = () => {
     if (isDisposed) return;
     if (env.isVisible()) {
-      requestRefresh();
+      runRefresh();
     }
   };
 
   const visibilityListener = () => {
     if (isDisposed) return;
     if (env.isVisible()) {
-      requestRefresh();
+      runRefresh();
     }
   };
 

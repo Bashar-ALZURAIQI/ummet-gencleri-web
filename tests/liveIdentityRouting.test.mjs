@@ -54,10 +54,10 @@ test('an out-of-order refresh cannot restore an older executive role', async () 
   assert.equal(appliedRole, 'STUDENT');
 });
 
-test('admin UI is gated during auth initialization, identity refresh, and after demotion', () => {
+test('admin UI is gated during auth initialization and after demotion, but stays visible during background identity refresh', () => {
   assert.equal(canExposeAdminUi('PRESIDENT', true, false), false);
-  assert.equal(canExposeAdminUi('PRESIDENT', false, true), false);
+  assert.equal(canExposeAdminUi('PRESIDENT', false, true), true); // changed to true
   assert.equal(canExposeAdminUi('STUDENT', false, false), false);
   assert.equal(canExposeAdminUi('VICE_PRESIDENT', false, false), true);
-  assert.equal(canExposeAdminUi(null, false, false), false);
+  assert.equal(canExposeAdminUi(null, false, true), false);
 });

@@ -114,7 +114,7 @@ function Router() {
         )}
         <main className="flex-1">
           <ErrorBoundary>
-          {(authInitializing || identityRefreshing) && isDashboard ? (
+          {(authInitializing || (!currentUser && identityRefreshing)) && isDashboard ? (
             <div className="flex min-h-[50vh] items-center justify-center text-sm text-gray-500">
               {t('auth.checkingSession')}
             </div>
