@@ -186,14 +186,14 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
     if (!validateRequired(form, ['title', 'targetRole', 'category', 'body'], setInvalid)) return;
     setSubmitting(true);
     setSubmitError(null);
-    const ok = await submitSuggestion({
+    const result = await submitSuggestion({
       targetRole: form.targetRole,
       category: form.category,
       title: form.title,
       content: form.body.trim()
     });
     setSubmitting(false);
-    if (!ok) {
+    if (!result.ok) {
       setSubmitError(t('suggestionsV2.suggestionSubmitFailure', 'Failed to submit suggestion.'));
       return;
     }
