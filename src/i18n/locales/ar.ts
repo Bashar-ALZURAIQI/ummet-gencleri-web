@@ -50,6 +50,8 @@ const ar = {
     editPrefix: 'تعديل: {{label}}',
     editField: 'تعديل {{label}}',
     loadingPage: 'جارٍ تحميل الصفحة...',
+    routeLoadError: 'تعذر تحميل هذه الصفحة. تحقق من اتصالك ثم أعد تحميل الصفحة.',
+    reloadPage: 'إعادة تحميل الصفحة',
   },
   navigation: {
     home: 'الرئيسية',
