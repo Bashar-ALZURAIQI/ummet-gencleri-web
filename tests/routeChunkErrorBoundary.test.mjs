@@ -29,6 +29,29 @@ describe('Route Chunk Error Boundary Contract', () => {
     assert.ok(!/setTimeout/.test(boundarySource), 'Should not use setTimeout');
   });
 
+  it('uses correct translation keys with common namespace', () => {
+    assert.ok(
+      !/useTranslation\(['"]common['"]\)/.test(boundarySource),
+      'Must not use useTranslation("common")'
+    );
+    assert.ok(
+      !/t\(['"]routeLoadError['"]\)/.test(boundarySource),
+      'Must not use bare t("routeLoadError")'
+    );
+    assert.ok(
+      !/t\(['"]reloadPage['"]\)/.test(boundarySource),
+      'Must not use bare t("reloadPage")'
+    );
+    assert.ok(
+      /t\(['"]common\.routeLoadError['"]\)/.test(boundarySource),
+      'RouteChunkErrorBoundary must use t("common.routeLoadError")'
+    );
+    assert.ok(
+      /t\(['"]common\.reloadPage['"]\)/.test(boundarySource),
+      'RouteChunkErrorBoundary must use t("common.reloadPage")'
+    );
+  });
+
   it('translation keys exist in AR/TR/EN', () => {
     assert.ok(/routeLoadError:\s*['"]/.test(arSource), 'AR missing routeLoadError');
     assert.ok(/reloadPage:\s*['"]/.test(arSource), 'AR missing reloadPage');

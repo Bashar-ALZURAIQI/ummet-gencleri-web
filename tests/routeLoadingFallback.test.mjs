@@ -26,8 +26,16 @@ describe('Route Loading Fallback Contract', () => {
 
   it('uses common.loadingPage translation', () => {
     assert.ok(
-      /t\(['"]loadingPage['"]\)/.test(fallbackSource),
-      'RouteLoadingFallback must use t("loadingPage")'
+      !/useTranslation\(['"]common['"]\)/.test(fallbackSource),
+      'Must not use useTranslation("common")'
+    );
+    assert.ok(
+      !/t\(['"]loadingPage['"]\)/.test(fallbackSource),
+      'Must not use bare t("loadingPage")'
+    );
+    assert.ok(
+      /t\(['"]common\.loadingPage['"]\)/.test(fallbackSource),
+      'RouteLoadingFallback must use t("common.loadingPage")'
     );
   });
 
