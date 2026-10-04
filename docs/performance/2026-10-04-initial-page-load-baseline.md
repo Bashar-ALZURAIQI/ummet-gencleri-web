@@ -3,12 +3,29 @@
 ## Git State
 branch: perf/initial-page-load
 SHA: 93938f5fa4747bd6dd7eb649c1427f1ce99f67dc
+Vercel deployment status: SUCCESS
+Preview application URL: NOT AVAILABLE
 
 ## Verification
 tests: 1957 passed
 typecheck: passed
 build: passed
-lint exact: 11 errors, 0 warnings
+lint exact: CURRENT PERFORMANCE WORK LINT BASELINE:
+11 errors
+0 warnings
+
+## Existing Lint Baseline
+- `src/context/AppContext.tsx:983` - @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type
+- `src/context/AppContext.tsx:986` - @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type
+- `src/domain/sessionDraft.ts:135` - @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type
+- `src/domain/sessionDraft.ts:184` - @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type
+- `src/domain/sessionDraft.ts:224` - @typescript-eslint/no-unused-vars - 'err' is defined but never used
+- `src/domain/sessionDraft.ts:236` - @typescript-eslint/no-unused-vars - 'err' is defined but never used
+- `src/domain/sessionDraft.ts:244` - @typescript-eslint/no-unused-vars - 'err' is defined but never used
+- `src/domain/sessionDraft.ts:282` - @typescript-eslint/no-unused-vars - 'err' is defined but never used
+- `src/domain/sessionDraft.ts:343` - @typescript-eslint/no-unused-vars - 'err' is defined but never used
+- `src/domain/studentSuggestionGateway.ts:76` - @typescript-eslint/no-explicit-any - Unexpected any. Specify a different type
+- `src/services/accountService.ts:268` - @typescript-eslint/no-unused-vars - 'error' is defined but never used
 
 ## Build Output
 entry JS: index-KAB58OMC.js (2235615 bytes)

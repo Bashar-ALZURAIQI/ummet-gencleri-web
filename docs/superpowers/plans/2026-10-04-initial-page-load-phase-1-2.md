@@ -28,7 +28,7 @@
 - Preview only.
 - Existing protected route behavior must remain fail-closed.
 - Existing deep-link, password recovery, returnTo, and push routing must remain unchanged.
-- Current lint baseline is 9 errors / 0 warnings.
+- Current lint baseline is 11 errors / 0 warnings.
 - Non-zero lint must never be reported as PASS.
 
 ## REVIEW FOCUS (Risks)
