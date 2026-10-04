@@ -47,6 +47,7 @@ const tr: TranslationSchema = {
     saving: 'Kaydediliyor...',
     editPrefix: 'Düzenle: {{label}}',
     editField: '{{label}} Düzenle',
+    loadingPage: 'Sayfa yükleniyor...',
   },
   navigation: {
     home: 'Ana Sayfa',

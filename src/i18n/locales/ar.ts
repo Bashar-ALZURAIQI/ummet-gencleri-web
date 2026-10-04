@@ -49,6 +49,7 @@ const ar = {
     saving: 'جارٍ الحفظ...',
     editPrefix: 'تعديل: {{label}}',
     editField: 'تعديل {{label}}',
+    loadingPage: 'جارٍ تحميل الصفحة...',
   },
   navigation: {
     home: 'الرئيسية',

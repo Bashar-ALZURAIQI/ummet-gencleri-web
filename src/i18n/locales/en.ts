@@ -47,6 +47,7 @@ const en: TranslationSchema = {
     saving: 'Saving...',
     editPrefix: 'Edit: {{label}}',
     editField: 'Edit {{label}}',
+    loadingPage: 'Loading page...',
   },
   navigation: {
     home: 'Home',
