@@ -971,8 +971,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           createdAt: d.createdAt,
           responses: d.responses.map(r => ({
             id: r.id,
-            by: r.responderName,
-            byRole: r.responderRole,
+            by: r.responderName ?? '',
+            byRole: r.responderRole ?? '',
             text: r.responseText,
             at: r.createdAt,
           }))
@@ -980,10 +980,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return { ok: true, data: mapped };
       },
       submit: async (params) => {
-        return studentSuggestionService.submitStudentSuggestion(params);
+        return studentSuggestionService.submitStudentSuggestion(params as any);
       },
       respond: async (params) => {
-        return studentSuggestionService.respondToStudentSuggestion(params);
+        return studentSuggestionService.respondToStudentSuggestion(params as any);
       },
       onUpdate: (data) => setSuggestions(data),
       onStorageRetire: () => localStorage.removeItem(LS_SUGGESTIONS_KEY),

@@ -21,6 +21,7 @@ import { getExecutiveSectionLabel, getExecutiveRoleLabel } from '../domain/execu
 import { useSessionDraft } from '../hooks/useSessionDraft';
 import { buildSessionDraftKey } from '../domain/sessionDraft';
 import { useMemo } from 'react';
+import { shouldRefreshSuggestionsOnTabTransition } from '../domain/studentSuggestionRefreshGate';
 
 const STUDENT_TAB_ICONS = {
   activities: CalendarDays,
@@ -96,10 +97,10 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { refreshSuggestions, suggestionsLoading, suggestionsError } = useApp();
 
-  const prevTabRef = useRef(tab);
+  const prevTabRef = useRef<StudentPortalTabId | null>(null);
   useEffect(() => {
-    if (tab === 'suggestions' && prevTabRef.current !== 'suggestions') {
-      refreshSuggestions().catch(console.error);
+    if (shouldRefreshSuggestionsOnTabTransition(prevTabRef.current, tab)) {
+      void refreshSuggestions().catch(console.error);
     }
     prevTabRef.current = tab;
   }, [tab, refreshSuggestions]);

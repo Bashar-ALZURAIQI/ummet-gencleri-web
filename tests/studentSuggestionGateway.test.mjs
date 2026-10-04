@@ -101,6 +101,13 @@ test('loadVisibleStudentSuggestions maps database format and prevents realtime',
             byRole: 'PRESIDENT',
             response_text: 'Hello',
             created_at: '2026-09-26T01:00:00Z'
+          }, {
+            id: 'r-124',
+            responder_user_id: 'u-124',
+            by: null,
+            byRole: null,
+            response_text: 'Hello again',
+            created_at: '2026-09-26T02:00:00Z'
           }]
         }]
       };
@@ -115,9 +122,14 @@ test('loadVisibleStudentSuggestions maps database format and prevents realtime',
   assert.equal(result.data[0].studentUserId, 'u-999');
   assert.equal(result.data[0].studentName, 'Test Student');
   assert.equal(result.data[0].targetRole, 'PRESIDENT');
-  assert.equal(result.data[0].responses.length, 1);
+  assert.equal(result.data[0].responses.length, 2);
   assert.equal(result.data[0].responses[0].responderUserId, 'u-123');
   assert.equal(result.data[0].responses[0].responderName, 'Exec Name');
   assert.equal(result.data[0].responses[0].responderRole, 'PRESIDENT');
   assert.equal(result.data[0].responses[0].responseText, 'Hello');
+
+  assert.equal(result.data[0].responses[1].responderUserId, 'u-124');
+  assert.equal(result.data[0].responses[1].responderName, null);
+  assert.equal(result.data[0].responses[1].responderRole, null);
+  assert.equal(result.data[0].responses[1].responseText, 'Hello again');
 });

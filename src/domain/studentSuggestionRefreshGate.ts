@@ -1,5 +1,13 @@
 import type { StudentSuggestionErrorCode } from './studentSuggestionGateway.js';
 
+export function shouldRefreshSuggestionsOnTabTransition(
+  previousTab: string | null,
+  nextTab: string
+): boolean {
+  if (nextTab !== 'suggestions') return false;
+  return previousTab !== 'suggestions';
+}
+
 export interface AuthOwnership {
   epoch: number;
   userId: string | null;

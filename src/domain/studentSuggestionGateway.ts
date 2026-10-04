@@ -30,8 +30,8 @@ export interface RespondToStudentSuggestionParams {
 export interface SuggestionResponseDto {
   id: string;
   responder_user_id: string;
-  by: string;
-  byRole: string;
+  by: string | null;
+  byRole: string | null;
   response_text: string;
   created_at: string;
 }
@@ -53,8 +53,8 @@ export interface StudentSuggestionDto {
 export interface SuggestionResponse {
   id: string;
   responderUserId: string;
-  responderName: string;
-  responderRole: string;
+  responderName: string | null;
+  responderRole: string | null;
   responseText: string;
   createdAt: string;
 }
