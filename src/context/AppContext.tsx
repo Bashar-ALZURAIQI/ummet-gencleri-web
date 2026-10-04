@@ -2,7 +2,6 @@ import { DEFAULT_SITE_CONTENT } from '../data/defaultSiteContent.ts';
 import { resolveInitialSiteContent } from '../domain/siteContentBootstrap.ts';
 import { studentSuggestionService } from '../services/studentSuggestionService.ts';
 import { createSuggestionStateIntegration } from '../domain/studentSuggestionRefreshGate.ts';
-import type { StudentSuggestion } from '../domain/studentSuggestionGateway.ts';
 import {
   createContext,
   useContext,
@@ -216,12 +215,10 @@ import {
   type Suggestion,
   type SuggestionStatus,
   type SuggestionTargetRole,
-  type SuggestionResponse,
   type AdminPlan,
   type AdminReport,
   type CommitteeId,
   type UserRole,
-  ROLE_LABEL,
   COMMITTEE_ROLE,
   isLeadershipRole,
   type BoardMember,
@@ -253,7 +250,6 @@ import {
   DEFAULT_CONTACT_MAP,
 } from '../data/mockData';
 import {
-  emailKey,
   safeStr,
   safeArray,
   asRecord,
@@ -606,6 +602,7 @@ interface AppContextValue {
   setNews: React.Dispatch<React.SetStateAction<NewsItem[]>>;
   students: Student[];
   suggestions: Suggestion[];
+  refreshSuggestions: () => Promise<void>;
   plans: AdminPlan[];
   setPlans: React.Dispatch<React.SetStateAction<AdminPlan[]>>;
   reports: AdminReport[];
@@ -879,28 +876,6 @@ const loadLegacyHistoryOnce = (): EditsHistoryEntry[] => {
   return legacy;
 };
 
-const todayStr = () => new Date().toISOString().slice(0, 10);
-
-/** Migrates legacy suggestion objects (body/adminReply) into the new targeted model. */
-const normalizeSuggestion = (s: Partial<Suggestion> & { body?: string; adminReply?: string; repliedAt?: string }): Suggestion => ({
-  id: s.id ?? 'sg' + Date.now(),
-  studentId: s.studentId ?? '',
-  studentName: s.studentName ?? 'طالب',
-  studentEmail: s.studentEmail,
-  studentUniversity: s.studentUniversity,
-  studentMajor: s.studentMajor,
-  targetRole: (s.targetRole as SuggestionTargetRole | undefined) ?? 'PRESIDENT',
-  category: s.category ?? 'اقتراح',
-  title: s.title ?? '',
-  content: s.content ?? s.body ?? '',
-  status: (s.status as SuggestionStatus | undefined) ?? 'new',
-  createdAt: s.createdAt ?? todayStr(),
-  responses: Array.isArray(s.responses)
-    ? s.responses
-    : s.adminReply
-      ? [{ id: 'r0', by: 'الإدارة', byRole: 'الإدارة', text: s.adminReply, at: s.repliedAt ?? s.createdAt ?? todayStr() }]
-      : [],
-});
 
 const AppContext = createContext<AppContextValue | null>(null);
 
@@ -986,18 +961,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Map backend to frontend
         const mapped = res.data.map(d => ({
           id: d.id,
-          studentId: '',
-          studentName: 'Anonymous',
-          targetRole: d.targetRole as any,
+          studentId: d.studentUserId,
+          studentName: d.studentName,
+          targetRole: d.targetRole as SuggestionTargetRole,
           category: d.category,
           title: d.title,
           content: d.content,
-          status: d.status as any,
+          status: d.status as SuggestionStatus,
           createdAt: d.createdAt,
           responses: d.responses.map(r => ({
             id: r.id,
-            by: 'Exec',
-            byRole: 'Exec',
+            by: r.responderName,
+            byRole: r.responderRole,
             text: r.responseText,
             at: r.createdAt,
           }))
@@ -4007,6 +3982,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return result;
   };
 
+  const refreshSuggestions = async () => {
+    await suggestionsIntegration.performRefresh({
+      epoch: authEpoch.capture() ?? 0,
+      userId: currentUser?.userId ?? currentStudent?.id ?? null,
+      role: currentUser?.role ?? 'STUDENT'
+    });
+  };
+
   const value: AppContextValue = {
       view,
       setView,
@@ -4017,6 +4000,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setNews,
       students,
       suggestions,
+      refreshSuggestions,
       submitSuggestion,
       plans: effectivePlans,
       setPlans,

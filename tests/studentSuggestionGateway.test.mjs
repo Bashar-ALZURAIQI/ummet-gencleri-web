@@ -1,4 +1,4 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import test from 'node:test';
 
 const {
@@ -80,11 +80,13 @@ test('loadVisibleStudentSuggestions maps database format and prevents realtime',
   const mockSupabase = {
     rpc: async (name) => {
       rpcCalled = true;
-      assert.equal(name, 'list_visible_student_suggestions');
+      assert.equal(name, 'list_visible_student_suggestions_v2');
       return {
         error: null,
         data: [{
           id: 's-123',
+          student_user_id: 'u-999',
+          student_name: 'Test Student',
           target_role: 'PRESIDENT',
           category: 'C',
           title: 'T',
@@ -95,6 +97,8 @@ test('loadVisibleStudentSuggestions maps database format and prevents realtime',
           responses: [{
             id: 'r-123',
             responder_user_id: 'u-123',
+            by: 'Exec Name',
+            byRole: 'PRESIDENT',
             response_text: 'Hello',
             created_at: '2026-09-26T01:00:00Z'
           }]

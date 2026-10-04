@@ -1,4 +1,4 @@
-﻿export type StudentSuggestionErrorCode =
+export type StudentSuggestionErrorCode =
   | 'UNAUTHENTICATED'
   | 'MEMBERSHIP_REQUIRED'
   | 'INVALID_TARGET_ROLE'
@@ -28,12 +28,16 @@ export interface RespondToStudentSuggestionParams {
 export interface SuggestionResponseDto {
   id: string;
   responder_user_id: string;
+  by: string;
+  byRole: string;
   response_text: string;
   created_at: string;
 }
 
 export interface StudentSuggestionDto {
   id: string;
+  student_user_id: string;
+  student_name: string;
   target_role: string;
   category: string;
   title: string;
@@ -47,12 +51,16 @@ export interface StudentSuggestionDto {
 export interface SuggestionResponse {
   id: string;
   responderUserId: string;
+  responderName: string;
+  responderRole: string;
   responseText: string;
   createdAt: string;
 }
 
 export interface StudentSuggestion {
   id: string;
+  studentUserId: string;
+  studentName: string;
   targetRole: string;
   category: string;
   title: string;
@@ -79,6 +87,8 @@ function normalizeError(error: any): StudentSuggestionErrorCode {
 function mapSuggestion(dto: StudentSuggestionDto): StudentSuggestion {
   return {
     id: dto.id,
+    studentUserId: dto.student_user_id,
+    studentName: dto.student_name,
     targetRole: dto.target_role,
     category: dto.category,
     title: dto.title,
@@ -89,6 +99,8 @@ function mapSuggestion(dto: StudentSuggestionDto): StudentSuggestion {
     responses: (dto.responses || []).map(r => ({
       id: r.id,
       responderUserId: r.responder_user_id,
+      responderName: r.by,
+      responderRole: r.byRole,
       responseText: r.response_text,
       createdAt: r.created_at,
     }))
@@ -142,7 +154,7 @@ export async function loadVisibleStudentSuggestions(
   supabase: any
 ): Promise<ServiceResult<StudentSuggestion[]>> {
   try {
-    const { data, error } = await supabase.rpc('list_visible_student_suggestions');
+    const { data, error } = await supabase.rpc('list_visible_student_suggestions_v2');
 
     if (error) {
       return { ok: false, error: normalizeError(error) };

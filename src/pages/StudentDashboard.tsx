@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { CalendarDays, Lightbulb, CheckCircle2, Clock, LogOut, Send, Sparkles, UserCircle, GraduationCap, Mail, Building2, Video, XCircle, PartyPopper, FileText, Pencil, MessageSquareReply, X, ClipboardCheck, Trophy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
-import { applicationStatusLabels, applicationStatusColors, SUGGESTION_TARGETS, SUGGESTION_TARGET_LABEL, ROLE_LABEL, type Suggestion, type SuggestionTargetRole, type ApplicationStatus } from '../data/mockData';
+import { applicationStatusLabels, applicationStatusColors, SUGGESTION_TARGETS, SUGGESTION_TARGET_LABEL, ROLE_LABEL, type Suggestion, type ApplicationStatus } from '../data/mockData';
 import Modal from '../components/Modal';
 import ProfileSettings from '../components/ProfileSettings';
 import UserAvatar from '../components/UserAvatar';
@@ -94,7 +94,13 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
   const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const { suggestionsLoading, suggestionsError } = useApp();
+  const { refreshSuggestions, suggestionsLoading, suggestionsError } = useApp();
+
+  useEffect(() => {
+    if (tab === 'suggestions') {
+      refreshSuggestions().catch(console.error);
+    }
+  }, [tab, refreshSuggestions]);
   const [refreshPending, setRefreshPending] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [joiningActivityCount, setJoiningActivityCount] = useState(0);
@@ -438,7 +444,16 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
                 <Lightbulb className="h-5 w-5 text-gold-500" />
                 {t('student.suggestions.previousTitle', 'اقتراحاتي السابقة')}
               </h3>
-              {mySuggestions.length === 0 ? (
+              {suggestionsError ? (
+                <div className="rounded-xl border border-rose-100 bg-rose-50 p-4 text-sm text-rose-800">
+                  {suggestionsError}
+                </div>
+              ) : suggestionsLoading && mySuggestions.length === 0 ? (
+                <div className="card flex flex-col items-center justify-center py-12 text-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-gold-500 border-t-transparent" />
+                  <p className="mt-3 text-sm text-gray-500">{t('common.loading', 'جاري التحميل...')}</p>
+                </div>
+              ) : mySuggestions.length === 0 ? (
                 <div className="card flex flex-col items-center justify-center py-12 text-center">
                   <Lightbulb className="h-10 w-10 text-gray-300" />
                   <p className="mt-3 text-sm text-gray-500">{t('student.suggestions.empty', 'لم تقدم أي اقتراح بعد.')}</p>
@@ -453,7 +468,18 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
                           <span className="rounded-full bg-navy-50 px-2.5 py-0.5 text-xs font-bold text-navy-700">{s.category}</span>
                           <h4 className="text-sm font-bold text-navy-900">{s.title}</h4>
                         </div>
-                        <StatusBadge status={s.status} />
+                        <div className="flex items-center gap-2">
+                          {s.responses.length > 0 ? (
+                            <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
+                              {t('student.suggestions.hasResponse', 'تم الرد')}
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-bold text-gray-600">
+                              {t('student.suggestions.noResponses', 'لم يتم الرد بعد')}
+                            </span>
+                          )}
+                          <StatusBadge status={s.status} />
+                        </div>
                       </div>
                       <p className="mt-2 text-sm leading-relaxed text-gray-600">{s.content}</p>
                       <div className="mt-3 text-xs text-gray-400">{s.createdAt}</div>
