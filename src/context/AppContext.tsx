@@ -3982,13 +3982,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return result;
   };
 
-  const refreshSuggestions = async () => {
+  const refreshSuggestions = useCallback(async () => {
+    const owner = captureConfirmedAuthOwner();
+    if (!owner || !currentUser?.role) {
+      return;
+    }
+
     await suggestionsIntegration.performRefresh({
-      epoch: authEpoch.capture() ?? 0,
-      userId: currentUser?.userId ?? currentStudent?.id ?? null,
-      role: currentUser?.role ?? 'STUDENT'
+      epoch: owner.epoch,
+      userId: owner.userId,
+      role: currentUser.role
     });
-  };
+  }, [
+    captureConfirmedAuthOwner,
+    currentUser?.role,
+    suggestionsIntegration,
+  ]);
 
   const value: AppContextValue = {
       view,

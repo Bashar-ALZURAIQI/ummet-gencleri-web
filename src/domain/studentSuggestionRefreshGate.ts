@@ -1,6 +1,6 @@
 import type { StudentSuggestionErrorCode } from './studentSuggestionGateway.js';
 
-﻿export interface AuthOwnership {
+export interface AuthOwnership {
   epoch: number;
   userId: string | null;
   role: string | null;
@@ -47,8 +47,8 @@ export type SuggestionMutationResult =
 
 export interface SuggestionStateIntegrationDeps<T> {
   load: () => Promise<{ ok: boolean; data?: T[]; error?: string }>;
-  submit: (params: any) => Promise<{ ok: boolean; error?: string }>;
-  respond: (params: any) => Promise<{ ok: boolean; error?: string }>;
+  submit: (params: unknown) => Promise<{ ok: boolean; error?: string }>;
+  respond: (params: unknown) => Promise<{ ok: boolean; error?: string }>;
   onUpdate: (data: T[]) => void;
   onStorageRetire: () => void;
   onLoading?: (isLoading: boolean) => void;
@@ -96,8 +96,8 @@ export function createSuggestionStateIntegration<T>(deps: SuggestionStateIntegra
 
   return {
     performRefresh,
-    submit: async (auth: AuthOwnership, params: any) => handleMutation(auth, await deps.submit(params)),
-    respond: async (auth: AuthOwnership, params: any) => handleMutation(auth, await deps.respond(params)),
+    submit: async (auth: AuthOwnership, params: unknown) => handleMutation(auth, await deps.submit(params)),
+    respond: async (auth: AuthOwnership, params: unknown) => handleMutation(auth, await deps.respond(params)),
     clear: () => gate.clear()
   };
 }

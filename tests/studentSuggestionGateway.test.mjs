@@ -112,7 +112,12 @@ test('loadVisibleStudentSuggestions maps database format and prevents realtime',
   assert.equal(result.ok, true);
   assert.equal(result.data.length, 1);
   assert.equal(result.data[0].id, 's-123');
+  assert.equal(result.data[0].studentUserId, 'u-999');
+  assert.equal(result.data[0].studentName, 'Test Student');
   assert.equal(result.data[0].targetRole, 'PRESIDENT');
   assert.equal(result.data[0].responses.length, 1);
+  assert.equal(result.data[0].responses[0].responderUserId, 'u-123');
+  assert.equal(result.data[0].responses[0].responderName, 'Exec Name');
+  assert.equal(result.data[0].responses[0].responderRole, 'PRESIDENT');
   assert.equal(result.data[0].responses[0].responseText, 'Hello');
 });

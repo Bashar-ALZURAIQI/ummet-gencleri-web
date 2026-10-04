@@ -105,4 +105,26 @@ test('student suggestions v2 exposes strictly secured RPCs', async () => {
   // private.is_current_president should be called with ZERO arguments
   assert.match(sql, /private\.is_current_president\(\)/i);
   assert.doesNotMatch(sql, /private\.is_current_president\([^)]+\)/i);
+  assert.doesNotMatch(sql, /private\.is_current_president\([^)]+\)/i);
+});
+
+test('list_visible_student_suggestions_v2 contract', async () => {
+  const v2MigrationUrl = new URL('../supabase/migrations/20261004150000_student_suggestion_student_archive.sql', import.meta.url);
+  const sql = await readFile(v2MigrationUrl, 'utf8');
+
+  // student fields
+  assert.match(sql, /student_user_id/i);
+  assert.match(sql, /student_name/i);
+  
+  // response fields
+  assert.match(sql, /'by', rp\.name/i);
+  assert.match(sql, /'byRole', \(SELECT ea\.position_key/i);
+
+  // no false fallback
+  assert.doesNotMatch(sql, /COALESCE\(rp\.name, 'Exec'\)/i);
+  assert.doesNotMatch(sql, /COALESCE\(\(SELECT ea\.position_key[^\)]+\), 'PRESIDENT'\)/i);
+
+  // no realtime re-introduced
+  assert.doesNotMatch(sql, /supabase_realtime/i);
+  assert.doesNotMatch(sql, /postgres_changes/i);
 });

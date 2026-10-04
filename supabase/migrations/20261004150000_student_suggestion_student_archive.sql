@@ -63,8 +63,8 @@ BEGIN
           json_build_object(
             'id', sr.id,
             'responder_user_id', sr.responder_user_id,
-            'by', COALESCE(rp.name, 'Exec'),
-            'byRole', COALESCE((SELECT ea.position_key FROM public.executive_assignments ea WHERE ea.user_id = sr.responder_user_id LIMIT 1), 'PRESIDENT'),
+            'by', rp.name,
+            'byRole', (SELECT ea.position_key FROM public.executive_assignments ea WHERE ea.user_id = sr.responder_user_id LIMIT 1),
             'response_text', sr.response_text,
             'created_at', sr.created_at
           ) ORDER BY sr.created_at ASC

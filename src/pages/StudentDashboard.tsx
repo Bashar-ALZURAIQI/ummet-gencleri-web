@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { CalendarDays, Lightbulb, CheckCircle2, Clock, LogOut, Send, Sparkles, UserCircle, GraduationCap, Mail, Building2, Video, XCircle, PartyPopper, FileText, Pencil, MessageSquareReply, X, ClipboardCheck, Trophy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
@@ -96,10 +96,12 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { refreshSuggestions, suggestionsLoading, suggestionsError } = useApp();
 
+  const prevTabRef = useRef(tab);
   useEffect(() => {
-    if (tab === 'suggestions') {
+    if (tab === 'suggestions' && prevTabRef.current !== 'suggestions') {
       refreshSuggestions().catch(console.error);
     }
+    prevTabRef.current = tab;
   }, [tab, refreshSuggestions]);
   const [refreshPending, setRefreshPending] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -211,6 +213,18 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
       setRefreshPending(false);
       setSent(true);
       setTimeout(() => setSent(false), 4000);
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      return new Intl.DateTimeFormat(localeCode, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(new Date(dateStr));
+    } catch {
+      return dateStr;
     }
   };
 
@@ -482,7 +496,9 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
                         </div>
                       </div>
                       <p className="mt-2 text-sm leading-relaxed text-gray-600">{s.content}</p>
-                      <div className="mt-3 text-xs text-gray-400">{s.createdAt}</div>
+                      <div className="mt-3 text-xs text-gray-400">
+                        {t('student.suggestions.submittedAt', 'تاريخ الإرسال')}: {formatDate(s.createdAt)}
+                      </div>
                       {s.responses.length > 0 && (
                         <div className="mt-4 space-y-3">
                           {s.responses.map((r) => (
@@ -490,9 +506,13 @@ type SuggestionDraftData = { title: string; body: string; category: string; targ
                               <div className="mb-2 flex items-center justify-between text-xs font-bold text-navy-700">
                                 <span className="flex items-center gap-2">
                                   <MessageSquareReply className="h-4 w-4" />
-                                  {t('student.suggestions.replyFrom', 'رد: ')}{r.by} ({getExecutiveRoleLabel(r.byRole, t) || roleLabels[r.byRole] || r.byRole})
+                                  {t('student.suggestions.replyFrom', 'رد: ')}
+                                  {r.by || t('student.suggestions.officialFallback', 'مسؤول الاتحاد')}
+                                  {r.byRole && ` (${getExecutiveRoleLabel(r.byRole, t) || roleLabels[r.byRole] || r.byRole})`}
                                 </span>
-                                <span className="text-gray-400">{r.at}</span>
+                                <span className="text-gray-400">
+                                  {t('student.suggestions.responseAt', 'تاريخ الرد')}: {formatDate(r.at)}
+                                </span>
                               </div>
                               <p className="text-sm leading-relaxed text-navy-800">{r.text}</p>
                             </div>

@@ -23,6 +23,9 @@ test('StudentDashboard UI integration', () => {
   // loading/error state is represented
   assert.ok(studentSource.includes('suggestionsLoading'), 'uses suggestionsLoading');
   assert.ok(studentSource.includes('suggestionsError'), 'uses suggestionsError');
+
+  // transition guard prevents refresh loops
+  assert.ok(studentSource.includes('prevTabRef.current !== \'suggestions\''), 'has transition guard for suggestion refresh');
 });
 
 test('AdminDashboard UI integration', () => {

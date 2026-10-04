@@ -1,3 +1,5 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 export type StudentSuggestionErrorCode =
   | 'UNAUTHENTICATED'
   | 'MEMBERSHIP_REQUIRED'
@@ -108,7 +110,7 @@ function mapSuggestion(dto: StudentSuggestionDto): StudentSuggestion {
 }
 
 export async function submitStudentSuggestion(
-  supabase: any,
+  supabase: SupabaseClient,
   params: SubmitStudentSuggestionParams
 ): Promise<ServiceResult<string>> {
   try {
@@ -130,7 +132,7 @@ export async function submitStudentSuggestion(
 }
 
 export async function respondToStudentSuggestion(
-  supabase: any,
+  supabase: SupabaseClient,
   params: RespondToStudentSuggestionParams
 ): Promise<ServiceResult<void>> {
   try {
@@ -151,7 +153,7 @@ export async function respondToStudentSuggestion(
 }
 
 export async function loadVisibleStudentSuggestions(
-  supabase: any
+  supabase: SupabaseClient
 ): Promise<ServiceResult<StudentSuggestion[]>> {
   try {
     const { data, error } = await supabase.rpc('list_visible_student_suggestions_v2');
