@@ -47,6 +47,9 @@ const tr: TranslationSchema = {
     saving: 'Kaydediliyor...',
     editPrefix: 'Düzenle: {{label}}',
     editField: '{{label}} Düzenle',
+    loadingPage: 'Sayfa yükleniyor...',
+    routeLoadError: 'Bu sayfa yüklenemedi. Bağlantınızı kontrol edip sayfayı yeniden yükleyin.',
+    reloadPage: 'Sayfayı yeniden yükle',
   },
   navigation: {
     home: 'Ana Sayfa',

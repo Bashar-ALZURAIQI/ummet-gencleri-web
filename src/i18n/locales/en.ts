@@ -47,6 +47,9 @@ const en: TranslationSchema = {
     saving: 'Saving...',
     editPrefix: 'Edit: {{label}}',
     editField: 'Edit {{label}}',
+    loadingPage: 'Loading page...',
+    routeLoadError: 'This page could not be loaded. Check your connection and reload the page.',
+    reloadPage: 'Reload page',
   },
   navigation: {
     home: 'Home',

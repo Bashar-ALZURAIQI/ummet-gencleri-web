@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, Suspense, lazy } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppProvider, useApp } from './context/AppContext';
 import { CmsLocalizationProvider } from './context/CmsLocalizationContext';
@@ -6,25 +6,44 @@ import Navbar from './components/Navbar';
 import DynamicFavicon from './components/DynamicFavicon';
 import Footer from './components/Footer';
 import ErrorBoundary from './components/ErrorBoundary';
+import RouteChunkErrorBoundary from './components/RouteChunkErrorBoundary';
+import RouteLoadingFallback from './components/RouteLoadingFallback';
 import { InlineEditProvider } from './components/InlineEditOverlay';
-import HomePage from './pages/HomePage';
-import AboutPage from './pages/AboutPage';
-import ProgramsPage from './pages/ProgramsPage';
-import ContactPage from './pages/ContactPage';
-import MediaGallery from './pages/MediaGallery';
-import NewsPage from './pages/NewsPage';
-import StudentGuide from './pages/StudentGuide';
-import FAQPage from './pages/FAQPage';
-import {
-  ForgotPasswordPage,
-  LoginPage,
-  RegisterPage,
-  UpdatePasswordPage,
-} from './pages/AuthPages';
-import StudentDashboard from './pages/StudentDashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import BoardPage from './pages/BoardPage';
-import CommitteePage from './pages/CommitteePage';
+
+const HomePage = lazy(() => import('./pages/HomePage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const ProgramsPage = lazy(() => import('./pages/ProgramsPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
+const MediaGallery = lazy(() => import('./pages/MediaGallery'));
+const NewsPage = lazy(() => import('./pages/NewsPage'));
+const StudentGuide = lazy(() => import('./pages/StudentGuide'));
+const FAQPage = lazy(() => import('./pages/FAQPage'));
+
+const LoginPage = lazy(() =>
+  import('./pages/AuthPages').then((module) => ({
+    default: module.LoginPage,
+  }))
+);
+const RegisterPage = lazy(() =>
+  import('./pages/AuthPages').then((module) => ({
+    default: module.RegisterPage,
+  }))
+);
+const ForgotPasswordPage = lazy(() =>
+  import('./pages/AuthPages').then((module) => ({
+    default: module.ForgotPasswordPage,
+  }))
+);
+const UpdatePasswordPage = lazy(() =>
+  import('./pages/AuthPages').then((module) => ({
+    default: module.UpdatePasswordPage,
+  }))
+);
+
+const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const BoardPage = lazy(() => import('./pages/BoardPage'));
+const CommitteePage = lazy(() => import('./pages/CommitteePage'));
 import { canExposeAdminUi } from './domain/liveIdentityRouting';
 import { pushDestinationFromUrl } from './domain/webPushClient';
 import { loadLastAdminTab } from './domain/adminTabMemory';
@@ -119,24 +138,26 @@ function Router() {
               {t('auth.checkingSession')}
             </div>
           ) : (
-          <>
-          {view.kind === 'home' && <HomePage />}
-          {view.kind === 'about' && <AboutPage />}
-          {view.kind === 'programs' && <ProgramsPage />}
-          {view.kind === 'contact' && <ContactPage />}
-          {view.kind === 'gallery' && <MediaGallery />}
-          {view.kind === 'news' && <NewsPage />}
-          {view.kind === 'guide' && <StudentGuide />}
-          {view.kind === 'faq' && <FAQPage />}
-          {view.kind === 'login' && <LoginPage />}
-          {view.kind === 'register' && <RegisterPage />}
-          {view.kind === 'forgot-password' && <ForgotPasswordPage />}
-          {view.kind === 'update-password' && <UpdatePasswordPage />}
-          {view.kind === 'student-dashboard' && <StudentDashboard />}
-          {adminAllowed && view.kind === 'admin' && <AdminDashboard />}
-          {view.kind === 'board' && <BoardPage />}
-          {view.kind === 'committee' && <CommitteePage committeeId={view.committeeId} />}
-          </>
+          <RouteChunkErrorBoundary key={view.kind}>
+            <Suspense fallback={<RouteLoadingFallback />}>
+              {view.kind === 'home' && <HomePage />}
+              {view.kind === 'about' && <AboutPage />}
+              {view.kind === 'programs' && <ProgramsPage />}
+              {view.kind === 'contact' && <ContactPage />}
+              {view.kind === 'gallery' && <MediaGallery />}
+              {view.kind === 'news' && <NewsPage />}
+              {view.kind === 'guide' && <StudentGuide />}
+              {view.kind === 'faq' && <FAQPage />}
+              {view.kind === 'login' && <LoginPage />}
+              {view.kind === 'register' && <RegisterPage />}
+              {view.kind === 'forgot-password' && <ForgotPasswordPage />}
+              {view.kind === 'update-password' && <UpdatePasswordPage />}
+              {view.kind === 'student-dashboard' && <StudentDashboard />}
+              {adminAllowed && view.kind === 'admin' && <AdminDashboard />}
+              {view.kind === 'board' && <BoardPage />}
+              {view.kind === 'committee' && <CommitteePage committeeId={view.committeeId} />}
+            </Suspense>
+          </RouteChunkErrorBoundary>
           )}
         </ErrorBoundary>
       </main>
