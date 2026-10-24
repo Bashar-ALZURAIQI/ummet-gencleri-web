@@ -84,10 +84,8 @@ Deno.serve(async (request) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const resendApiKey = Deno.env.get('RESEND_API_KEY');
+  const mailRelaySecret = Deno.env.get('APPLICATION_EMAIL_RELAY_SECRET');
   const sitePublicUrl = Deno.env.get('SITE_PUBLIC_URL');
-  const fromEmail = Deno.env.get('APPLICATION_EMAIL_FROM')
-    ?? Deno.env.get('CONTACT_REPLY_FROM');
 
   if (!supabaseUrl || !anonKey || !serviceRoleKey) {
     return json(500, { error: 'SUPABASE_FUNCTION_NOT_CONFIGURED' });
@@ -242,7 +240,7 @@ Deno.serve(async (request) => {
     if (emailPattern.test(studentEmail)) recipient = studentEmail;
   }
 
-  if (!recipient || !resendApiKey || !fromEmail || !sitePublicUrl) {
+  if (!recipient || !mailRelaySecret || !sitePublicUrl) {
     await markFailed('EMAIL_DELIVERY_CONFIGURATION_OR_RECIPIENT_INVALID');
     return json(500, { error: 'EMAIL_DELIVERY_NOT_CONFIGURED', status: 'FAILED' });
   }
@@ -255,35 +253,41 @@ Deno.serve(async (request) => {
     return json(500, { error: 'EMAIL_TEMPLATE_INVALID', status: 'FAILED' });
   }
 
+  // Protected Vercel Node runtime relay: only this server-side function has the shared key.
+  // Authentication and recipient lookup remain exclusively here in Supabase.
   let response: Response;
   try {
-    response = await fetch('https://api.resend.com/emails', {
+    response = await fetch('https://ummet-genc.vercel.app/api/send-union-mail', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${resendApiKey}`,
+        'x-union-mail-secret': mailRelaySecret,
         'Content-Type': 'application/json',
-        'Idempotency-Key': `application-notification/${notification.id}`,
       },
       body: JSON.stringify({
-        from: fromEmail,
-        to: [recipient],
+        to: recipient,
         subject: renderedEmail.subject,
         text: renderedEmail.text,
         html: renderedEmail.html,
+        notificationId: notification.id,
       }),
+      signal: AbortSignal.timeout(23000),
     });
   } catch (error) {
-    await markFailed(error instanceof Error ? error.message : 'RESEND_NETWORK_FAILED');
-    return json(502, { error: 'RESEND_DELIVERY_FAILED', status: 'FAILED' });
+    await markFailed(error instanceof Error && error.name === 'TimeoutError'
+      ? 'SMTP_RELAY_OUTCOME_UNKNOWN_REVIEW_BEFORE_RETRY'
+      : 'SMTP_RELAY_NETWORK_FAILED');
+    return json(502, { error: 'SMTP_RELAY_DELIVERY_FAILED', status: 'FAILED' });
   }
 
   const providerBody = await response.json().catch(() => ({})) as Record<string, unknown>;
   if (!response.ok) {
-    await markFailed(`RESEND_${response.status}:${String(providerBody.message ?? 'DELIVERY_FAILED')}`);
-    return json(502, { error: 'RESEND_DELIVERY_FAILED', status: 'FAILED' });
+    await markFailed('SMTP_RELAY_' + response.status + ':' +
+      String(providerBody.error ?? 'DELIVERY_FAILED'));
+    return json(502, { error: 'SMTP_RELAY_DELIVERY_FAILED', status: 'FAILED' });
   }
 
-  const providerId = typeof providerBody.id === 'string' ? providerBody.id : null;
+  const providerId = typeof providerBody.messageId === 'string'
+    ? providerBody.messageId : null;
   const { error: updateError } = await admin
     .from('application_email_notifications')
     .update({
