@@ -47,14 +47,14 @@ test('claims pending or failed work before sending and handles already-sent work
   assert.match(source, /\.in\(['"]delivery_status['"],\s*\[['"]PENDING['"],\s*['"]FAILED['"]\]\)/);
 });
 
-test('uses Resend idempotency and persists sent or failed audit state', async () => {
+test('uses authenticated Gmail SMTP relay and persists sent or failed audit state', async () => {
   const source = await readFile(functionUrl, 'utf8');
-  assert.match(source, /RESEND_API_KEY/);
-  assert.match(source, /APPLICATION_EMAIL_FROM/);
-  assert.match(source, /CONTACT_REPLY_FROM/);
+  assert.match(source, /APPLICATION_EMAIL_RELAY_SECRET/);
+  assert.match(source, /x-union-mail-secret/);
+  assert.match(source, /send-union-mail/);
   assert.match(source, /SITE_PUBLIC_URL/);
-  assert.match(source, /Idempotency-Key/);
-  assert.match(source, /application-notification\/\$\{notification\.id\}/);
+  assert.doesNotMatch(source, /api\.resend\.com/);
+  assert.match(source, /notificationId: notification\.id/);
   assert.match(source, /email_provider_id/);
   assert.match(source, /sent_at/);
   assert.match(source, /delivery_last_error/);
