@@ -77,3 +77,11 @@ test('does not send without configuration or leak provider errors', async () => 
   assert.equal(result.body.error, 'SMTP_SEND_FAILED');
   assert.ok(!JSON.stringify(result).includes('SECRET PASSWORD'));
 });
+
+// Regression: Nodemailer SMTP uses auth.pass; auth.password is silently ignored.
+test('Gmail transport supplies credentials in the Nodemailer auth.pass property', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const source = await readFile(new URL('../api/send-union-mail.mjs', import.meta.url), 'utf8');
+  assert.match(source, /auth:\s*\{[\s\S]*?user:\s*config\.GMAIL_SMTP_USER,[\s\S]*?pass:\s*config\.GMAIL_SMTP_APP_PASSWORD/);
+  assert.doesNotMatch(source, /\bpassword:\s*config\.GMAIL_SMTP_APP_PASSWORD/);
+});
