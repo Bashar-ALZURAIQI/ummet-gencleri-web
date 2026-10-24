@@ -8,7 +8,7 @@ const transportOptions = (config) => ({
   secure: true,
   auth: {
     user: config.GMAIL_SMTP_USER,
-    password: config.GMAIL_SMTP_APP_PASSWORD.replace(/\s/g, ''),
+    pass: config.GMAIL_SMTP_APP_PASSWORD.replace(/\s/g, ''),
   },
   connectionTimeout: 10000,
   greetingTimeout: 10000,
