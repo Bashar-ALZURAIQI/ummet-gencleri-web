@@ -69,7 +69,8 @@ function Router() {
   useEffect(() => {
     const currentUrl = new URL(window.location.href);
     if (currentUrl.searchParams.get('auth') === 'recovery') {
-      navigate({ kind: 'update-password' }, { replace: true });
+      // urlToView already selected update-password. Do not replace the URL here:
+      // Supabase Auth still needs the callback code/hash to establish recovery.
       return;
     }
 

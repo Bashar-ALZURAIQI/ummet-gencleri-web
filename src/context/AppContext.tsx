@@ -13,7 +13,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, type ServiceResult } from '../lib/supabase';
+import { supabase, isInitialRecoveryCallbackSession, type ServiceResult } from '../lib/supabase';
 import { clearSessionDraftsForUser } from '../domain/sessionDraft';
 import { i18n } from '../i18n/config.ts';
 import { overlayLocalizedCmsPayload } from '../domain/cmsPublicRead.ts';
@@ -1979,39 +1979,81 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAuthInitializing(true);
     setIdentityRefreshing(false);
 
+    const acceptRecoverySession = (session: Session, epoch: number) => {
+      if (!authEpoch.isCurrent(epoch)) return;
+      clearConfirmedAuthOwnership();
+      identitySubscriptionGeneration.invalidateAll();
+      latestAuthEventRef.current = { epoch, session };
+      setCurrentStudent(null);
+      setCurrentUser(null);
+      setAuthError(null);
+      setAuthInitializing(false);
+      setIdentityRefreshing(false);
+      setPasswordRecoveryGate('READY');
+      setView({ kind: 'update-password' });
+
+      // Remove the callback credentials only AFTER Supabase consumed them.
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete('auth');
+      cleanUrl.hash = '';
+      window.history.replaceState(
+        window.history.state,
+        '',
+        `${cleanUrl.pathname}${cleanUrl.search}`,
+      );
+    };
+
+    const verifyRecoveredCallbackSession = (session: Session) => {
+      const epoch = authEpoch.beginEvent();
+      if (epoch === null) return;
+      // Keep verification outside the synchronous auth listener, avoiding
+      // the GoTrue callback lock and cross-session identity races.
+      authEpoch.schedule(epoch, () => {
+        void (async () => {
+          try {
+            const { data, error } = await supabase.auth.getUser();
+            if (!authEpoch.isCurrent(epoch)) return;
+            if (!error && data.user?.id === session.user.id) {
+              acceptRecoverySession(session, epoch);
+              return;
+            }
+          } catch {
+            // An invalid or expired callback must never open the recovery gate.
+          }
+          if (!authEpoch.isCurrent(epoch)) return;
+          setPasswordRecoveryGate('IDLE');
+          setAuthInitializing(false);
+        })();
+      });
+    };
+
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       const eventAction = classifyAuthEvent(event, session !== null);
 
       if (event === 'PASSWORD_RECOVERY') {
-        const nextGate = reducePasswordRecoveryGate('IDLE', event, session !== null);
-        if (!session || nextGate !== 'READY') {
+        if (!session) {
           setPasswordRecoveryGate('IDLE');
+          setAuthInitializing(false);
           return;
         }
-
-        clearConfirmedAuthOwnership();
-        identitySubscriptionGeneration.invalidateAll();
         const recoveryEpoch = authEpoch.beginEvent();
-        if (recoveryEpoch === null) return;
-        latestAuthEventRef.current = { epoch: recoveryEpoch, session };
-        setCurrentStudent(null);
-        setCurrentUser(null);
-        setAuthError(null);
-        setAuthInitializing(false);
-        setIdentityRefreshing(false);
-        setPasswordRecoveryGate(nextGate);
-        setView({ kind: 'update-password' });
-
-        const cleanUrl = new URL(window.location.href);
-        cleanUrl.searchParams.delete('auth');
-        cleanUrl.hash = '';
-        window.history.replaceState(
-          window.history.state,
-          '',
-          `${cleanUrl.pathname}${cleanUrl.search}`,
-        );
+        if (recoveryEpoch !== null) acceptRecoverySession(session, recoveryEpoch);
         return;
       }
+
+      // Supabase's URL initialization can finish before React subscribes to
+      // PASSWORD_RECOVERY. Recover only the exact token supplied by the
+      // initial GoTrue recovery callback, checked against getUser on server.
+      if (session && isInitialRecoveryCallbackSession(session)) {
+        verifyRecoveredCallbackSession(session);
+        return;
+      }
+
+      // A recovery callback awaiting processing is not a normal sign-in.
+      if (
+        new URL(window.location.href).searchParams.get('auth') === 'recovery'
+        && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')
+      ) return;
 
       // A recovery session must not become normal application authority before
       // the password is changed and the temporary session is explicitly closed.
@@ -2076,6 +2118,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setAuthInitializing(false);
           setIdentityRefreshing(false);
           navigate({ kind: 'login' }, { replace: true });
+          return;
+        }
+        if (data.session && isInitialRecoveryCallbackSession(data.session)) {
+          verifyRecoveredCallbackSession(data.session);
+          return;
+        }
+        if (new URL(window.location.href).searchParams.get('auth') === 'recovery') {
+          // No confirmed recovery event or matching callback session: fail closed.
+          setAuthInitializing(false);
           return;
         }
         if (data.session) {

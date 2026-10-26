@@ -1,5 +1,19 @@
 export type PasswordRecoveryGate = 'IDLE' | 'READY';
 
+// Capture a callback token only when GoTrue explicitly marks the redirect as
+// a recovery flow. Never treat the public ?auth=recovery parameter as proof.
+export function extractRecoveryCallbackAccessToken(callbackUrl: string): string | null {
+  try {
+    const url = new URL(callbackUrl);
+    if (url.searchParams.get('auth') !== 'recovery') return null;
+    const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
+    if (hash.get('type') !== 'recovery' || !hash.get('refresh_token')) return null;
+    return hash.get('access_token') || null;
+  } catch {
+    return null;
+  }
+}
+
 export interface PasswordRecoveryAuthClient {
   auth: {
     resetPasswordForEmail(
