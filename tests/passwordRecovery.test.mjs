@@ -158,3 +158,12 @@ test('password update converts a network exception into a safe result', async ()
     error: 'تعذر تغيير كلمة المرور. قد يكون الرابط منتهياً؛ اطلب رابط استعادة جديداً.',
   });
 });
+
+test('a recovery callback is recognized only with matching recovery type and both tokens', () => {
+  const callback = 'https://portal.example.org/forgot-password?auth=recovery#access_token=validRecoveryToken&refresh_token=refreshValue&type=recovery';
+  assert.equal(recovery.extractRecoveryCallbackAccessToken(callback), 'validRecoveryToken');
+  assert.equal(recovery.extractRecoveryCallbackAccessToken(callback.replace('type=recovery','type=signup')), null);
+  assert.equal(recovery.extractRecoveryCallbackAccessToken(callback.replace('refresh_token=refreshValue&','')), null);
+  assert.equal(recovery.extractRecoveryCallbackAccessToken(callback.replace('auth=recovery','auth=other')), null);
+  assert.equal(recovery.extractRecoveryCallbackAccessToken('invalid-url'), null);
+});

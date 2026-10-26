@@ -1,8 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import { createIsolatedAuthClient } from '../domain/isolatedAuthClient.ts';
+import { extractRecoveryCallbackAccessToken } from '../domain/passwordRecovery.ts';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// Capture the initial recovery hash BEFORE createClient starts consuming it.
+// The token stays in memory; it is never placed in logs or localStorage here.
+const initialRecoveryToken = typeof window === 'undefined'
+  ? null : extractRecoveryCallbackAccessToken(window.location.href);
+
+export const isInitialRecoveryCallbackSession = (session: { access_token: string } | null): boolean => (
+  initialRecoveryToken !== null && session?.access_token === initialRecoveryToken
+);
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 

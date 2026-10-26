@@ -46,3 +46,21 @@ test('recovery update UI is gated by the confirmed Supabase PASSWORD_RECOVERY ev
   assert.match(context, /updateRecoveredPassword/);
   assert.match(context, /finishPasswordRecovery/);
 });
+
+test('recovery callback URL is preserved until Supabase has consumed its credentials', async () => {
+  const [app, client, context, auth] = await Promise.all([
+    read('../src/App.tsx'),
+    read('../src/lib/supabase.ts'),
+    read('../src/context/AppContext.tsx'),
+    read('../src/pages/AuthPages.tsx'),
+  ]);
+  assert.match(app, /Supabase Auth still needs the callback code\/hash/);
+  assert.doesNotMatch(app, /navigate\(\{ kind: 'update-password' \}, \{ replace: true \}\);/);
+  assert.ok(client.indexOf('extractRecoveryCallbackAccessToken(window.location.href)') < client.indexOf('createClient(supabaseUrl, supabaseAnonKey)'));
+  assert.match(context, /isInitialRecoveryCallbackSession\(session\)/);
+  assert.match(context, /await supabase\.auth\.getUser\(\)/);
+  assert.match(context, /data\.user\?\.id === session\.user\.id/);
+  assert.match(context, /passwordRecoveryGateRef\.current === 'READY'/);
+  assert.match(auth, /verificationTimedOut/);
+  assert.match(auth, /window\.setTimeout\(\(\) => setVerificationTimedOut\(true\), 15000\)/);
+});

@@ -173,8 +173,18 @@ export function UpdatePasswordPage() {
   const [confirmation, setConfirmation] = useState('');
   const [loading, setLoading] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [verificationTimedOut, setVerificationTimedOut] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
   const navigationTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!authInitializing) {
+      setVerificationTimedOut(false);
+      return;
+    }
+    const timeoutId = window.setTimeout(() => setVerificationTimedOut(true), 15000);
+    return () => window.clearTimeout(timeoutId);
+  }, [authInitializing]);
 
   useEffect(() => () => {
     if (navigationTimer.current !== null) window.clearTimeout(navigationTimer.current);
@@ -207,6 +217,20 @@ export function UpdatePasswordPage() {
   };
 
   if (authInitializing) {
+    if (verificationTimedOut) {
+      return (
+        <AuthShell title={t('auth.invalidLinkTitle')} subtitle={t('auth.invalidLinkSubtitle')}>
+          <div className="space-y-5">
+            <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {t('auth.invalidLinkAlert')}
+            </div>
+            <button type="button" onClick={() => setView({ kind: 'forgot-password' })} className="btn-primary w-full">
+              {t('auth.requestNewResetLink')}
+            </button>
+          </div>
+        </AuthShell>
+      );
+    }
     return (
       <AuthShell title={t('auth.verifyingRecoveryTitle')} subtitle={t('auth.verifyingRecoverySubtitle')}>
         <div className="py-8 text-center text-sm font-semibold text-gray-500">{t('auth.verifyingRecoveryMessage')}</div>
