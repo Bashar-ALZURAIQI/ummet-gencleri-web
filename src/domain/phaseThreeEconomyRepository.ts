@@ -186,6 +186,13 @@ export function createPhaseThreeEconomyRepository(client: InternalEconomyClient)
       const response = await rpc(client, 'save_activity_attendance', { p_activity_id: activityId, p_student_id: studentId, p_status: status });
       return response.error ? serverError(response.error) : one(response.data) ? ok(undefined) : fail('ATTENDANCE_RESPONSE_INVALID', 'لم يؤكد الخادم التقييم.');
     },
+    async cancelActivity(activityId: string): Promise<InternalEconomyResult<void>> {
+      const response = await rpc(client, 'cancel_activity_evaluation', { p_activity_id: activityId });
+      if (response.error) return serverError(response.error);
+      const row = one(response.data);
+      return row && row.activityId === activityId && row.attendanceDeleted === true
+        ? ok(undefined) : fail('ACTIVITY_CANCEL_INVALID', 'لم يؤكد الخادم حذف التحضير.');
+    },
     async finalizeActivity(activityId: string): Promise<InternalEconomyResult<FinalizationResult>> {
       const response = await rpc(client, 'finalize_activity_evaluation', { p_activity_id: activityId });
       if (response.error) return serverError(response.error);

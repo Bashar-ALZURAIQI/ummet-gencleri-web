@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, RefreshCw } from 'lucide-react';
+import { CheckCircle2, RefreshCw, Trash2 } from 'lucide-react';
 import TransientToast, { type ToastMessage } from './TransientToast';
 import UserAvatar from './UserAvatar';
 import { activityDraftComplete } from '../domain/phaseThreeEconomy.ts';
 import type { ActivityEvaluationRow, AttendanceStatus } from '../domain/internalEconomyTypes.ts';
-import { finalizeActivityEvaluation, loadActivityEvaluations, saveActivityAttendance } from '../services/phaseThreeEconomyService.ts';
+import { cancelActivityEvaluation, finalizeActivityEvaluation, loadActivityEvaluations, saveActivityAttendance } from '../services/phaseThreeEconomyService.ts';
 
 const groupRows = <T,>(rows: T[], keyOf: (row: T) => string): T[][] => (
   Array.from(rows.reduce((groups, row) => {
@@ -64,6 +64,16 @@ export default function OversightEvaluationPanel() {
     )));
   };
 
+  const discardActivity = async (rows: ActivityEvaluationRow[]) => {
+    if (!rows.length || busy || !window.confirm('هل تريد حذف التحضير نهائياً دون توزيع النقاط أو خصمها؟')) return;
+    setBusy(rows[0].activityId);
+    const result = await cancelActivityEvaluation(rows[0].activityId);
+    setBusy(null);
+    if (!result.ok) { notify('error', result.error.message); return; }
+    setActivities((cur) => cur.filter((r) => r.activityId !== rows[0].activityId));
+    notify('success', 'تم إلغاء التحضير دون توزيع درجات.');
+  };
+
   const closeActivity = async (rows: ActivityEvaluationRow[]) => {
     if (!activityDraftComplete(rows) || !confirm(t('admin.oversight.confirmClose', 'سيتم إغلاق النشاط وتوزيع النقاط نهائياً. هل تريد المتابعة؟'))) return;
     setBusy(rows[0].activityId);
@@ -110,13 +120,17 @@ export default function OversightEvaluationPanel() {
                       : t('admin.oversight.pointsValue', 'قيمة النشاط: {{points}}', { points: rows[0].pointsValue })}
                   </p>
                 </div>
-                <button
-                  disabled={!activityDraftComplete(rows) || busy === rows[0].activityId}
-                  onClick={() => void closeActivity(rows)}
-                  className="btn-primary"
-                >
-                  <CheckCircle2 className="h-4 w-4" /> {t('admin.oversight.closeAndDistribute', 'إغلاق وتوزيع النقاط')}
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="button" disabled={busy !== null} onClick={() => void discardActivity(rows)}
+                    aria-label="حذف التحضير دون توزيع النقاط" title="حذف التحضير"
+                    className="flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50">
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <button disabled={!activityDraftComplete(rows) || busy !== null}
+                    onClick={() => void closeActivity(rows)} className="btn-primary">
+                    <CheckCircle2 className="h-4 w-4" /> {t('admin.oversight.closeAndDistribute', 'إغلاق وتوزيع النقاط')}
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 {rows.map((row) => {
