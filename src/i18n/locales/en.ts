@@ -978,6 +978,7 @@ const en: TranslationSchema = {
   home: {
     eventsBadge: 'Events',
     upcomingProgramsTitle: 'Upcoming Programs',
+    viewEventInPrograms: 'View details and register in Programs',
     newsBadge: 'News Center',
     latestNewsTitle: 'Latest Union News',
     readMoreAbout: 'Read More About the Union',

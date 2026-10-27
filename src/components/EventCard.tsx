@@ -1,4 +1,4 @@
-import { CalendarDays, MapPin, Users, Clock, CheckCircle2, ExternalLink } from 'lucide-react';
+import { CalendarDays, MapPin, Users, Clock, CheckCircle2, ExternalLink, ArrowLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { categoryColors, type UEvent } from '../data/mockData';
@@ -8,8 +8,11 @@ import { getEventCategoryLabel } from '../domain/eventCategoryPresentation.ts';
 import { formatPublicDate, formatPublicTime } from '../domain/datePresentation.ts';
 import ActivityDecisionControls from './ActivityDecisionControls';
 
-export default function EventCard({ event, activity, activityLoading = false, activityBusy = false, onJoin, onDecline }: {
+export default function EventCard({ event, activity, activityLoading = false, activityBusy = false, onJoin, onDecline, presentation = 'registration' }: {
   event: UEvent;
+  /** On the homepage, show a navigation CTA instead of registration controls.
+   *  The homepage does not load the member's activity enrollment state. */
+  presentation?: 'registration' | 'homepage';
   activity?: StudentActivityBoardItem | null;
   activityLoading?: boolean;
   activityBusy?: boolean;
@@ -102,6 +105,16 @@ export default function EventCard({ event, activity, activityLoading = false, ac
         )}
 
         {event.status === 'upcoming' ? (
+          presentation === 'homepage' ? (
+            <button
+              type="button"
+              onClick={() => setView({ kind: 'programs' })}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-navy-800 px-4 py-3 text-center text-sm font-bold text-white shadow-sm transition-colors hover:bg-navy-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-700"
+            >
+              {t('home.viewEventInPrograms')}
+              <ArrowLeft className="h-4 w-4 shrink-0 rtl:rotate-180" aria-hidden="true" />
+            </button>
+          ) : (
           <ActivityDecisionControls
             item={activity ?? null}
             hasStudent={Boolean(currentUser)}
@@ -112,6 +125,7 @@ export default function EventCard({ event, activity, activityLoading = false, ac
             onJoin={() => activity && onJoin?.(activity)}
             onDecline={() => activity && onDecline?.(activity)}
           />
+          )
         ) : (
           <span className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gray-50 px-4 py-2.5 text-sm font-semibold text-gray-500">
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />

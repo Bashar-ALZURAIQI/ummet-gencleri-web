@@ -978,6 +978,7 @@ const tr: TranslationSchema = {
   home: {
     eventsBadge: 'Etkinlikler',
     upcomingProgramsTitle: 'Yaklaşan Programlar',
+    viewEventInPrograms: 'Detaylar ve kayıt için programlara git',
     newsBadge: 'Haber Merkezi',
     latestNewsTitle: 'Birlikten Son Haberler',
     readMoreAbout: 'Birlik Hakkında Daha Fazla Bilgi',
