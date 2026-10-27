@@ -980,6 +980,7 @@ const ar = {
   home: {
     eventsBadge: 'الفعاليات',
     upcomingProgramsTitle: 'أحدث البرامج القادمة',
+    viewEventInPrograms: 'التفاصيل والتسجيل في البرامج والأنشطة',
     newsBadge: 'المركز الإخباري',
     latestNewsTitle: 'آخر أخبار الاتحاد',
     readMoreAbout: 'اقرأ المزيد عن الاتحاد',

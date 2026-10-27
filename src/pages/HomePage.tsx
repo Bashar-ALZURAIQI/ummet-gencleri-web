@@ -297,7 +297,7 @@ export default function HomePage() {
           </div>
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {upcoming.map((e) => (
-              <EventCard key={e.id} event={e} />
+              <EventCard key={e.id} event={e} presentation="homepage" />
             ))}
           </div>
         </div>
