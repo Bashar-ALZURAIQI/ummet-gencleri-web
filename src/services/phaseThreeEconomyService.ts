@@ -9,6 +9,7 @@ export const reviewExcuse = repository.reviewExcuse;
 export const loadActivityEvaluations = repository.loadActivityEvaluations;
 export const saveActivityAttendance = repository.saveAttendance;
 export const finalizeActivityEvaluation = repository.finalizeActivity;
+export const cancelActivityEvaluation = repository.cancelActivity;
 export const loadManagedTasks = repository.loadManagedTasks;
 export const loadManagedTaskEnrollments = repository.loadManagedTaskEnrollments;
 export const saveTaskCompletion = repository.saveTaskCompletion;

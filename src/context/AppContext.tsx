@@ -749,7 +749,7 @@ interface AppContextValue {
   ) => Promise<{ ok: boolean; error?: string }>;
   createPublishedEvent: (event: UEvent) => Promise<{ ok: boolean; error?: string }>;
   updateOwnedEvent: (eventId: string, eventPatch: Partial<UEvent>) => Promise<{ ok: boolean; error?: string }>;
-  deleteOwnedEvent: (eventId: string) => Promise<{ ok: boolean; error?: string; eventData?: unknown }>;
+  deleteOwnedEvent: (eventId: string, removeAttendance?: boolean) => Promise<{ ok: boolean; error?: string; eventData?: unknown }>;
   createGalleryAlbum: (album: GalleryAlbum) => Promise<{ ok: boolean; error?: string }>;
   updateOwnedGalleryAlbum: (albumId: string, albumPatch: Partial<GalleryAlbum>) => Promise<{ ok: boolean; error?: string }>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3474,7 +3474,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return { ok: true };
   };
 
-  const deleteOwnedEvent: AppContextValue['deleteOwnedEvent'] = async (eventId) => {
+  const deleteOwnedEvent: AppContextValue['deleteOwnedEvent'] = async (eventId, removeAttendance = false) => {
     const owner = captureConfirmedAuthOwner();
     if (!owner || !isLeadershipRole(owner.role)) {
       return { ok: false, error: 'حذف الفعاليات متاح لأعضاء الهيئة التنفيذية فقط.' };
@@ -3484,7 +3484,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { ok: false, error: 'لم تكتمل مزامنة النسخة الرسمية بعد. حدّث الصفحة ثم أعد المحاولة.' };
     }
     const { deleteOwnedEvent: serviceDelete } = await import('../services/sectionContentService.ts');
-    const result = await serviceDelete(eventId);
+    const result = await serviceDelete(eventId, removeAttendance);
     const currentOwner = captureConfirmedAuthOwner();
     if (!currentOwner || currentOwner.userId !== owner.userId || currentOwner.epoch !== owner.epoch || !isLeadershipRole(currentOwner.role)) {
       return { ok: false, error: 'تغيرت صلاحية الحساب أثناء الحذف؛ لم تُعتمد النتيجة في هذه الجلسة.' };

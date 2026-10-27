@@ -304,9 +304,10 @@ export function createSectionContentRepository(client: SectionContentClient) {
         : fail('SECTION_CONTENT_RESPONSE_INVALID', 'أعاد الخادم نتيجة تعديل فعالية غير صالحة.');
     },
 
-    async deleteOwnedEvent(eventId: string): Promise<RepositoryResult<{ deletedEventId: string; eventData: unknown, newVersion?: number }>> {
+    async deleteOwnedEvent(eventId: string, removeAttendance = false): Promise<RepositoryResult<{ deletedEventId: string; eventData: unknown, newVersion?: number }>> {
       const response = await client.rpc('delete_owned_published_event', {
         p_event_id: eventId,
+        p_remove_attendance: removeAttendance,
       });
       if (response.error) {
         return fail(

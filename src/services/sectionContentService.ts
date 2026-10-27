@@ -35,8 +35,8 @@ export const publishOwnCommitteeFields = (
 export const updateOwnedEvent = (eventId: string, eventPatch: unknown, expectedVersion: number) => (
   repository.updateOwnedEvent(eventId, eventPatch, expectedVersion)
 );
-export const deleteOwnedEvent = (eventId: string) => (
-  repository.deleteOwnedEvent(eventId)
+export const deleteOwnedEvent = (eventId: string, removeAttendance = false) => (
+  repository.deleteOwnedEvent(eventId, removeAttendance)
 );
 export const createGalleryAlbum = (album: unknown, expectedVersion: number) => (
   repository.createGalleryAlbum(album, expectedVersion)

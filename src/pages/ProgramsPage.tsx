@@ -44,6 +44,7 @@ export default function ProgramsPage() {
     savePublishedSiteTarget,
     createPublishedEvent,
     updateOwnedEvent,
+    deleteOwnedEvent,
     listOwnEventIds,
     refreshPublishedLocalizations,
   } = useApp();
@@ -67,6 +68,8 @@ export default function ProgramsPage() {
   const [excuseActivity, setExcuseActivity] = useState<StudentActivityBoardItem | null>(null);
   const [excuseText, setExcuseText] = useState('');
   const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<UEvent | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const repository = useCmsLocalizationRepository();
   const [translations, setTranslations] = useState<Record<'tr' | 'en', Record<string, string>>>({
     tr: { title: '', description: '', location: '' },
@@ -330,20 +333,34 @@ export default function ProgramsPage() {
     notify('success', editId ? 'تم حفظ الفعالية وإعدادات التسجيل.' : 'تمت إضافة الفعالية وربطها بالتسجيل الدائم.');
   };
 
+  const deleteEvent = async (id: string, removeAttendance: boolean) => {
+    if (deleteBusy) return;
+    setDeleteBusy(true);
+    try {
+      const result = await deleteOwnedEvent(id, removeAttendance);
+      if (!result.ok) { notify('error', result.error ?? 'تعذر حذف الفعالية.'); return; }
+      setDeleteCandidate(null); notify('success', 'تم حذف الفعالية.');
+    } finally { setDeleteBusy(false); }
+  };
   const removeEvent = async (id: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذه الفعالية؟')) return;
-    const current = (canonicalEvents ?? events).find((e) => e.id === id);
+    const current = (canonicalEvents ?? events).find(e => e.id === id);
     if (!current) return;
     if (currentUser?.role === 'MEDIA_HEAD') {
-      await submitSiteEdit({
+      if (!confirm('سيُرسل طلب حذف الفعالية للمراجعة. متابعة؟')) return;
+      const submitted = await submitSiteEdit({
         pageId: 'programs', pageLabel: 'البرامج والأنشطة', sectionLabel: current.title,
         target: 'events', op: 'delete', recordId: id, recordValue: current,
         diffs: eventDiffs('delete', current, current),
       });
-      mediaNotice();
+      if (!submitted) notify('error', 'تعذر إرسال طلب الحذف.');
       return;
     }
-    await savePublishedSiteTarget('events', (canonicalEvents ?? events).filter((event) => event.id !== id));
+    if (new Date(current.date).getTime() > Date.now()) {
+      if (!confirm('الفعالية قادمة؛ سيُحذف التحضير معها دون توزيع نقاط. هل تريد المتابعة؟')) return;
+      await deleteEvent(id, true);
+      return;
+    }
+    setDeleteCandidate(current);
   };
 
 const saveHeader = async (e: React.FormEvent) => {
@@ -726,6 +743,21 @@ const saveHeader = async (e: React.FormEvent) => {
         )}
       </section>
 
+      <Modal open={deleteCandidate !== null} title="خيارات حذف فعالية منتهية"
+        onClose={() => { if (!deleteBusy) setDeleteCandidate(null); }}>
+        <div className="space-y-4">
+          <p className="text-sm text-gray-700">هل تريد حذف «{deleteCandidate?.title}» فقط أم حذف التحضير معها؟ لا يمكن حذف التحضير بعد توزيع درجاته.</p>
+          <button disabled={deleteBusy} type="button" className="w-full rounded-xl border px-4 py-3 font-bold text-navy-800"
+            onClick={() => { if (deleteCandidate) void deleteEvent(deleteCandidate.id, false); }}>
+            حذف الفعالية والإبقاء على التحضير
+          </button>
+          <button disabled={deleteBusy} type="button" className="w-full rounded-xl border border-rose-200 px-4 py-3 font-bold text-rose-700"
+            onClick={() => { if (deleteCandidate && confirm('تأكيد إلغاء التحضير دون توزيع نقاط؟')) void deleteEvent(deleteCandidate.id, true); }}>
+            <Trash2 className="me-2 inline h-4 w-4" /> حذف الفعالية والتحضير معاً
+          </button>
+          <button disabled={deleteBusy} type="button" onClick={() => setDeleteCandidate(null)} className="btn-ghost w-full">إلغاء</button>
+        </div>
+      </Modal>
       {/* Add/Edit Event Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editId ? 'تعديل فعالية' : 'إضافة فعالية جديدة'} maxWidth="max-w-xl">
         <form onSubmit={saveEvent} className="space-y-4">
