@@ -58,6 +58,12 @@ export default function Navbar() {
   } = useApp();
   const adminUiAllowed = canExposeAdminUi(currentUser?.role, authInitializing, identityRefreshing);
   const canEdit = !!currentUser && canEditSection('homepage');
+  // Never expose an account shortcut before the authenticated role is known.
+  const showMobileAccountActions = !!currentUser
+    && !authInitializing
+    && !identityRefreshing
+    && (currentUser.role === 'STUDENT' || adminUiAllowed);
+  const mobilePortalIsAdmin = adminUiAllowed;
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [boardOpen, setBoardOpen] = useState(false);
@@ -127,7 +133,7 @@ export default function Navbar() {
         {/* Logo */}
         <button
           onClick={() => go({ kind: 'home' })}
-          className="flex min-w-0 flex-1 items-center gap-2.5 transition-transform hover:scale-[1.02] sm:gap-3"
+          className="flex min-w-0 flex-1 items-center gap-1.5 transition-transform hover:scale-[1.02] sm:gap-3"
         >
           <BrandMark
             logoUrl={siteContent.brand.logoUrl}
@@ -147,11 +153,11 @@ export default function Navbar() {
             currentValues={{ 'brand.name': siteContent.brand.name, 'brand.nameTr': siteContent.brand.nameTr }}
           >
             <div className="text-start min-w-0 whitespace-nowrap">
-              <div className="truncate text-sm font-extrabold leading-tight text-navy-900 sm:text-base lg:text-lg">
+              <div className={`truncate font-extrabold leading-tight text-navy-900 lg:text-lg ${showMobileAccountActions ? 'text-[11px] min-[390px]:text-xs sm:text-base' : 'text-sm sm:text-base'}`}>
                 {resolvePublicBrandName(i18n.language, siteContent.brand)}
               </div>
               {i18n.language === 'ar' && (
-                <div className="truncate text-[10px] font-medium text-gray-500 lg:text-xs">
+                <div className={`truncate text-[10px] font-medium text-gray-500 lg:text-xs ${showMobileAccountActions ? 'hidden sm:block' : ''}`}>
                   {siteContent.brand.nameTr}
                 </div>
               )}
@@ -238,8 +244,43 @@ export default function Navbar() {
         </div>
 
         {/* Right actions */}
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
           <LanguageSwitcher variant="desktop" />
+
+          {/* Authenticated phone shortcut: keep the role-appropriate portal visible
+              on every public page, without requiring the long mobile menu. */}
+          {showMobileAccountActions && (
+            <div className="flex shrink-0 items-center gap-1 sm:hidden" data-mobile-account-actions>
+              <button
+                type="button"
+                onClick={goStudentPortal}
+                aria-label={mobilePortalIsAdmin ? t('admin.adminDashboard') : t('dashboard.studentPortal')}
+                title={mobilePortalIsAdmin ? t('admin.adminDashboard') : t('dashboard.studentPortal')}
+                aria-current={
+                  (mobilePortalIsAdmin && view.kind === 'admin')
+                    || (!mobilePortalIsAdmin && view.kind === 'student-dashboard')
+                    ? 'page' : undefined
+                }
+                className="flex h-9 min-w-0 max-w-[106px] items-center justify-center rounded-lg bg-navy-800 px-2 text-[11px] font-bold text-white shadow-sm transition-colors hover:bg-navy-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy-600 min-[420px]:max-w-[150px]"
+              >
+                {mobilePortalIsAdmin
+                  ? <Shield className="me-1 hidden h-3.5 w-3.5 shrink-0 min-[420px]:block" aria-hidden="true" />
+                  : <LayoutDashboard className="me-1 hidden h-3.5 w-3.5 shrink-0 min-[420px]:block" aria-hidden="true" />}
+                <span className="truncate">
+                  {mobilePortalIsAdmin ? t('admin.adminDashboard') : t('dashboard.studentPortal')}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { void logout(); setMobileOpen(false); setProfileOpen(false); }}
+                aria-label={t('auth.logout')}
+                title={t('auth.logout')}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-200 bg-white text-rose-600 transition-colors hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-600"
+              >
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          )}
           {currentUser ? (
             /* Profile dropdown (logged in) */
             <div className="relative hidden sm:block">
@@ -308,7 +349,7 @@ export default function Navbar() {
           {/* Mobile toggle */}
           <button
             onClick={() => setMobileOpen((o) => !o)}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-200 text-navy-800 xl:hidden"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-navy-800 xl:hidden sm:h-10 sm:w-10"
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
