@@ -1101,7 +1101,7 @@ const tr: TranslationSchema = {
     empty: 'Sonuçlar puan hareketleri kaydedildikten sonra görünecektir.',
     points: 'Puan',
     monthlyStar: 'Ayın Yıldızı',
-    pointsLast30Days: 'Son 30 günde puan',
+    pointsLast30Days: 'Bu ay kazanılan puan',
     noMonthlyStar: 'Henüz ayın yıldızı bulunmuyor; son 30 günde pozitif bakiye olduğunda görünür.',
   },
   news: {

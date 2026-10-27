@@ -1101,7 +1101,7 @@ const en: TranslationSchema = {
     empty: 'Results will appear after points activity is recorded.',
     points: 'points',
     monthlyStar: 'Star of the Month',
-    pointsLast30Days: 'points in last 30 days',
+    pointsLast30Days: 'points this month',
     noMonthlyStar: 'No star of the month yet; appears when there is a positive balance in the last 30 days.',
   },
   news: {
