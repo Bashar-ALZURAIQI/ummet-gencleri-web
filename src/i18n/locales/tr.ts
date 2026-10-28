@@ -106,6 +106,7 @@ const tr: TranslationSchema = {
     motivationPlaceholder: 'Birliğe neden katılmak istediğinizi kısaca yazın...',
     loginAction: 'Giriş Yap',
     loggingIn: 'Giriş yapılıyor...',
+    slowLoginWarning: 'Giriş hizmetinden yanıt gecikti. Sayfayı yeniden yükleyip tekrar deneyebilirsiniz. Bu gecikme şifrenizin yanlış olduğu anlamına gelmez.',
     forgotPassword: 'Şifrenizi mi unuttunuz?',
     noAccount: 'Hesabınız yok mu?',
     createAccountLink: 'Hesap oluşturun',

@@ -25,6 +25,18 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [invalid, setInvalid] = useState<string[]>([]);
+  const [slowLogin, setSlowLogin] = useState(false);
+
+  // A stalled request must not silently look like a wrong password.
+  // This warning never changes Auth state or cancels a request that may succeed.
+  useEffect(() => {
+    if (!loading) {
+      setSlowLogin(false);
+      return;
+    }
+    const timeoutId = window.setTimeout(() => setSlowLogin(true), 15000);
+    return () => window.clearTimeout(timeoutId);
+  }, [loading]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,6 +102,18 @@ export function LoginPage() {
           <LogIn className="h-4 w-4" />
           {loading ? t('auth.loggingIn') : t('auth.loginAction')}
         </button>
+        {loading && slowLogin && (
+          <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            <p>{t('auth.slowLoginWarning')}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-2 font-bold underline underline-offset-2"
+            >
+              {t('common.reloadPage')}
+            </button>
+          </div>
+        )}
         <p className="text-center text-sm text-gray-500">
           {t('auth.noAccount')}{' '}
           <button type="button" onClick={() => setView({ kind: 'register' })} className="font-bold text-navy-700 hover:text-navy-900">

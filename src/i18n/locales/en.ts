@@ -106,6 +106,7 @@ const en: TranslationSchema = {
     motivationPlaceholder: 'Briefly state why you wish to join the union...',
     loginAction: 'Sign In',
     loggingIn: 'Signing in...',
+    slowLoginWarning: 'The sign-in service is taking longer than expected. You can reload the page and try again. This delay does not mean your password is incorrect.',
     forgotPassword: 'Forgot your password?',
     noAccount: "Don't have an account?",
     createAccountLink: 'Create an account',
