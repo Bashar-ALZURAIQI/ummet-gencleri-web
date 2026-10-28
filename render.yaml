@@ -1,0 +1,17 @@
+# Isolated static-site connectivity trial for Ummet Gencleri.
+# Do NOT merge into main; do NOT attach the production domain.
+services:
+  - type: web
+    name: ummet-gencleri-render-test
+    runtime: static
+    repo: https://github.com/Bashar-ALZURAIQI/ummet-gencleri-web
+    branch: experiment/render-static-isolated-20261029
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    autoDeployTrigger: off
+    previews:
+      generation: off
+    headers:
+      - path: /hosting-check.html
+        name: Cache-Control
+        value: no-store
