@@ -168,3 +168,12 @@ test('a recovery callback is recognized only with matching recovery type and bot
   assert.equal(recovery.extractRecoveryCallbackAccessToken('https://portal.example.org/#access_token=validRecoveryToken&refresh_token=refreshValue&type=recovery'), 'validRecoveryToken');
   assert.equal(recovery.extractRecoveryCallbackAccessToken('invalid-url'), null);
 });
+
+
+test('one-time recovery token hash is accepted only on dedicated recovery route', () => {
+  const url = 'https://portal.example.org/update-password?token_hash=secureHash&type=recovery';
+  assert.equal(recovery.extractRecoveryTokenHash(url), 'secureHash');
+  assert.equal(recovery.extractRecoveryTokenHash(url.replace('recovery','signup')), null);
+  assert.equal(recovery.extractRecoveryTokenHash(url.replace('/update-password','/')), null);
+  assert.equal(recovery.extractRecoveryTokenHash('https://portal.example.org/update-password?type=recovery'), null);
+});
