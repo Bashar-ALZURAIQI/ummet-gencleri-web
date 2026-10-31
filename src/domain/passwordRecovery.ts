@@ -16,6 +16,20 @@ export function extractRecoveryCallbackAccessToken(callbackUrl: string): string 
   }
 }
 
+/** A recovery token hash is only a request to verify, never proof of authorization. */
+export function extractRecoveryTokenHash(callbackUrl: string): string | null {
+  try {
+    const url = new URL(callbackUrl);
+    if (url.pathname !== '/update-password' || url.searchParams.get('type') !== 'recovery') {
+      return null;
+    }
+    const tokenHash = url.searchParams.get('token_hash');
+    return tokenHash && tokenHash.length <= 1024 ? tokenHash : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface PasswordRecoveryAuthClient {
   auth: {
     resetPasswordForEmail(
