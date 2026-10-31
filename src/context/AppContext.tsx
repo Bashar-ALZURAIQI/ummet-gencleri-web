@@ -13,7 +13,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, isInitialRecoveryCallbackSession, type ServiceResult } from '../lib/supabase';
+import { supabase, isInitialRecoveryCallbackSession, initialRecoveryTokenHash, type ServiceResult } from '../lib/supabase';
 import { clearSessionDraftsForUser } from '../domain/sessionDraft';
 import { i18n } from '../i18n/config.ts';
 import { overlayLocalizedCmsPayload } from '../domain/cmsPublicRead.ts';
@@ -2049,6 +2049,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // Do not let ordinary auth events hijack a one-time email recovery flow.
+      if (initialRecoveryTokenHash && event !== 'PASSWORD_RECOVERY') return;
+
       // A recovery callback awaiting processing is not a normal sign-in.
       if (
         new URL(window.location.href).searchParams.get('auth') === 'recovery'
@@ -2108,6 +2111,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     void (async () => {
       try {
+        if (initialRecoveryTokenHash) {
+          // A one-time Supabase OTP is verified against Auth, not trusted from URL alone.
+          const { data, error } = await supabase.auth.verifyOtp({
+            token_hash: initialRecoveryTokenHash,
+            type: 'recovery',
+          });
+          if (!authEpoch.isCurrent(initialEpoch)) return;
+          if (!error && data.session && data.user?.id === data.session.user.id) {
+            acceptRecoverySession(data.session, initialEpoch);
+          } else {
+            setPasswordRecoveryGate('IDLE');
+            setAuthInitializing(false);
+            setView({ kind: 'update-password' });
+            const clean = new URL(window.location.href);
+            clean.searchParams.delete('token_hash');
+            clean.searchParams.delete('type');
+            window.history.replaceState(window.history.state, '', clean.pathname + clean.search);
+          }
+          return;
+        }
         const { data, error } = await supabase.auth.getSession();
         if (!authEpoch.isCurrent(initialEpoch)) return;
         if (error) {
