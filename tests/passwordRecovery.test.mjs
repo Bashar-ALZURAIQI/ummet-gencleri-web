@@ -164,6 +164,7 @@ test('a recovery callback is recognized only with matching recovery type and bot
   assert.equal(recovery.extractRecoveryCallbackAccessToken(callback), 'validRecoveryToken');
   assert.equal(recovery.extractRecoveryCallbackAccessToken(callback.replace('type=recovery','type=signup')), null);
   assert.equal(recovery.extractRecoveryCallbackAccessToken(callback.replace('refresh_token=refreshValue&','')), null);
-  assert.equal(recovery.extractRecoveryCallbackAccessToken(callback.replace('auth=recovery','auth=other')), null);
+  assert.equal(recovery.extractRecoveryCallbackAccessToken(callback.replace('auth=recovery','auth=other')), 'validRecoveryToken');
+  assert.equal(recovery.extractRecoveryCallbackAccessToken('https://portal.example.org/#access_token=validRecoveryToken&refresh_token=refreshValue&type=recovery'), 'validRecoveryToken');
   assert.equal(recovery.extractRecoveryCallbackAccessToken('invalid-url'), null);
 });
