@@ -100,9 +100,9 @@ test('favicon static artifacts correctly point to public branding assets', async
   const { DEFAULT_FAVICON_HREF } = await loadFaviconModule();
 
   // index.html correctly configured
-  assert.match(indexHtml, /<link rel="icon" href="\/favicon\.png" \/>/, 'index.html favicon points to /favicon.png');
+  assert.match(indexHtml, /<link rel="icon" type="image\/png" sizes="192x192" href="\/icons\/union-brand-192\.png" \/>/, 'index.html favicon points to official union icon');
   assert.doesNotMatch(indexHtml, /union-push-icon\.svg/i, 'index.html must not use push icon as favicon');
-  assert.doesNotMatch(indexHtml, /type="image\//i, 'favicon link must not hardcode MIME type incompatible with future formats');
+  assert.match(indexHtml, /type="image\/png"/, 'favicon declares its PNG MIME type');
 
   // DEFAULT_FAVICON_HREF matches static configuration
   assert.equal(DEFAULT_FAVICON_HREF, '/favicon.png', 'fallback favicon href matches static file');
@@ -148,9 +148,9 @@ test('SEO structured data properly identifies the union', async () => {
   assert.ok(org.alternateName.includes('اتحاد شباب الأمة'));
   assert.ok(org.alternateName.includes('UMS Union'));
   assert.ok(org.alternateName.includes('Ummah Youth Union'));
-  assert.equal(org.url, 'https://ummet-genc.vercel.app/');
+  assert.equal(org.url, 'https://ummetgencleribirligi.onrender.com/');
   assert.equal(org.logo['@type'], 'ImageObject');
-  assert.equal(org.logo.url, 'https://ummet-genc.vercel.app/favicon.png');
+  assert.equal(org.logo.url, 'https://ummetgencleribirligi.onrender.com/favicon.png');
   assert.equal(org.logo.width, 898);
   assert.equal(org.logo.height, 898);
 
@@ -160,6 +160,6 @@ test('SEO structured data properly identifies the union', async () => {
   assert.ok(website.alternateName.includes('اتحاد شباب الأمة'));
   assert.ok(website.alternateName.includes('UMS Union'));
   assert.ok(website.alternateName.includes('Ummah Youth Union'));
-  assert.equal(website.url, 'https://ummet-genc.vercel.app/');
+  assert.equal(website.url, 'https://ummetgencleribirligi.onrender.com/');
   assert.equal(website.publisher['@id'], org['@id']);
 });
