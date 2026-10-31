@@ -5,7 +5,9 @@ export type PasswordRecoveryGate = 'IDLE' | 'READY';
 export function extractRecoveryCallbackAccessToken(callbackUrl: string): string | null {
   try {
     const url = new URL(callbackUrl);
-    if (url.searchParams.get('auth') !== 'recovery') return null;
+    // The Supabase verification endpoint can return to the configured Site URL
+    // without the optional ?auth=recovery marker. The signed callback itself
+    // identifies the recovery flow; a confirmed server session is still required.
     const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
     if (hash.get('type') !== 'recovery' || !hash.get('refresh_token')) return null;
     return hash.get('access_token') || null;
