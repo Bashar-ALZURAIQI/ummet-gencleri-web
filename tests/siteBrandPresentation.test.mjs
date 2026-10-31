@@ -128,7 +128,7 @@ test('SEO structured data properly identifies the union', async () => {
 
   assert.match(indexHtml, /<meta name="application-name" content="Ümmet Gençleri Birliği" \/>/, 'application-name is present');
   assert.match(indexHtml, /<meta property="og:site_name" content="Ümmet Gençleri Birliği" \/>/, 'og:site_name is present');
-  assert.match(indexHtml, /<link rel="canonical" href="https:\/\/ummet-genc\.vercel\.app\/" \/>/, 'canonical URL is correctly present with trailing slash');
+  assert.match(indexHtml, /<link rel="canonical" href="https:\/\/ummetgencleribirligi\.onrender\.com\/" \/>/, 'canonical URL is correctly present with trailing slash');
 
   const jsonLdMatch = indexHtml.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
   assert.ok(jsonLdMatch, 'JSON-LD script must exist');
