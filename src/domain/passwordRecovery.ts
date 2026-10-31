@@ -37,7 +37,7 @@ export function buildPasswordRecoveryRedirectUrl(location: {
   origin: string;
   pathname: string;
 }): string {
-  const url = new URL(location.pathname || '/', location.origin);
+  const url = new URL('/forgot-password', location.origin);
   url.search = '';
   url.hash = '';
   url.searchParams.set('auth', 'recovery');
