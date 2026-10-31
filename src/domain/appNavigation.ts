@@ -197,6 +197,12 @@ export function urlToView(urlOrPath: string): ParsedAppRoute {
   try {
     const url = new URL(urlOrPath, 'https://site.example');
 
+    // The dedicated email recovery callback must resolve to the reset form,
+    // but its token will be verified server-side before accepting a new password.
+    if (url.pathname === '/update-password' && url.searchParams.get('type') === 'recovery' && url.searchParams.has('token_hash')) {
+      return { view: { kind: 'update-password' }, isPasswordRecovery: true };
+    }
+
     // 1. A signed Supabase recovery callback can arrive at the Site URL
     // even if the optional auth=recovery query parameter was not preserved.
     const recoveryHash = new URLSearchParams(url.hash.replace(/^#/, ''));
