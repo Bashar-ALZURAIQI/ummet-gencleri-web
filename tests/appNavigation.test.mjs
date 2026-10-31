@@ -186,7 +186,14 @@ test('62. generic route parsing preserves auth=recovery on any path', () => {
   assert.equal(parsed.isPasswordRecovery, true);
 });
 
-test('63. push destination parses to intended view', () => {
+test('63. recovery callback delivered to Site URL without auth parameter still routes to update-password', () => {
+  const parsed = urlToView('/#access_token=tokenValue&refresh_token=refreshValue&type=recovery');
+  assert.deepEqual(parsed.view, { kind: 'update-password' });
+  assert.equal(parsed.isPasswordRecovery, true);
+  assert.deepEqual(urlToView('/#access_token=tokenValue&refresh_token=refreshValue&type=signup').view, { kind: 'home' });
+});
+
+test('64. push destination parses to intended view', () => {
   const parsedNews = urlToView('/?push=news');
   assert.deepEqual(parsedNews.view, { kind: 'news' });
   assert.equal(parsedNews.pushDestination, 'news');
