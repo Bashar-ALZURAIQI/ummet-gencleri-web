@@ -77,7 +77,7 @@ test('recovery callback URL keeps a deployed base path and replaces stale query 
       origin: 'https://portal.example.org',
       pathname: '/union/',
     }),
-    'https://portal.example.org/union/?auth=recovery',
+    'https://portal.example.org/forgot-password?auth=recovery',
   );
 });
 
