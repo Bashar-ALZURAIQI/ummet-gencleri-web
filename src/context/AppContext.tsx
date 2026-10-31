@@ -2480,6 +2480,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         email: emailLower,
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/login`,
           data: {
             name: name.trim(),
             contact_email: emailLower,
