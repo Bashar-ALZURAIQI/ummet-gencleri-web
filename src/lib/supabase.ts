@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { createIsolatedAuthClient } from '../domain/isolatedAuthClient.ts';
-import { extractRecoveryCallbackAccessToken } from '../domain/passwordRecovery.ts';
+import { extractRecoveryCallbackAccessToken, extractRecoveryTokenHash } from '../domain/passwordRecovery.ts';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -9,6 +9,10 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 // The token stays in memory; it is never placed in logs or localStorage here.
 const initialRecoveryToken = typeof window === 'undefined'
   ? null : extractRecoveryCallbackAccessToken(window.location.href);
+
+// The token is read before React mounts. Never store or log it.
+export const initialRecoveryTokenHash = typeof window === 'undefined'
+  ? null : extractRecoveryTokenHash(window.location.href);
 
 export const isInitialRecoveryCallbackSession = (session: { access_token: string } | null): boolean => (
   initialRecoveryToken !== null && session?.access_token === initialRecoveryToken
