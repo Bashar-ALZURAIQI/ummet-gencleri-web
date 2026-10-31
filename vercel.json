@@ -1,4 +1,16 @@
 {
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "https://ummetgencleribirligi.onrender.com/",
+      "statusCode": 301
+    },
+    {
+      "source": "/:path((?!api/|assets/|icons/|push-sw\\.js$|favicon\\.png$|apple-touch-icon\\.png$).*)",
+      "destination": "https://ummetgencleribirligi.onrender.com/:path",
+      "statusCode": 301
+    }
+  ],
   "rewrites": [
     {
       "source": "/((?!assets/|api/|icons/).*)",
