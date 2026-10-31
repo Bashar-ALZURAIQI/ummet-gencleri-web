@@ -85,7 +85,8 @@ Deno.serve(async (request) => {
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
   const mailRelaySecret = Deno.env.get('APPLICATION_EMAIL_RELAY_SECRET');
-  const sitePublicUrl = Deno.env.get('SITE_PUBLIC_URL');
+  // The official website is on Render. The Vercel route below remains only as a protected SMTP relay.
+  const sitePublicUrl = 'https://ummetgencleribirligi.onrender.com';
 
   if (!supabaseUrl || !anonKey || !serviceRoleKey) {
     return json(500, { error: 'SUPABASE_FUNCTION_NOT_CONFIGURED' });
