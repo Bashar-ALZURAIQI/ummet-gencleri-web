@@ -197,8 +197,19 @@ export function urlToView(urlOrPath: string): ParsedAppRoute {
   try {
     const url = new URL(urlOrPath, 'https://site.example');
 
-    // 1. Password recovery takes precedence if auth=recovery parameter is present
-    if (url.searchParams.get('auth') === 'recovery') {
+    // The dedicated email recovery callback must resolve to the reset form,
+    // but its token will be verified server-side before accepting a new password.
+    if (url.pathname === '/update-password' && url.searchParams.get('type') === 'recovery' && url.searchParams.has('token_hash')) {
+      return { view: { kind: 'update-password' }, isPasswordRecovery: true };
+    }
+
+    // 1. A signed Supabase recovery callback can arrive at the Site URL
+    // even if the optional auth=recovery query parameter was not preserved.
+    const recoveryHash = new URLSearchParams(url.hash.replace(/^#/, ''));
+    const isSignedRecoveryCallback = recoveryHash.get('type') === 'recovery'
+      && Boolean(recoveryHash.get('access_token'))
+      && Boolean(recoveryHash.get('refresh_token'));
+    if (url.searchParams.get('auth') === 'recovery' || isSignedRecoveryCallback) {
       return {
         view: { kind: 'update-password' },
         isPasswordRecovery: true,

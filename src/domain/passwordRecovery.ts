@@ -5,10 +5,26 @@ export type PasswordRecoveryGate = 'IDLE' | 'READY';
 export function extractRecoveryCallbackAccessToken(callbackUrl: string): string | null {
   try {
     const url = new URL(callbackUrl);
-    if (url.searchParams.get('auth') !== 'recovery') return null;
+    // The Supabase verification endpoint can return to the configured Site URL
+    // without the optional ?auth=recovery marker. The signed callback itself
+    // identifies the recovery flow; a confirmed server session is still required.
     const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
     if (hash.get('type') !== 'recovery' || !hash.get('refresh_token')) return null;
     return hash.get('access_token') || null;
+  } catch {
+    return null;
+  }
+}
+
+/** A recovery token hash is only a request to verify, never proof of authorization. */
+export function extractRecoveryTokenHash(callbackUrl: string): string | null {
+  try {
+    const url = new URL(callbackUrl);
+    if (url.pathname !== '/update-password' || url.searchParams.get('type') !== 'recovery') {
+      return null;
+    }
+    const tokenHash = url.searchParams.get('token_hash');
+    return tokenHash && tokenHash.length <= 1024 ? tokenHash : null;
   } catch {
     return null;
   }
@@ -35,7 +51,7 @@ export function buildPasswordRecoveryRedirectUrl(location: {
   origin: string;
   pathname: string;
 }): string {
-  const url = new URL(location.pathname || '/', location.origin);
+  const url = new URL('/forgot-password', location.origin);
   url.search = '';
   url.hash = '';
   url.searchParams.set('auth', 'recovery');

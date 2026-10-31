@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>اختبار استضافة اتحاد شباب الأمة</title>
+  <style>
+    body{font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;background:#f5f7fc;color:#14213d;margin:0;display:grid;place-items:center;min-height:100svh;padding:20px;box-sizing:border-box}
+    main{max-width:670px;background:white;padding:28px;border-radius:18px;box-shadow:0 12px 38px #14213d10}
+    h1{margin:0 0 14px;font-size:1.5rem}p{line-height:1.8}
+    code{font-family:ui-monospace,monospace;overflow-wrap:anywhere;direction:ltr;display:inline-block}
+    .ok{color:#13734c}.bad{color:#a52f2f}
+    button{background:#173366;border:0;border-radius:9px;padding:11px 16px;color:#fff;font:inherit;cursor:pointer}
+    #result{background:#f0f3f9;padding:12px;border-radius:8px}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>اختبار الاتصال بالاستضافة التجريبية</h1>
+    <p>هذه صفحة فحص مستقلة لاتحاد شباب الأمة. لا تستخدم حسابات الطلاب، ولا تتصل بقاعدة البيانات، ولا ترسل أي معلومات.</p>
+    <p>إذا ظهرت الصفحة، فإن الاتصال الآمن بهذه الاستضافة قد نجح في هذه المحاولة. هذا لا يعني أن الموقع سيعمل دائمًا؛ جرّب الدخول عدة مرات وعلى شبكات مختلفة.</p>
+    <p>المضيف الحالي: <code id="host">—</code></p>
+    <p id="result" role="status" aria-live="polite">يجري فحص تحميل ملف ثابت...</p>
+    <button type="button" id="test">إعادة فحص ملف ثابت</button>
+  </main>
+  <script>
+    document.getElementById('host').textContent = location.host;
+    document.getElementById('test').addEventListener('click', runTest);
+    async function runTest(){
+      const status = document.getElementById('result');
+      status.textContent = 'يجري الاتصال...';
+      const started = performance.now();
+      try {
+        const response = await fetch('/favicon.png?hosting_check=' + Date.now(), {cache:'no-store'});
+        const elapsed = Math.round(performance.now()-started);
+        status.textContent = response.ok
+          ? 'نجح تحميل الملف الثابت (' + response.status + ') خلال ' + elapsed + ' مللي ثانية.'
+          : 'تعذّر تحميل الملف الثابت: HTTP ' + response.status;
+        status.className = response.ok ? 'ok' : 'bad';
+      } catch (e) {
+        status.textContent = 'فشل الاتصال أثناء تحميل الملف الثابت. أعد التجربة من شبكة مختلفة.';
+        status.className = 'bad';
+      }
+    }
+    runTest();
+  </script>
+</body>
+</html>

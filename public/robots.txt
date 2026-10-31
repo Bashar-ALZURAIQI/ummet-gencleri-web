@@ -14,4 +14,4 @@ Disallow: /login
 Disallow: /forgot-password
 Disallow: /update-password
 
-Sitemap: https://ummet-genc.vercel.app/sitemap.xml
+Sitemap: https://ummetgencleribirligi.onrender.com/sitemap.xml
