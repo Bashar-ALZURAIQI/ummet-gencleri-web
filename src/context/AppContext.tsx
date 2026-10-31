@@ -2050,7 +2050,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
 
       // Do not let ordinary auth events hijack a one-time email recovery flow.
-      if (initialRecoveryTokenHash && event !== 'PASSWORD_RECOVERY') return;
+      if (initialRecoveryTokenHash) return;
 
       // A recovery callback awaiting processing is not a normal sign-in.
       if (
